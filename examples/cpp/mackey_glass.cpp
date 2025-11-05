@@ -36,6 +36,7 @@ int main() {
 
     // Split into training and testing sets
     int train_len = 1000;
+    int washout_len = 100;
     Eigen::MatrixXd X_train = X.topRows(train_len);
     Eigen::MatrixXd y_train = y.topRows(train_len);
     Eigen::MatrixXd X_test = X.bottomRows(X.rows() - train_len);
@@ -53,7 +54,7 @@ int main() {
     model.setReadout(readout);
 
     // 5. Fit and Predict
-    model.fit(X_train, y_train);
+    model.fit(X_train, y_train, washout_len);
     Eigen::MatrixXd y_pred = model.predict(X_test);
 
     // 6. Print the results

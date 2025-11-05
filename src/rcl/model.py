@@ -12,8 +12,8 @@ class ESN:
     def set_readout(self, readout):
         self.model.setReadout(readout)
 
-    def fit(self, X, y):
-        self.model.fit(X, y)
+    def fit(self, X, y, washout_len=0):
+        self.model.fit(X, y, washout_len)
 
     def predict(self, X):
         return self.model.predict(X)

@@ -19,6 +19,7 @@ y = data[1:].reshape(-1, 1)
 
 # Split into training and testing sets
 train_len = 1000
+washout_len = 100
 X_train, y_train = X[:train_len], y[:train_len]
 X_test, y_test = X[train_len:], y[train_len:]
 
@@ -40,7 +41,7 @@ model.add_reservoir(res)
 model.set_readout(readout)
 
 # 5. Fit and Predict
-model.fit(X_train, y_train)
+model.fit(X_train, y_train, washout_len)
 y_pred = model.predict(X_test)
 
 # 6. Plot the results
