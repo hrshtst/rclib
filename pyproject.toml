@@ -15,6 +15,7 @@ build-backend = "scikit_build_core.build"
 [dependency-groups]
 dev = [
     "pytest>=8.4.2",
+    "ruff>=0.14.3",
 ]
 
 [tool.scikit-build]
@@ -31,3 +32,12 @@ line-length = 88
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
+
+[tool.pyright]
+include = ["src", "tests", "examples"]
+exclude = [
+    "**/node_modules",
+    "**/__pycache__",
+]
+venvPath = "."
+venv = ".venv"
