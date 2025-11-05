@@ -3,7 +3,7 @@ project(rcl LANGUAGES CXX)
 
 # Add subdirectories for third-party dependencies
 add_subdirectory(cpp_core/third_party/catch2)
-add_subdirectory(cpp_core/third_party/pybind11)
+find_package(pybind11 CONFIG REQUIRED)
 add_subdirectory(cpp_core/third_party/eigen)
 
 # Add the C++ core subdirectory
