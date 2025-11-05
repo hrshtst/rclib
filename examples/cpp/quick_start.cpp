@@ -22,7 +22,7 @@ int main() {
     auto res = std::make_shared<RandomSparseReservoir>(1000, 0.9, 0.1, 0.3, true);
 
     // 3. Configure Readout
-    auto readout = std::make_shared<RidgeReadout>(1e-8, true);
+    auto readout = std::make_shared<RidgeReadout>(0.1, true);
 
     // 4. Configure Model
     Model model;

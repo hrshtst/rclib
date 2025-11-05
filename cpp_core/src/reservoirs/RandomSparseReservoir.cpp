@@ -1,7 +1,7 @@
 #include "rcl/reservoirs/RandomSparseReservoir.h"
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
-#include <Eigen/Eigenvalues>
+
 #include <vector>
 #include <random>
 
@@ -25,6 +25,23 @@ Eigen::SparseMatrix<double> generate_sparse_random_matrix(int size, double spars
     return mat;
 }
 
+// Function to find the largest eigenvalue of a sparse matrix using power iteration
+double largest_eigenvalue(const Eigen::SparseMatrix<double>& mat, int iterations = 100) {
+    if (mat.rows() == 0) {
+        return 0.0;
+    }
+    Eigen::VectorXd b_k = Eigen::VectorXd::Random(mat.rows());
+    for (int i = 0; i < iterations; ++i) {
+        Eigen::VectorXd b_k1 = mat * b_k;
+        if (b_k1.norm() < 1e-9) {
+            return 0.0; // Matrix is likely zero
+        }
+        b_k = b_k1.normalized();
+    }
+    return (mat * b_k).norm();
+}
+
+
 RandomSparseReservoir::RandomSparseReservoir(int n_neurons, double spectral_radius, double sparsity, double leak_rate, bool include_bias)
     : n_neurons(n_neurons), spectral_radius(spectral_radius), sparsity(sparsity), leak_rate(leak_rate), include_bias(include_bias), W_in_initialized(false) {
 
@@ -33,13 +50,7 @@ RandomSparseReservoir::RandomSparseReservoir(int n_neurons, double spectral_radi
     W_res = generate_sparse_random_matrix(n_neurons, sparsity);
 
     if (spectral_radius > 0) {
-        Eigen::MatrixXd dense_W_res(W_res);
-        Eigen::EigenSolver<Eigen::MatrixXd> es(dense_W_res);
-        double max_eigenvalue = 0.0;
-        for (int i = 0; i < es.eigenvalues().rows(); ++i) {
-            max_eigenvalue = std::max(max_eigenvalue, std::abs(es.eigenvalues()[i].real()));
-        }
-
+        double max_eigenvalue = largest_eigenvalue(W_res);
         if (max_eigenvalue > 1e-9) {
             W_res = W_res * (spectral_radius / max_eigenvalue);
         }
