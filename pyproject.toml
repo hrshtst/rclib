@@ -12,8 +12,19 @@ dependencies = [
 requires = ["scikit-build-core", "pybind11"]
 build-backend = "scikit_build_core.build"
 
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+]
+
 [tool.scikit-build]
 cmake.source-dir = "."
+wheel.packages = ["src/rcl"]
+
+[tool.pytest.ini_options]
+testpaths = [
+    "tests/python",
+]
 
 [tool.ruff]
 line-length = 88

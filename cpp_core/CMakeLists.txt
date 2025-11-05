@@ -8,6 +8,8 @@ add_library(rcl_core STATIC
     src/readouts/LmsReadout.cpp
 )
 
+set_target_properties(rcl_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 target_include_directories(rcl_core PUBLIC
     include
     ${EIGEN_INCLUDE_DIRS}

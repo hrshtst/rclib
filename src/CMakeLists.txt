@@ -3,3 +3,5 @@ pybind11_add_module(_rcl
 )
 
 target_link_libraries(_rcl PRIVATE rcl_core)
+
+install(TARGETS _rcl DESTINATION rcl)
