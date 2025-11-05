@@ -1,0 +1,9 @@
+[submodule "cpp_core/third_party/eigen"]
+	path = cpp_core/third_party/eigen
+	url = https://gitlab.com/libeigen/eigen.git
+[submodule "cpp_core/third_party/catch2"]
+	path = cpp_core/third_party/catch2
+	url = https://github.com/catchorg/Catch2.git
+[submodule "cpp_core/third_party/pybind11"]
+	path = cpp_core/third_party/pybind11
+	url = https://github.com/pybind/pybind11.git
