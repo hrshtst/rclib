@@ -1,0 +1,22 @@
+[project]
+name = "rcl"
+version = "0.0.1"
+description = "A reservoir computing library"
+authors = [{ name = "Hiroshi Atsuta" }]
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+]
+
+[build-system]
+requires = ["scikit-build-core", "pybind11"]
+build-backend = "scikit_build_core.build"
+
+[tool.scikit-build]
+cmake.source-dir = "."
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
