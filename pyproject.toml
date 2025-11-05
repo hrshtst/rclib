@@ -5,7 +5,9 @@ description = "A reservoir computing library"
 authors = [{ name = "Hiroshi Atsuta" }]
 requires-python = ">=3.10"
 dependencies = [
+    "matplotlib>=3.10.7",
     "numpy",
+    "pyqt6>=6.10.0",
 ]
 
 [build-system]
@@ -53,3 +55,18 @@ exclude = [
 ]
 venvPath = "."
 venv = ".venv"
+
+[tool.mypy]
+files = ["src", "tests", "examples"]
+python_executable = ".venv/bin/python"
+check_untyped_defs = true       # Type-checks the interior of functions without type annotations.
+
+[[tool.mypy.overrides]]
+module = [
+  "numpy.*",
+  "scipy.*",
+  "matplotlib.*",
+  "pandas.*",
+  "seaborn.*",
+]
+ignore_missing_imports = true
