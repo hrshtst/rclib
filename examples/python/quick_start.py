@@ -3,7 +3,7 @@ import numpy as np
 from rcl import ESN, readouts, reservoirs
 
 # 1. Create some dummy data
-X_train = np.random.rand(100, 1)
+X_train = np.linspace(0, 1, 100).reshape(-1, 1)
 y_train = np.sin(X_train * 10)
 
 X_test = np.linspace(0, 1, 100).reshape(-1, 1)
@@ -36,6 +36,8 @@ try:
     plt.figure(figsize=(10, 6))
     plt.plot(X_test, y_test, label="True")
     plt.plot(X_test, y_pred, label="Predicted")
+    mse = np.mean((y_pred - y_test)**2)
+    plt.text(0.05, 0.95, f'MSE: {mse:.4e}', transform=plt.gca().transAxes, fontsize=12, verticalalignment='top')
     plt.legend()
     plt.show()
 except ImportError:
