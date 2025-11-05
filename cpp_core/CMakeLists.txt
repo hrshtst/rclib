@@ -1,5 +1,6 @@
 add_library(rcl_core STATIC
     src/Reservoir.cpp
+    src/Readout.cpp
     src/Model.cpp
     src/reservoirs/RandomSparseReservoir.cpp
     src/reservoirs/NvarReservoir.cpp

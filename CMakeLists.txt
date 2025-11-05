@@ -17,3 +17,8 @@ add_subdirectory(src)
 if(BUILD_TESTING)
     add_subdirectory(tests/cpp)
 endif()
+
+option(BUILD_EXAMPLES "Build examples" ON)
+if(BUILD_EXAMPLES)
+    add_subdirectory(examples/cpp)
+endif()
