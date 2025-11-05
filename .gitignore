@@ -44,3 +44,8 @@ CTestTestfile.cmake
 
 # Caches
 .cache/
+
+# Build artifacts
+.skbuild-info.json
+.cmake/
+CMakeInit.txt

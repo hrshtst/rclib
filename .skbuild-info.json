@@ -1,8 +1,0 @@
-{
-  "source_dir": "/home/atsuta/develop/new_rcl",
-  "build_dir": "/home/atsuta/develop/new_rcl",
-  "cmake_path": "/usr/bin/cmake",
-  "skbuild_path": "/home/atsuta/.cache/uv/builds-v0/.tmpZXWvrf/lib/python3.12/site-packages/scikit_build_core",
-  "skbuild_version": "0.11.6",
-  "python_executable": "/home/atsuta/.cache/uv/builds-v0/.tmpZXWvrf/bin/python"
-}
