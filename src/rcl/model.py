@@ -1,5 +1,6 @@
 from . import _rcl
 
+
 class ESN:
     def __init__(self, connection_type='serial'):
         self.model = _rcl.Model()

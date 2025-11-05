@@ -1,5 +1,6 @@
 import numpy as np
-from rcl import reservoirs, readouts, ESN
+
+from rcl import ESN, readouts, reservoirs
 
 # 1. Create some dummy data
 X_train = np.random.rand(100, 1)

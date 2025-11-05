@@ -28,6 +28,18 @@ testpaths = [
 ]
 
 [tool.ruff]
+exclude = [
+    ".git",
+    ".mypy_cache",
+    ".nox",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".venv",
+    ".vscode",
+    "__pypackages__",
+    "build",
+    "cpp_core/third_party",
+]
 line-length = 88
 
 [tool.ruff.lint]

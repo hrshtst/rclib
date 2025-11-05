@@ -1,5 +1,7 @@
 import numpy as np
-from rcl import reservoirs, readouts, ESN
+
+from rcl import ESN, readouts, reservoirs
+
 
 def test_model_creation():
     model = ESN()
