@@ -49,6 +49,8 @@ try:
     plt.figure(figsize=(15, 6))
     plt.plot(range(len(y_test)), y_test, label="True")
     plt.plot(range(len(y_pred)), y_pred, label="Predicted")
+    mse = np.mean((y_pred - y_test)**2)
+    plt.text(0.05, 0.95, f'MSE: {mse:.4e}', transform=plt.gca().transAxes, fontsize=12, verticalalignment='top')
     plt.legend()
     plt.show()
 except ImportError:

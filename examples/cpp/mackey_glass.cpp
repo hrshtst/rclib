@@ -10,6 +10,8 @@
 #include "rcl/reservoirs/RandomSparseReservoir.h"
 #include "rcl/readouts/RidgeReadout.h"
 
+#include <iomanip>
+
 // Mackey-Glass time series generation
 Eigen::VectorXd mackey_glass(int n_samples = 1500, int tau = 17, int seed = 0) {
     std::mt19937 gen(seed);
@@ -56,7 +58,7 @@ int main() {
 
     // 6. Print the results
     double mse = (y_pred - y_test).squaredNorm() / y_test.rows();
-    std::cout << "Test loss (MSE): " << mse << std::endl;
+    std::cout << "Test loss (MSE): " << std::scientific << std::setprecision(4) << mse << std::endl;
 
     return 0;
 }
