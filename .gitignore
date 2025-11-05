@@ -1,0 +1,46 @@
+# Build artifacts
+build/
+_build/
+
+# Python
+.venv/
+env/
+venv/
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+.eggs/
+
+# uv
+uv.lock
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+Makefile
+cmake_install.cmake
+install_manifest.txt
+CTestTestfile.cmake
+
+# C++
+*.o
+*.so
+*.a
+*.lo
+*.la
+*.dll
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*~
+
+# IDEs
+.vscode/
+.idea/
+
+# Caches
+.cache/

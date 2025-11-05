@@ -1,5 +1,11 @@
 add_library(rcl_core STATIC
     src/Reservoir.cpp
+    src/Model.cpp
+    src/reservoirs/RandomSparseReservoir.cpp
+    src/reservoirs/NvarReservoir.cpp
+    src/readouts/RidgeReadout.cpp
+    src/readouts/RlsReadout.cpp
+    src/readouts/LmsReadout.cpp
 )
 
 target_include_directories(rcl_core PUBLIC
