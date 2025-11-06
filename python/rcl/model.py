@@ -45,9 +45,9 @@ class ESN:
         else:
             raise ValueError("Unsupported readout type")
 
-    def fit(self, X, y):
+    def fit(self, X, y, washout_len=0):
         # Call the C++ model's fit method
-        self._cpp_model.fit(X, y)
+        self._cpp_model.fit(X, y, washout_len)
 
     def predict(self, X):
         # Call the C++ model's predict method
