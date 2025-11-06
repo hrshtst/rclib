@@ -7,8 +7,8 @@ from rcl.reservoirs import RandomSparse
 
 def run_experiment(include_bias: bool, n_total_samples: int, n_train_samples: int, noise_amplitude: float,
                    n_neurons: int, spectral_radius: float, sparsity: float, leak_rate: float,
-                   input_scaling: float, ridge_alpha: float, washout_len: int, plot_filename: str):
-    print(f"--- Running experiment with include_bias={include_bias}, washout_len={washout_len}, input_scaling={input_scaling} ---")
+                   input_scaling: float, ridge_alpha: float, washout_len: int, reset_state_before_predict: bool, plot_filename: str):
+    print(f"--- Running experiment with include_bias={include_bias}, washout_len={washout_len}, input_scaling={input_scaling}, reset_state_before_predict={reset_state_before_predict} ---")
 
     # --- 1. Data Generation ---
     print("--- Generating Data ---")
@@ -44,19 +44,19 @@ def run_experiment(include_bias: bool, n_total_samples: int, n_train_samples: in
     model.fit(train_input, train_target, washout_len=washout_len)
 
     print("--- Predicting with ESN ---")
-    predictions = model.predict(test_input)
+    predictions = model.predict(test_input, reset_state_before_predict=reset_state_before_predict)
 
     mse = np.mean((predictions[:len(test_target)] - test_target) ** 2)
-    print(f"Mean Squared Error (include_bias={include_bias}, washout_len={washout_len}, input_scaling={input_scaling}): {mse:.6f}")
+    print(f"Mean Squared Error (include_bias={include_bias}, washout_len={washout_len}, input_scaling={input_scaling}, reset_state_before_predict={reset_state_before_predict}): {mse:.6f}")
 
     # --- 3. Plot Results ---
-    print(f"\nPlotting results for include_bias={include_bias}, washout_len={washout_len}, input_scaling={input_scaling}...")
+    print(f"\nPlotting results for include_bias={include_bias}, washout_len={washout_len}, input_scaling={input_scaling}, reset_state_before_predict={reset_state_before_predict}...")
     plt.style.use("seaborn-v0_8-whitegrid")
     fig, ax = plt.subplots(figsize=(15, 6))
     plot_range = range(min(200, len(test_target)))
     ax.plot(test_target[plot_range], "b", label="True Target (with noise)", linewidth=2, alpha=0.7)
     ax.plot(predictions[plot_range], "r--", label="ESN Prediction", linewidth=2)
-    ax.set_title(f"ESN: Sine Wave Prediction (Bias={include_bias}, Washout={washout_len}, InputScale={input_scaling})", fontsize=16)
+    ax.set_title(f"ESN: Sine Wave Prediction (Bias={include_bias}, Washout={washout_len}, InputScale={input_scaling}, ResetPredict={reset_state_before_predict})", fontsize=16)
     ax.set_xlabel("Time Step")
     ax.set_ylabel("Value")
     ax.legend(loc="upper right")
@@ -88,51 +88,55 @@ def main():
     sparsity = 0.02
     leak_rate = 0.2
     ridge_alpha = 1e-4
-    input_scaling = 1.0 # New parameter
+    input_scaling = 1.0
 
     washout_lengths = [0, 50, 100, 200]
+    reset_options = [True, False]
     results = {}
 
-    for washout_len in washout_lengths:
-        # Run with bias
-        mse_with_bias = run_experiment(
-            include_bias=True,
-            n_total_samples=n_total_samples,
-            n_train_samples=n_train_samples,
-            noise_amplitude=noise_amplitude,
-            n_neurons=n_neurons,
-            spectral_radius=spectral_radius,
-            sparsity=sparsity,
-            leak_rate=leak_rate,
-            input_scaling=input_scaling,
-            ridge_alpha=ridge_alpha,
-            washout_len=washout_len,
-            plot_filename=f"sine_wave_prediction_bias_true_washout_{washout_len}.png"
-        )
-        results[(True, washout_len)] = mse_with_bias
+    for reset_state_before_predict in reset_options:
+        for washout_len in washout_lengths:
+            # Run with bias
+            mse_with_bias = run_experiment(
+                include_bias=True,
+                n_total_samples=n_total_samples,
+                n_train_samples=n_train_samples,
+                noise_amplitude=noise_amplitude,
+                n_neurons=n_neurons,
+                spectral_radius=spectral_radius,
+                sparsity=sparsity,
+                leak_rate=leak_rate,
+                input_scaling=input_scaling,
+                ridge_alpha=ridge_alpha,
+                washout_len=washout_len,
+                reset_state_before_predict=reset_state_before_predict,
+                plot_filename=f"sine_wave_prediction_bias_true_washout_{washout_len}_reset_{reset_state_before_predict}.png"
+            )
+            results[(True, washout_len, reset_state_before_predict)] = mse_with_bias
 
-        # Run without bias
-        mse_without_bias = run_experiment(
-            include_bias=False,
-            n_total_samples=n_total_samples,
-            n_train_samples=n_train_samples,
-            noise_amplitude=noise_amplitude,
-            n_neurons=n_neurons,
-            spectral_radius=spectral_radius,
-            sparsity=sparsity,
-            leak_rate=leak_rate,
-            input_scaling=input_scaling,
-            ridge_alpha=ridge_alpha,
-            washout_len=washout_len,
-            plot_filename=f"sine_wave_prediction_bias_false_washout_{washout_len}.png"
-        )
-        results[(False, washout_len)] = mse_without_bias
+            # Run without bias
+            mse_without_bias = run_experiment(
+                include_bias=False,
+                n_total_samples=n_total_samples,
+                n_train_samples=n_train_samples,
+                noise_amplitude=noise_amplitude,
+                n_neurons=n_neurons,
+                spectral_radius=spectral_radius,
+                sparsity=sparsity,
+                leak_rate=leak_rate,
+                input_scaling=input_scaling,
+                ridge_alpha=ridge_alpha,
+                washout_len=washout_len,
+                reset_state_before_predict=reset_state_before_predict,
+                plot_filename=f"sine_wave_prediction_bias_false_washout_{washout_len}_reset_{reset_state_before_predict}.png"
+            )
+            results[(False, washout_len, reset_state_before_predict)] = mse_without_bias
 
     print("\n--- Comparison of Results (MSE) ---")
-    print("Bias | Washout | MSE")
-    print("---------------------")
-    for (bias, washout), mse in results.items():
-        print(f"{str(bias):<4} | {washout:<7} | {mse:.6f}")
+    print("Bias | Washout | ResetPredict | MSE")
+    print("-----------------------------------")
+    for (bias, washout, reset_predict), mse in results.items():
+        print(f"{str(bias):<4} | {washout:<7} | {str(reset_predict):<12} | {mse:.6f}")
 
     # Suggest further tuning
     print("\n--- Further Tuning Suggestions ---")

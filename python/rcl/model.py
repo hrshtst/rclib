@@ -50,9 +50,9 @@ class ESN:
         # Call the C++ model's fit method
         self._cpp_model.fit(X, y, washout_len)
 
-    def predict(self, X):
+    def predict(self, X, reset_state_before_predict=True):
         # Call the C++ model's predict method
-        return self._cpp_model.predict(X)
+        return self._cpp_model.predict(X, reset_state_before_predict)
 
     def predict_online(self, X):
         # Call the C++ model's predictOnline method

@@ -67,7 +67,7 @@ double run_esn_experiment_cpp(bool include_bias, double input_scaling = 1.0) {
     model.setReadout(readout);
 
     model.fit(train_input, train_target);
-    Eigen::MatrixXd predictions = model.predict(test_input);
+    Eigen::MatrixXd predictions = model.predict(test_input, true);
 
     Eigen::MatrixXd diff = predictions.topRows(test_target.rows()) - test_target;
     double mse = diff.array().square().mean();

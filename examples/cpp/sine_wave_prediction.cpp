@@ -21,10 +21,11 @@ double run_experiment(
     double spectral_radius,
     double sparsity,
     double leak_rate,
-    double input_scaling, // New parameter
-    double ridge_alpha
+    double input_scaling,
+    double ridge_alpha,
+    bool reset_state_before_predict // New parameter
 ) {
-    std::cout << "--- Running experiment with include_bias=" << (include_bias ? "true" : "false") << ", input_scaling=" << input_scaling << " ---" << std::endl;
+    std::cout << "--- Running experiment with include_bias=" << (include_bias ? "true" : "false") << ", input_scaling=" << input_scaling << ", reset_state_before_predict=" << (reset_state_before_predict ? "true" : "false") << " ---" << std::endl;
 
     // --- 1. Data Generation ---
     std::cout << "--- Generating Data ---" << std::endl;
@@ -64,7 +65,7 @@ double run_experiment(
         spectral_radius,
         sparsity,
         leak_rate,
-        input_scaling, // Pass new parameter
+        input_scaling,
         include_bias
     );
 
@@ -81,12 +82,12 @@ double run_experiment(
     model.fit(train_input, train_target /*, washout_len=100 */); // Experiment with washout_len
 
     std::cout << "--- Predicting with ESN ---" << std::endl;
-    Eigen::MatrixXd predictions = model.predict(test_input);
+    Eigen::MatrixXd predictions = model.predict(test_input, reset_state_before_predict);
 
     // --- 3. Evaluate Results ---
     Eigen::MatrixXd diff = predictions.topRows(test_target.rows()) - test_target;
     double mse = diff.array().square().mean();
-    std::cout << "Mean Squared Error (include_bias=" << (include_bias ? "true" : "false") << ", input_scaling=" << input_scaling << "): " << mse << std::endl;
+    std::cout << "Mean Squared Error (include_bias=" << (include_bias ? "true" : "false") << ", input_scaling=" << input_scaling << ", reset_state_before_predict=" << (reset_state_before_predict ? "true" : "false") << "): " << mse << std::endl;
 
     std::cout << "\nSample Predictions vs. True Targets:" << std::endl;
     for (int i = 0; i < std::min(10, (int)test_target.rows()); ++i) {
@@ -107,47 +108,53 @@ int main() {
     const double spectral_radius = 0.99;
     const double sparsity = 0.02;
     const double leak_rate = 0.2;
-    const double input_scaling = 1.0; // New parameter
+    const double input_scaling = 1.0;
     const double ridge_alpha = 1e-4;
 
-    // Run with bias
-    double mse_with_bias = run_experiment(
-        true,
-        n_total_samples,
-        n_train_samples,
-        noise_amplitude,
-        n_neurons,
-        spectral_radius,
-        sparsity,
-        leak_rate,
-        input_scaling,
-        ridge_alpha
-    );
+    std::vector<bool> reset_options = {true, false};
+    std::map<std::tuple<bool, bool>, double> results;
 
-    // Run without bias
-    double mse_without_bias = run_experiment(
-        false,
-        n_total_samples,
-        n_train_samples,
-        noise_amplitude,
-        n_neurons,
-        spectral_radius,
-        sparsity,
-        leak_rate,
-        input_scaling,
-        ridge_alpha
-    );
+    for (bool reset_state_before_predict : reset_options) {
+        // Run with bias
+        double mse_with_bias = run_experiment(
+            true,
+            n_total_samples,
+            n_train_samples,
+            noise_amplitude,
+            n_neurons,
+            spectral_radius,
+            sparsity,
+            leak_rate,
+            input_scaling,
+            ridge_alpha,
+            reset_state_before_predict
+        );
+        results[std::make_tuple(true, reset_state_before_predict)] = mse_with_bias;
 
-    std::cout << "\n--- Comparison of Results ---" << std::endl;
-    std::cout << "MSE with bias: " << mse_with_bias << std::endl;
-    std::cout << "MSE without bias: " << mse_without_bias << std::endl;
+        // Run without bias
+        double mse_without_bias = run_experiment(
+            false,
+            n_total_samples,
+            n_train_samples,
+            noise_amplitude,
+            n_neurons,
+            spectral_radius,
+            sparsity,
+            leak_rate,
+            input_scaling,
+            ridge_alpha,
+            reset_state_before_predict
+        );
+        results[std::make_tuple(false, reset_state_before_predict)] = mse_without_bias;
+    }
 
-    if (mse_with_bias < mse_without_bias) {
-        std::cout << "Conclusion: Model performed better with bias." << std::endl;
-    } else if (mse_without_bias < mse_with_bias) {
-        std::cout << "Conclusion: Model performed better without bias." << std::endl;
-    } else {
-        std::cout << "Conclusion: Model performance was similar with and without bias." << std::endl;
+    std::cout << "\n--- Comparison of Results (MSE) ---" << std::endl;
+    std::cout << "Bias | ResetPredict | MSE" << std::endl;
+    std::cout << "--------------------------" << std::endl;
+    for (const auto& pair : results) {
+        std::string bias_str = std::get<0>(pair.first) ? "True " : "False";
+        std::string reset_str = std::get<1>(pair.first) ? "True         " : "False        ";
+        std::cout << bias_str << " | " << reset_str << " | " << pair.second << std::endl;
     }
 
     std::cout << "\n--- Further Tuning Suggestions ---" << std::endl;
@@ -157,6 +164,7 @@ int main() {
     std::cout << "3. ridge_alpha: Try 1e-6, 1e-3." << std::endl;
     std::cout << "4. input_scaling: Experiment with 0.1, 0.5, 1.0, 2.0." << std::endl;
     std::cout << "5. n_neurons: Increase for more complex tasks, decrease for simpler ones." << std::endl;
+    std::cout << "6. reset_state_before_predict: Experiment with true/false." << std::endl;
 
     return 0;
 }

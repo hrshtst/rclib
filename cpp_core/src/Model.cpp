@@ -67,13 +67,15 @@ void Model::fit(const Eigen::MatrixXd& inputs, const Eigen::MatrixXd& targets, i
     readout->fit(fit_states, fit_targets);
 }
 
-Eigen::MatrixXd Model::predict(const Eigen::MatrixXd& inputs) {
+Eigen::MatrixXd Model::predict(const Eigen::MatrixXd& inputs, bool reset_state_before_predict) {
     if (reservoirs.empty() || !readout) {
         throw std::runtime_error("Model is not fully configured. Add at least one reservoir and a readout.");
     }
 
-    for (auto& res : reservoirs) {
-        res->resetState();
+    if (reset_state_before_predict) {
+        for (auto& res : reservoirs) {
+            res->resetState();
+        }
     }
 
     // Collect states from all reservoirs

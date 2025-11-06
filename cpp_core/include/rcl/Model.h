@@ -11,7 +11,7 @@ public:
     void addReservoir(std::shared_ptr<Reservoir> res, std::string connection_type = "serial");
     void setReadout(std::shared_ptr<Readout> readout);
     void fit(const Eigen::MatrixXd& inputs, const Eigen::MatrixXd& targets, int washout_len = 0);
-    Eigen::MatrixXd predict(const Eigen::MatrixXd& inputs);
+    Eigen::MatrixXd predict(const Eigen::MatrixXd& inputs, bool reset_state_before_predict = true);
     Eigen::MatrixXd predictOnline(const Eigen::MatrixXd& input);
 
     std::shared_ptr<Reservoir> getReservoir(size_t index) const;
