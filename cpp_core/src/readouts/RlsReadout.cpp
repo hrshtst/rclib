@@ -34,12 +34,16 @@ void RlsReadout::partialFit(const Eigen::MatrixXd& state, const Eigen::MatrixXd&
 
     // RLS update equations
     Eigen::MatrixXd Px = P * x.transpose();
-    Eigen::MatrixXd k = Px / (lambda + (x * Px)(0,0));
+    double denominator = lambda + (x * Px)(0,0);
+    Eigen::MatrixXd k = Px / denominator;
     Eigen::MatrixXd y_hat = x * W_out;
     Eigen::MatrixXd error = target - y_hat;
 
     W_out = W_out + k * error;
-    P = (1.0 / lambda) * (P - k * x * P);
+
+    // Optimized P update: (1.0 / lambda) * (P - k * (x * P))
+    Eigen::MatrixXd xP = x * P;
+    P = (1.0 / lambda) * (P - k * xP);
 }
 
 Eigen::MatrixXd RlsReadout::predict(const Eigen::MatrixXd& states) {

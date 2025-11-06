@@ -68,7 +68,7 @@ void RandomSparseReservoir::initialize_W_in(int input_dim) {
     W_in_initialized = true;
 }
 
-Eigen::MatrixXd& RandomSparseReservoir::advance(const Eigen::MatrixXd& input) {
+Eigen::MatrixXd RandomSparseReservoir::advance(const Eigen::MatrixXd& input) {
     if (!W_in_initialized) {
         initialize_W_in(input.cols());
     }

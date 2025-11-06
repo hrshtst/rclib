@@ -158,5 +158,3 @@ std::shared_ptr<Readout> Model::getReadout() const {
     }
     return readout;
 }
-
-

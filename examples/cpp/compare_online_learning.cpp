@@ -29,7 +29,7 @@ int main() {
     double ridge_alpha = 1e-4;
     double lms_learning_rate = 0.001;
     double rls_lambda = 0.999;
-    double rls_delta = 0.1;
+    double rls_delta = 1.0;
 
     // --- 2. Generate Data with Changing Dynamics ---
     std::cout << "--- Generating Data ---" << std::endl;
@@ -79,19 +79,18 @@ int main() {
     esn_lms.setReadout(readout_lms);
 
     Eigen::MatrixXd preds_lms(test_target.rows(), test_target.cols());
-    // Initialize W_out by performing one partial_fit before the main loop
-    esn_lms.getReservoir(0)->advance(test_input.row(0)); // Advance reservoir for first input
-    esn_lms.getReadout()->partialFit(esn_lms.getReservoir(0)->getState(), test_target.row(0)); // Initialize W_out
 
-    for (int i = 0; i < test_input.rows(); ++i) {
+    // Initialize W_out and predict first step
+    esn_lms.getReservoir(0)->advance(test_input.row(0));
+    esn_lms.getReadout()->partialFit(esn_lms.getReservoir(0)->getState(), test_target.row(0));
+    preds_lms.row(0) = esn_lms.predict(esn_lms.getReservoir(0)->getState());
+
+    for (int i = 1; i < test_input.rows(); ++i) {
         Eigen::MatrixXd current_input = test_input.row(i);
         Eigen::MatrixXd current_target = test_target.row(i);
 
-        // Predict current step
+        // Predict and adapt online
         preds_lms.row(i) = esn_lms.predictOnline(current_input);
-
-        // Adapt (partial_fit)
-        esn_lms.getReservoir(0)->advance(current_input);
         esn_lms.getReadout()->partialFit(esn_lms.getReservoir(0)->getState(), current_target);
     }
     double mse_lms = calculate_mse(preds_lms, test_target);
@@ -106,19 +105,17 @@ int main() {
     esn_rls.setReadout(readout_rls);
 
     Eigen::MatrixXd preds_rls(test_target.rows(), test_target.cols());
-    // Initialize W_out by performing one partial_fit before the main loop
-    esn_rls.getReservoir(0)->advance(test_input.row(0)); // Advance reservoir for first input
-    esn_rls.getReadout()->partialFit(esn_rls.getReservoir(0)->getState(), test_target.row(0)); // Initialize W_out
+    // Initialize W_out and P and predict first step
+    esn_rls.getReservoir(0)->advance(test_input.row(0));
+    esn_rls.getReadout()->partialFit(esn_rls.getReservoir(0)->getState(), test_target.row(0));
+    preds_rls.row(0) = esn_rls.predict(esn_rls.getReservoir(0)->getState());
 
-    for (int i = 0; i < test_input.rows(); ++i) {
+    for (int i = 1; i < test_input.rows(); ++i) {
         Eigen::MatrixXd current_input = test_input.row(i);
         Eigen::MatrixXd current_target = test_target.row(i);
 
-        // Predict current step
+        // Predict and adapt online
         preds_rls.row(i) = esn_rls.predictOnline(current_input);
-
-        // Adapt (partial_fit)
-        esn_rls.getReservoir(0)->advance(current_input);
         esn_rls.getReadout()->partialFit(esn_rls.getReservoir(0)->getState(), current_target);
     }
     double mse_rls = calculate_mse(preds_rls, test_target);
