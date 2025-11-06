@@ -20,13 +20,13 @@ double calculate_mse(const Eigen::MatrixXd& predictions, const Eigen::MatrixXd& 
 int main() {
     // --- 1. Configuration ---
     std::cout << "--- Configuration ---" << std::endl;
-    int n_neurons = 1000;
-    double spectral_radius = 0.9;
-    double sparsity = 0.1;
-    double leak_rate = 0.3;
+    int n_neurons = 2000;
+    double spectral_radius = 0.99;
+    double sparsity = 0.02;
+    double leak_rate = 0.2;
     bool include_bias = true;
 
-    double ridge_alpha = 1e-8;
+    double ridge_alpha = 1e-4;
     double lms_learning_rate = 0.001;
     double rls_lambda = 0.999;
     double rls_delta = 0.1;

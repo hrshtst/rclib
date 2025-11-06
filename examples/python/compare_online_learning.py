@@ -11,13 +11,13 @@ def main():
     """
     # --- 1. Configuration (Simplified) ---
     print("--- Configuration ---")
-    n_neurons = 1000
-    spectral_radius = 0.9
-    sparsity = 0.1
-    leak_rate = 0.3
+    n_neurons = 2000
+    spectral_radius = 0.99
+    sparsity = 0.02
+    leak_rate = 0.2
     include_bias = True
 
-    ridge_alpha = 1e-8
+    ridge_alpha = 1e-4
     lms_learning_rate = 0.001
     rls_lambda = 0.999
     rls_delta = 0.1
