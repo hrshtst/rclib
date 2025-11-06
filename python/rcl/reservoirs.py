@@ -6,6 +6,7 @@ class RandomSparse:
         self.leak_rate = leak_rate
         self.include_bias = include_bias
 
+
 class Nvar:
     def __init__(self, num_lags):
         self.num_lags = num_lags

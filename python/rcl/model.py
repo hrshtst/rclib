@@ -1,15 +1,16 @@
-import numpy as np
-from . import _rcl # Import the C++ bindings
+from . import (
+    _rcl,  # Import the C++ bindings
+    readouts,
+    reservoirs,
+)
 
-from . import reservoirs
-from . import readouts
 
 class ESN:
-    def __init__(self, connection_type='serial'):
+    def __init__(self, connection_type="serial"):
         self.connection_type = connection_type
-        self._reservoirs_params = [] # Store parameters for Python-side reservoir objects
+        self._reservoirs_params = []  # Store parameters for Python-side reservoir objects
         self._readout_params = None  # Store parameters for Python-side readout object
-        self._cpp_model = _rcl.Model() # Initialize the C++ Model object
+        self._cpp_model = _rcl.Model()  # Initialize the C++ Model object
 
     def add_reservoir(self, reservoir):
         # Store the Python reservoir object's parameters
@@ -21,7 +22,7 @@ class ESN:
                 reservoir.spectral_radius,
                 reservoir.sparsity,
                 reservoir.leak_rate,
-                reservoir.include_bias
+                reservoir.include_bias,
             )
             self._cpp_model.addReservoir(cpp_res, self.connection_type)
         # Add other reservoir types here as they are implemented

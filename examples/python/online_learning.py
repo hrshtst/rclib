@@ -16,7 +16,7 @@ res = reservoirs.RandomSparse(
     spectral_radius=0.9,
     sparsity=0.1,
     leak_rate=0.3,
-    include_bias=True
+    include_bias=True,
 )
 
 # 3. Configure Readout for online learning (RLS)
@@ -30,8 +30,8 @@ model.set_readout(readout)
 # 5. Online Training Loop
 print("Starting online training...")
 for i in range(num_steps):
-    current_input = X_data[i:i+1, :]
-    current_target = y_data[i:i+1, :]
+    current_input = X_data[i : i + 1, :]
+    current_target = y_data[i : i + 1, :]
 
     model.partial_fit(current_input, current_target)
 
@@ -43,11 +43,12 @@ print("Online training finished.")
 y_pred = model.predict(X_data)
 
 # 7. Print the results
-mse = np.mean((y_pred - y_data)**2)
+mse = np.mean((y_pred - y_data) ** 2)
 print(f"Test loss (MSE) after online training: {mse:.4e}")
 
 try:
     import matplotlib.pyplot as plt
+
     plt.figure(figsize=(10, 6))
     plt.plot(np.arange(num_steps), y_data, label="True")
     plt.plot(np.arange(num_steps), y_pred, label="Predicted")

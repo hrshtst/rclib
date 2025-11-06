@@ -1,7 +1,8 @@
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 
 from rcl import ESN, readouts, reservoirs
+
 
 def main():
     """
@@ -36,7 +37,7 @@ def main():
     signal[:change_point] = np.sin(freq1 * time_vec[:change_point])
     signal[change_point:] = np.sin(freq2 * time_vec[change_point:])
 
-    data = signal.reshape(-1, 1).astype(np.float64) # Use float64 for Eigen compatibility
+    data = signal.reshape(-1, 1).astype(np.float64)  # Use float64 for Eigen compatibility
 
     train_input = data[: n_train - 1]
     train_target = data[1:n_train]
@@ -50,7 +51,7 @@ def main():
         spectral_radius=spectral_radius,
         sparsity=sparsity,
         leak_rate=leak_rate,
-        include_bias=include_bias
+        include_bias=include_bias,
     )
     readout_ridge = readouts.Ridge(alpha=ridge_alpha, include_bias=include_bias)
     esn_ridge = ESN()
@@ -68,7 +69,7 @@ def main():
         spectral_radius=spectral_radius,
         sparsity=sparsity,
         leak_rate=leak_rate,
-        include_bias=include_bias
+        include_bias=include_bias,
     )
     readout_lms = readouts.Lms(learning_rate=lms_learning_rate, include_bias=include_bias)
     esn_lms = ESN()
@@ -78,10 +79,10 @@ def main():
     # Online adaptation loop for LMS
     preds_lms = np.zeros_like(test_target)
     # Initialize W_out by performing one partial_fit before the main loop
-    esn_lms.partial_fit(test_input[0:1, :], test_target[0:1, :]) # Call partial_fit once
+    esn_lms.partial_fit(test_input[0:1, :], test_target[0:1, :])  # Call partial_fit once
     for i in range(test_input.shape[0]):
-        current_input = test_input[i:i+1, :]
-        current_target = test_target[i:i+1, :]
+        current_input = test_input[i : i + 1, :]
+        current_target = test_target[i : i + 1, :]
 
         # Predict current step
         pred_lms_step = esn_lms.predict_online(current_input)
@@ -97,7 +98,7 @@ def main():
         spectral_radius=spectral_radius,
         sparsity=sparsity,
         leak_rate=leak_rate,
-        include_bias=include_bias
+        include_bias=include_bias,
     )
     readout_rls = readouts.Rls(lambda_=rls_lambda, delta=rls_delta, include_bias=include_bias)
     esn_rls = ESN()
@@ -107,10 +108,10 @@ def main():
     # Online adaptation loop for RLS
     preds_rls = np.zeros_like(test_target)
     # Initialize W_out by performing one partial_fit before the main loop
-    esn_rls.partial_fit(test_input[0:1, :], test_target[0:1, :]) # Call partial_fit once
+    esn_rls.partial_fit(test_input[0:1, :], test_target[0:1, :])  # Call partial_fit once
     for i in range(test_input.shape[0]):
-        current_input = test_input[i:i+1, :]
-        current_target = test_target[i:i+1, :]
+        current_input = test_input[i : i + 1, :]
+        current_target = test_target[i : i + 1, :]
 
         # Predict current step
         pred_rls_step = esn_rls.predict_online(current_input)
@@ -139,7 +140,8 @@ def main():
     plt.tight_layout()
     plt.savefig(plot_output_file)
     print(f"Plot saved to {plot_output_file}")
-    plt.show() # Commented out for non-interactive environment
+    plt.show()  # Commented out for non-interactive environment
+
 
 if __name__ == "__main__":
     main()
