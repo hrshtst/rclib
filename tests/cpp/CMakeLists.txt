@@ -24,3 +24,7 @@ catch_discover_tests(test_lms_readout)
 add_executable(test_model test_model.cpp)
 target_link_libraries(test_model PRIVATE rcl_core Catch2::Catch2WithMain)
 catch_discover_tests(test_model)
+
+add_executable(test_bias_effect test_bias_effect.cpp)
+target_link_libraries(test_bias_effect PRIVATE rcl_core Catch2::Catch2WithMain)
+catch_discover_tests(test_bias_effect)
