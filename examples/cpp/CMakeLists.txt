@@ -6,3 +6,6 @@ target_link_libraries(mackey_glass PRIVATE rcl_core)
 
 add_executable(online_learning online_learning.cpp)
 target_link_libraries(online_learning PRIVATE rcl_core)
+
+add_executable(compare_online_learning compare_online_learning.cpp)
+target_link_libraries(compare_online_learning PRIVATE rcl_core)
