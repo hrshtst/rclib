@@ -52,6 +52,10 @@ class ESN:
         # Call the C++ model's predict method
         return self._cpp_model.predict(X)
 
+    def predict_online(self, X):
+        # Call the C++ model's predictOnline method
+        return self._cpp_model.predictOnline(X)
+
     def partial_fit(self, X, y):
         # Assuming only one reservoir for simplicity in online learning for now.
         # If multiple reservoirs are present, the logic would need to be more complex

@@ -56,8 +56,9 @@ PYBIND11_MODULE(_rcl, m) {
         .def(py::init<>())
         .def("addReservoir", &Model::addReservoir)
         .def("setReadout", &Model::setReadout)
-        .def("fit", &Model::fit)
+        .def("fit", &Model::fit, py::arg("inputs"), py::arg("targets"), py::arg("washout_len") = 0)
         .def("predict", &Model::predict)
         .def("getReservoir", &Model::getReservoir) // Added
-        .def("getReadout", &Model::getReadout);    // Added
+        .def("getReadout", &Model::getReadout)    // Added
+        .def("predictOnline", &Model::predictOnline);
 }
