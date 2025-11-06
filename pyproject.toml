@@ -22,7 +22,7 @@ dev = [
 
 [tool.scikit-build]
 cmake.source-dir = "."
-wheel.packages = ["src/rcl"]
+wheel.packages = ["python/rcl"]
 
 [tool.pytest.ini_options]
 testpaths = [
@@ -48,7 +48,7 @@ line-length = 120
 select = ["E", "F", "I"]
 
 [tool.pyright]
-include = ["src", "tests", "examples"]
+include = ["python", "tests", "examples"]
 exclude = [
     "**/node_modules",
     "**/__pycache__",
@@ -57,7 +57,7 @@ venvPath = "."
 venv = ".venv"
 
 [tool.mypy]
-files = ["src", "tests", "examples"]
+files = ["python", "tests", "examples"]
 python_executable = ".venv/bin/python"
 check_untyped_defs = true       # Type-checks the interior of functions without type annotations.
 

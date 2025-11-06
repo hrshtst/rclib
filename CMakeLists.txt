@@ -11,7 +11,7 @@ add_subdirectory(cpp_core/third_party/eigen)
 add_subdirectory(cpp_core)
 
 # Add the Python binding subdirectory
-add_subdirectory(src)
+add_subdirectory(python)
 
 # Add the C++ tests subdirectory
 if(BUILD_TESTING)

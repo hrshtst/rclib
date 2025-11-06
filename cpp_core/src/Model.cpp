@@ -37,16 +37,25 @@ void Model::fit(const Eigen::MatrixXd& inputs, const Eigen::MatrixXd& targets, i
         }
         all_states_full = current_input;
     } else if (connection_type == "parallel") {
+        std::vector<Eigen::MatrixXd> reservoir_outputs;
         for (const auto& res : reservoirs) {
-            Eigen::MatrixXd res_states(inputs.rows(), res->getState().cols());
+            Eigen::MatrixXd res_states_for_all_inputs(inputs.rows(), res->getState().cols());
             for (int i = 0; i < inputs.rows(); ++i) {
-                res_states.row(i) = res->advance(inputs.row(i));
+                res_states_for_all_inputs.row(i) = res->advance(inputs.row(i));
             }
-            if (all_states_full.size() == 0) {
-                all_states_full = res_states;
-            } else {
-                all_states_full.conservativeResize(all_states_full.rows(), all_states_full.cols() + res_states.cols());
-                all_states_full.rightCols(res_states.cols()) = res_states;
+            reservoir_outputs.push_back(res_states_for_all_inputs);
+        }
+
+        if (!reservoir_outputs.empty()) {
+            int total_cols = 0;
+            for (const auto& mat : reservoir_outputs) {
+                total_cols += mat.cols();
+            }
+            all_states_full.resize(inputs.rows(), total_cols);
+            int current_col = 0;
+            for (const auto& mat : reservoir_outputs) {
+                all_states_full.middleCols(current_col, mat.cols()) = mat;
+                current_col += mat.cols();
             }
         }
     }
@@ -81,16 +90,25 @@ Eigen::MatrixXd Model::predict(const Eigen::MatrixXd& inputs) {
         }
         all_states = current_input;
     } else if (connection_type == "parallel") {
+        std::vector<Eigen::MatrixXd> reservoir_outputs;
         for (const auto& res : reservoirs) {
-            Eigen::MatrixXd res_states(inputs.rows(), res->getState().cols());
+            Eigen::MatrixXd res_states_for_all_inputs(inputs.rows(), res->getState().cols());
             for (int i = 0; i < inputs.rows(); ++i) {
-                res_states.row(i) = res->advance(inputs.row(i));
+                res_states_for_all_inputs.row(i) = res->advance(inputs.row(i));
             }
-            if (all_states.size() == 0) {
-                all_states = res_states;
-            } else {
-                all_states.conservativeResize(all_states.rows(), all_states.cols() + res_states.cols());
-                all_states.rightCols(res_states.cols()) = res_states;
+            reservoir_outputs.push_back(res_states_for_all_inputs);
+        }
+
+        if (!reservoir_outputs.empty()) {
+            int total_cols = 0;
+            for (const auto& mat : reservoir_outputs) {
+                total_cols += mat.cols();
+            }
+            all_states.resize(inputs.rows(), total_cols);
+            int current_col = 0;
+            for (const auto& mat : reservoir_outputs) {
+                all_states.middleCols(current_col, mat.cols()) = mat;
+                current_col += mat.cols();
             }
         }
     }
@@ -126,3 +144,19 @@ Eigen::MatrixXd Model::predictOnline(const Eigen::MatrixXd& input) {
 
     return readout->predict(all_states);
 }
+
+std::shared_ptr<Reservoir> Model::getReservoir(size_t index) const {
+    if (index >= reservoirs.size()) {
+        throw std::out_of_range("Reservoir index out of bounds.");
+    }
+    return reservoirs[index];
+}
+
+std::shared_ptr<Readout> Model::getReadout() const {
+    if (!readout) {
+        throw std::runtime_error("Readout not set.");
+    }
+    return readout;
+}
+
+

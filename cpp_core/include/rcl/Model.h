@@ -14,6 +14,9 @@ public:
     Eigen::MatrixXd predict(const Eigen::MatrixXd& inputs);
     Eigen::MatrixXd predictOnline(const Eigen::MatrixXd& input);
 
+    std::shared_ptr<Reservoir> getReservoir(size_t index) const;
+    std::shared_ptr<Readout> getReadout() const;
+
 private:
     std::vector<std::shared_ptr<Reservoir>> reservoirs;
     std::shared_ptr<Readout> readout;
