@@ -191,3 +191,13 @@ model.set_readout(readout)
 model.fit(X_train, Y_train)
 Y_pred = model.predict(X_test)
 ```
+
+## **7. Python Example Execution**
+
+To execute Python examples or tests within this project, use the following command structure:
+
+```bash
+rm -rf .venv && uv sync --no-cache && uv run python examples/python/your_script_name.py
+```
+
+Replace `examples/python/your_script_name.py` with the actual path to the Python script you wish to run. This command ensures that the project's Python environment is correctly set up and dependencies are managed by `uv` before execution.
