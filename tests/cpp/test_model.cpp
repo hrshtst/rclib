@@ -17,7 +17,7 @@ TEST_CASE("Model - configuration", "[Model]") {
         REQUIRE_THROWS(model.predictOnline(inputs.row(0)));
     }
 
-    auto res = std::make_shared<RandomSparseReservoir>(10, 0.9, 0.5, 0.1);
+    auto res = std::make_shared<RandomSparseReservoir>(10, 0.9, 0.5, 0.1, 1.0);
     model.addReservoir(res);
 
     SECTION("Throws when readout is not set") {
@@ -42,7 +42,7 @@ TEST_CASE("Model - configuration", "[Model]") {
 
 TEST_CASE("Model - fit and predict", "[Model]") {
     Model model;
-    auto res = std::make_shared<RandomSparseReservoir>(100, 0.9, 0.1, 0.2);
+    auto res = std::make_shared<RandomSparseReservoir>(100, 0.9, 0.1, 0.2, 1.0);
     auto readout = std::make_shared<RidgeReadout>(1e-6);
     model.addReservoir(res);
     model.setReadout(readout);
@@ -63,8 +63,8 @@ TEST_CASE("Model - fit and predict", "[Model]") {
 
 TEST_CASE("Model - parallel connection", "[Model]") {
     Model model;
-    auto res1 = std::make_shared<RandomSparseReservoir>(50, 0.9, 0.1, 0.2);
-    auto res2 = std::make_shared<RandomSparseReservoir>(50, 0.9, 0.1, 0.2);
+    auto res1 = std::make_shared<RandomSparseReservoir>(50, 0.9, 0.1, 0.2, 1.0);
+    auto res2 = std::make_shared<RandomSparseReservoir>(50, 0.9, 0.1, 0.2, 1.0);
     auto readout = std::make_shared<RidgeReadout>(1e-6);
     model.addReservoir(res1, "parallel");
     model.addReservoir(res2, "parallel");

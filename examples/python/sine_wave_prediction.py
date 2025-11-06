@@ -7,8 +7,8 @@ from rcl.reservoirs import RandomSparse
 
 def run_experiment(include_bias: bool, n_total_samples: int, n_train_samples: int, noise_amplitude: float,
                    n_neurons: int, spectral_radius: float, sparsity: float, leak_rate: float,
-                   ridge_alpha: float, washout_len: int, plot_filename: str):
-    print(f"--- Running experiment with include_bias={include_bias}, washout_len={washout_len} ---")
+                   input_scaling: float, ridge_alpha: float, washout_len: int, plot_filename: str):
+    print(f"--- Running experiment with include_bias={include_bias}, washout_len={washout_len}, input_scaling={input_scaling} ---")
 
     # --- 1. Data Generation ---
     print("--- Generating Data ---")
@@ -30,6 +30,7 @@ def run_experiment(include_bias: bool, n_total_samples: int, n_train_samples: in
         spectral_radius=spectral_radius,
         sparsity=sparsity,
         leak_rate=leak_rate,
+        input_scaling=input_scaling,
         include_bias=include_bias,
     )
 
@@ -46,16 +47,16 @@ def run_experiment(include_bias: bool, n_total_samples: int, n_train_samples: in
     predictions = model.predict(test_input)
 
     mse = np.mean((predictions[:len(test_target)] - test_target) ** 2)
-    print(f"Mean Squared Error (include_bias={include_bias}, washout_len={washout_len}): {mse:.6f}")
+    print(f"Mean Squared Error (include_bias={include_bias}, washout_len={washout_len}, input_scaling={input_scaling}): {mse:.6f}")
 
     # --- 3. Plot Results ---
-    print(f"\nPlotting results for include_bias={include_bias}, washout_len={washout_len}...")
+    print(f"\nPlotting results for include_bias={include_bias}, washout_len={washout_len}, input_scaling={input_scaling}...")
     plt.style.use("seaborn-v0_8-whitegrid")
     fig, ax = plt.subplots(figsize=(15, 6))
     plot_range = range(min(200, len(test_target)))
     ax.plot(test_target[plot_range], "b", label="True Target (with noise)", linewidth=2, alpha=0.7)
     ax.plot(predictions[plot_range], "r--", label="ESN Prediction", linewidth=2)
-    ax.set_title(f"ESN: Sine Wave Prediction (Bias={include_bias}, Washout={washout_len})", fontsize=16)
+    ax.set_title(f"ESN: Sine Wave Prediction (Bias={include_bias}, Washout={washout_len}, InputScale={input_scaling})", fontsize=16)
     ax.set_xlabel("Time Step")
     ax.set_ylabel("Value")
     ax.legend(loc="upper right")
@@ -87,6 +88,7 @@ def main():
     sparsity = 0.02
     leak_rate = 0.2
     ridge_alpha = 1e-4
+    input_scaling = 1.0 # New parameter
 
     washout_lengths = [0, 50, 100, 200]
     results = {}
@@ -102,6 +104,7 @@ def main():
             spectral_radius=spectral_radius,
             sparsity=sparsity,
             leak_rate=leak_rate,
+            input_scaling=input_scaling,
             ridge_alpha=ridge_alpha,
             washout_len=washout_len,
             plot_filename=f"sine_wave_prediction_bias_true_washout_{washout_len}.png"
@@ -118,6 +121,7 @@ def main():
             spectral_radius=spectral_radius,
             sparsity=sparsity,
             leak_rate=leak_rate,
+            input_scaling=input_scaling,
             ridge_alpha=ridge_alpha,
             washout_len=washout_len,
             plot_filename=f"sine_wave_prediction_bias_false_washout_{washout_len}.png"
@@ -136,7 +140,8 @@ def main():
     print("1. spectral_radius: Try values like 0.7, 0.8, 0.9 (must be < 1.0 for stability).")
     print("2. leak_rate: Experiment with 0.1, 0.5, 0.7.")
     print("3. ridge_alpha: Try 1e-6, 1e-3.")
-    print("4. n_neurons: Increase for more complex tasks, decrease for simpler ones.")
+    print("4. input_scaling: Experiment with 0.1, 0.5, 1.0, 2.0.")
+    print("5. n_neurons: Increase for more complex tasks, decrease for simpler ones.")
 
 
 if __name__ == "__main__":

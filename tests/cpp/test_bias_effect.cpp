@@ -9,7 +9,7 @@
 #include "rcl/reservoirs/RandomSparseReservoir.h"
 #include "rcl/readouts/RidgeReadout.h"
 
-double run_esn_experiment_cpp(bool include_bias) {
+double run_esn_experiment_cpp(bool include_bias, double input_scaling = 1.0) {
     // --- Configuration Parameters ---
     const int n_total_samples = 200;  // Smaller for faster tests
     const int n_train_samples = 150;
@@ -53,6 +53,7 @@ double run_esn_experiment_cpp(bool include_bias) {
         spectral_radius,
         sparsity,
         leak_rate,
+        input_scaling,
         include_bias
     );
 

@@ -22,9 +22,9 @@ PYBIND11_MODULE(_rcl, m) {
 
     // Bind RandomSparseReservoir
     py::class_<RandomSparseReservoir, Reservoir, std::shared_ptr<RandomSparseReservoir>>(m, "RandomSparseReservoir")
-        .def(py::init<int, double, double, double, bool>(),
+        .def(py::init<int, double, double, double, double, bool>(),
              py::arg("n_neurons"), py::arg("spectral_radius"), py::arg("sparsity"),
-             py::arg("leak_rate"), py::arg("include_bias"));
+             py::arg("leak_rate"), py::arg("input_scaling"), py::arg("include_bias"));
 
     // Bind NvarReservoir
     py::class_<NvarReservoir, Reservoir, std::shared_ptr<NvarReservoir>>(m, "NvarReservoir")

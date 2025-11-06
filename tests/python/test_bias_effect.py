@@ -4,7 +4,7 @@ from rcl.model import ESN
 from rcl.readouts import Ridge
 from rcl.reservoirs import RandomSparse
 
-def _run_esn_experiment(include_bias: bool) -> float:
+def _run_esn_experiment(include_bias: bool, input_scaling: float = 1.0) -> float:
     # --- Configuration Parameters ---
     n_total_samples = 200  # Smaller for faster tests
     n_train_samples = 150
@@ -34,6 +34,7 @@ def _run_esn_experiment(include_bias: bool) -> float:
         spectral_radius=spectral_radius,
         sparsity=sparsity,
         leak_rate=leak_rate,
+        input_scaling=input_scaling,
         include_bias=include_bias,
     )
 

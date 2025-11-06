@@ -21,9 +21,10 @@ double run_experiment(
     double spectral_radius,
     double sparsity,
     double leak_rate,
+    double input_scaling, // New parameter
     double ridge_alpha
 ) {
-    std::cout << "--- Running experiment with include_bias=" << (include_bias ? "true" : "false") << " ---" << std::endl;
+    std::cout << "--- Running experiment with include_bias=" << (include_bias ? "true" : "false") << ", input_scaling=" << input_scaling << " ---" << std::endl;
 
     // --- 1. Data Generation ---
     std::cout << "--- Generating Data ---" << std::endl;
@@ -63,6 +64,7 @@ double run_experiment(
         spectral_radius,
         sparsity,
         leak_rate,
+        input_scaling, // Pass new parameter
         include_bias
     );
 
@@ -84,7 +86,7 @@ double run_experiment(
     // --- 3. Evaluate Results ---
     Eigen::MatrixXd diff = predictions.topRows(test_target.rows()) - test_target;
     double mse = diff.array().square().mean();
-    std::cout << "Mean Squared Error (include_bias=" << (include_bias ? "true" : "false") << "): " << mse << std::endl;
+    std::cout << "Mean Squared Error (include_bias=" << (include_bias ? "true" : "false") << ", input_scaling=" << input_scaling << "): " << mse << std::endl;
 
     std::cout << "\nSample Predictions vs. True Targets:" << std::endl;
     for (int i = 0; i < std::min(10, (int)test_target.rows()); ++i) {
@@ -105,6 +107,7 @@ int main() {
     const double spectral_radius = 0.99;
     const double sparsity = 0.02;
     const double leak_rate = 0.2;
+    const double input_scaling = 1.0; // New parameter
     const double ridge_alpha = 1e-4;
 
     // Run with bias
@@ -117,6 +120,7 @@ int main() {
         spectral_radius,
         sparsity,
         leak_rate,
+        input_scaling,
         ridge_alpha
     );
 
@@ -130,6 +134,7 @@ int main() {
         spectral_radius,
         sparsity,
         leak_rate,
+        input_scaling,
         ridge_alpha
     );
 
@@ -144,6 +149,14 @@ int main() {
     } else {
         std::cout << "Conclusion: Model performance was similar with and without bias." << std::endl;
     }
+
+    std::cout << "\n--- Further Tuning Suggestions ---" << std::endl;
+    std::cout << "If predictions are still poor, consider tuning the following parameters:" << std::endl;
+    std::cout << "1. spectral_radius: Try values like 0.7, 0.8, 0.9 (must be < 1.0 for stability)." << std::endl;
+    std::cout << "2. leak_rate: Experiment with 0.1, 0.5, 0.7." << std::endl;
+    std::cout << "3. ridge_alpha: Try 1e-6, 1e-3." << std::endl;
+    std::cout << "4. input_scaling: Experiment with 0.1, 0.5, 1.0, 2.0." << std::endl;
+    std::cout << "5. n_neurons: Increase for more complex tasks, decrease for simpler ones." << std::endl;
 
     return 0;
 }

@@ -22,6 +22,7 @@ class ESN:
                 reservoir.spectral_radius,
                 reservoir.sparsity,
                 reservoir.leak_rate,
+                reservoir.input_scaling,
                 reservoir.include_bias,
             )
             self._cpp_model.addReservoir(cpp_res, self.connection_type)

@@ -42,8 +42,8 @@ double largest_eigenvalue(const Eigen::SparseMatrix<double>& mat, int iterations
 }
 
 
-RandomSparseReservoir::RandomSparseReservoir(int n_neurons, double spectral_radius, double sparsity, double leak_rate, bool include_bias)
-    : n_neurons(n_neurons), spectral_radius(spectral_radius), sparsity(sparsity), leak_rate(leak_rate), include_bias(include_bias), W_in_initialized(false) {
+RandomSparseReservoir::RandomSparseReservoir(int n_neurons, double spectral_radius, double sparsity, double leak_rate, double input_scaling, bool include_bias)
+    : n_neurons(n_neurons), spectral_radius(spectral_radius), sparsity(sparsity), leak_rate(leak_rate), input_scaling(input_scaling), include_bias(include_bias), W_in_initialized(false) {
 
     state = Eigen::MatrixXd::Zero(1, n_neurons);
 
@@ -64,7 +64,7 @@ RandomSparseReservoir::RandomSparseReservoir(int n_neurons, double spectral_radi
 }
 
 void RandomSparseReservoir::initialize_W_in(int input_dim) {
-    W_in = Eigen::MatrixXd::Random(input_dim, n_neurons);
+    W_in = Eigen::MatrixXd::Random(input_dim, n_neurons) * input_scaling;
     W_in_initialized = true;
 }
 
