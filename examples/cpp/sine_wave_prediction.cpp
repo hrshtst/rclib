@@ -76,7 +76,7 @@ double run_experiment(
     model.setReadout(readout);
 
     std::cout << "--- Fitting ESN ---" << std::endl;
-    model.fit(train_input, train_target);
+    model.fit(train_input, train_target /*, washout_len=100 */); // Experiment with washout_len
 
     std::cout << "--- Predicting with ESN ---" << std::endl;
     Eigen::MatrixXd predictions = model.predict(test_input);
