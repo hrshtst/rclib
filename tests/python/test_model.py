@@ -10,8 +10,10 @@ def test_model_creation():
 
 def test_model_fit_predict():
     model = ESN()
-    res = reservoirs.RandomSparse(n_neurons=100, spectral_radius=0.9, sparsity=0.1, leak_rate=0.2)
-    readout = readouts.Ridge(alpha=1e-6)
+    res = reservoirs.RandomSparse(
+        n_neurons=100, spectral_radius=0.9, sparsity=0.1, leak_rate=0.2, include_bias=False, input_scaling=1.0
+    )
+    readout = readouts.Ridge(alpha=1e-6, include_bias=False)
     model.add_reservoir(res)
     model.set_readout(readout)
 
@@ -27,9 +29,13 @@ def test_model_fit_predict():
 
 def test_parallel_model_fit_predict():
     model = ESN(connection_type="parallel")
-    res1 = reservoirs.RandomSparse(n_neurons=50, spectral_radius=0.9, sparsity=0.1, leak_rate=0.2)
-    res2 = reservoirs.RandomSparse(n_neurons=50, spectral_radius=0.9, sparsity=0.1, leak_rate=0.2)
-    readout = readouts.Ridge(alpha=1e-6)
+    res1 = reservoirs.RandomSparse(
+        n_neurons=50, spectral_radius=0.9, sparsity=0.1, leak_rate=0.2, include_bias=False, input_scaling=1.0
+    )
+    res2 = reservoirs.RandomSparse(
+        n_neurons=50, spectral_radius=0.9, sparsity=0.1, leak_rate=0.2, include_bias=False, input_scaling=1.0
+    )
+    readout = readouts.Ridge(alpha=1e-6, include_bias=False)
     model.add_reservoir(res1)
     model.add_reservoir(res2)
     model.set_readout(readout)

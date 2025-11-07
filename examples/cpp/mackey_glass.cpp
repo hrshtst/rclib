@@ -43,7 +43,7 @@ int main() {
     Eigen::MatrixXd y_test = y.bottomRows(y.rows() - train_len);
 
     // 2. Configure Reservoir
-    auto res = std::make_shared<RandomSparseReservoir>(2000, 1.1, 0.05, 0.1, true);
+    auto res = std::make_shared<RandomSparseReservoir>(2000, 1.1, 0.05, 0.1, true, 0.5);
 
     // 3. Configure Readout
     auto readout = std::make_shared<RidgeReadout>(1e-8, true);
@@ -55,7 +55,7 @@ int main() {
 
     // 5. Fit and Predict
     model.fit(X_train, y_train, washout_len);
-    Eigen::MatrixXd y_pred = model.predict(X_test);
+    Eigen::MatrixXd y_pred = model.predict(X_test, false);
 
     // 6. Print the results
     double mse = (y_pred - y_test).squaredNorm() / y_test.rows();
