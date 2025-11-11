@@ -1,6 +1,6 @@
 #pragma once
 
-#include "rcl/Reservoir.h"
+#include "rclib/Reservoir.h"
 #include <Eigen/Sparse>
 
 class RandomSparseReservoir : public Reservoir {

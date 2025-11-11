@@ -1,6 +1,6 @@
 import numpy as np
 
-from rcl import ESN, readouts, reservoirs
+from rclib import ESN, readouts, reservoirs
 
 # 1. Create some dummy data
 X_train = np.linspace(0, 1, 100).reshape(-1, 1)

@@ -1,7 +1,7 @@
-pybind11_add_module(_rcl
-    rcl/_rcl.cpp
+pybind11_add_module(_rclib
+    rclib/_rclib.cpp
 )
 
-target_link_libraries(_rcl PRIVATE rcl_core)
+target_link_libraries(_rclib PRIVATE rcl_core)
 
-install(TARGETS _rcl DESTINATION rcl)
+install(TARGETS _rclib DESTINATION rclib)

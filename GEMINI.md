@@ -1,8 +1,8 @@
-# **Project Specification: "rcl" (Reservoir Computing Library)**
+# **Project Specification: "rclib" (Reservoir Computing Library)**
 
 ## **1. Project Goal**
 
-The primary goal is to create a high-performance, scalable, and general-purpose reservoir computing framework, "rcl." It must be capable of handling both small-scale (100 neurons) and very large-scale (40,000+ neurons) networks, as well as deep (stacked) and parallel reservoir architectures.
+The primary goal is to create a high-performance, scalable, and general-purpose reservoir computing framework, "rclib." It must be capable of handling both small-scale (100 neurons) and very large-scale (40,000+ neurons) networks, as well as deep (stacked) and parallel reservoir architectures.
 
 The core library will be implemented in C++ for maximum computational performance, available as both a standalone C++ library and with comprehensive Python bindings for the machine learning community.
 
@@ -29,7 +29,7 @@ This project uses `git submodule` to manage C++ dependencies. They will be downl
 **Instructions for Gemini CLI (or User):** When scaffolding, the following commands must be used to add the dependencies.
 
 ``` shell
-# Ensure you are in the project root 'rcl/'
+# Ensure you are in the project root 'rclib/'
 git submodule add https://gitlab.com/libeigen/eigen.git cpp_core/third_party/eigen
 git submodule add https://github.com/catchorg/Catch2.git cpp_core/third_party/catch2
 git submodule add https://github.com/pybind/pybind11.git cpp_core/third_party/pybind11
@@ -53,7 +53,7 @@ The root `CMakeLists.txt` will then add these directories:
 ## **5. Proposed Directory Structure**
 
 ```
-rcl/
+rclib/
 ├── .gitmodules            # <- Will be created by git submodule
 ├── CMakeLists.txt         # Main CMake build file
 ├── README.md
@@ -62,7 +62,7 @@ rcl/
 ├── cpp_core/              # C++ source
 │   ├── CMakeLists.txt
 │   ├── include/
-│   │   ├── rcl/
+│   │   ├── rclib/
 │   │   │   ├── Reservoir.h
 │   │   │   ├── Readout.h
 │   │   │   ├── Model.h
@@ -82,10 +82,10 @@ rcl/
 │       └── catch2/          # <- Git Submodule
 ├── python/                # Python package
 │   ├── CMakeLists.txt     # For pybind11 module
-│   ├── rcl/
+│   ├── rclib/
 │   │   ├── __init__.py
 │   │   ├── model.py       # Python wrapper class for Model
-│   │   └── _rcl.cpp       # Pybind11 binding definitions
+│   │   └── _rclib.cpp       # Pybind11 binding definitions
 │   └── setup.py           # To build and install the Python package
 ├── tests/
 │   ├── cpp/               # C++ tests (using Catch2)
@@ -107,7 +107,7 @@ rcl/
 
 ### **CMake Configuration (`cpp_core/CMakeLists.txt`)**
 
-* The C++ core will be built as a static library (e.g., rcl_core).
+* The C++ core will be built as a static library (e.g., rclib_core).
 * It must use `add_subdirectory` for `catch2` and `pybind11` (as specified in Section 3).
 * It must find `Eigen` via `find_package(Eigen REQUIRED)` or by linking to the `Eigen3::Eigen` target if `add_subdirectory(eigen)` provides it.
 
@@ -148,15 +148,15 @@ rcl/
 
 ## **6. Python API (Pythonic Interface)**
 
-The `pybind11` module (`_rcl.cpp`) will expose the C++ classes. A Python wrapper (`model.py`) will provide a `scikit-learn`-style API.
+The `pybind11` module (`_rclib.cpp`) will expose the C++ classes. A Python wrapper (`model.py`) will provide a `scikit-learn`-style API.
 
 **Example Python Usage (`model.py`):**
 
 ``` python
 # This is the target API we are aiming for.
 
-from rcl import reservoirs, readouts
-from rcl.model import ESN
+from rclib import reservoirs, readouts
+from rclib.model import ESN
 
 # 1. Configure Reservoir(s)
 res1 = reservoirs.RandomSparse(

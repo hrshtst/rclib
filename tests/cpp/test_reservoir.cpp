@@ -1,7 +1,7 @@
 #define CATCH_CONFIG_MAIN // This tells Catch to provide a main() - only do this in one cpp file
 #include <catch2/catch_all.hpp>
 
-#include "rcl/reservoirs/RandomSparseReservoir.h"
+#include "rclib/reservoirs/RandomSparseReservoir.h"
 #include <Eigen/Dense>
 
 TEST_CASE("RandomSparseReservoir - Constructor and Initialization", "[RandomSparseReservoir]") {

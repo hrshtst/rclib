@@ -1,6 +1,6 @@
 #include <catch2/catch_all.hpp>
 
-#include "rcl/readouts/RidgeReadout.h"
+#include "rclib/readouts/RidgeReadout.h"
 #include <Eigen/Dense>
 
 TEST_CASE("RidgeReadout - fit and predict", "[RidgeReadout]") {

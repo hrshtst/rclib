@@ -6,11 +6,11 @@
 
 #include <Eigen/Dense>
 
-#include "rcl/Model.h"
-#include "rcl/reservoirs/RandomSparseReservoir.h"
-#include "rcl/readouts/RidgeReadout.h"
-#include "rcl/readouts/RlsReadout.h"
-#include "rcl/readouts/LmsReadout.h"
+#include "rclib/Model.h"
+#include "rclib/reservoirs/RandomSparseReservoir.h"
+#include "rclib/readouts/RidgeReadout.h"
+#include "rclib/readouts/RlsReadout.h"
+#include "rclib/readouts/LmsReadout.h"
 
 // Function to calculate Mean Squared Error
 double calculate_mse(const Eigen::MatrixXd& predictions, const Eigen::MatrixXd& targets) {

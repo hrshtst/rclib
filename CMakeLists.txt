@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(rcl LANGUAGES CXX)
+project(rclib LANGUAGES CXX)
 enable_testing()
 
 # Add subdirectories for third-party dependencies

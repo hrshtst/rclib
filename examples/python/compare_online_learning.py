@@ -1,13 +1,10 @@
-import matplotlib.pyplot as plt
-import numpy as np
-
-from rcl import ESN, readouts, reservoirs
+from rclib import ESN, readouts, reservoirs
 
 
 def main():
     """
     An example script demonstrating online learning with LMS and RLS
-    to adapt to a changing sine wave frequency using the rcl library.
+    to adapt to a changing sine wave frequency using the rclib library.
     """
     # --- 1. Configuration (Simplified) ---
     print("--- Configuration ---")
@@ -22,7 +19,7 @@ def main():
     rls_lambda = 0.999
     rls_delta = 0.1
 
-    plot_output_file = "online_learning_adaptation_rcl.png"
+    plot_output_file = "online_learning_adaptation_rclib.png"
 
     # --- 2. Generate Data with Changing Dynamics ---
     print("--- Generating Data ---")
@@ -131,7 +128,7 @@ def main():
     change_idx = change_point - n_train
     plt.axvline(x=change_idx, color="gray", linestyle="--", label="Frequency Change")
 
-    plt.title("ESN Online Learning: Adapting to Changing Sine Wave Frequency (rcl)", fontsize=16)
+    plt.title("ESN Online Learning: Adapting to Changing Sine Wave Frequency (rclib)", fontsize=16)
     plt.xlabel("Time Step", fontsize=12)
     plt.ylabel("Value", fontsize=12)
     plt.legend()

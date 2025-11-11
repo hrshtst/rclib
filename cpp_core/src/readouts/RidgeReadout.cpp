@@ -1,4 +1,4 @@
-#include "rcl/readouts/RidgeReadout.h"
+#include "rclib/readouts/RidgeReadout.h"
 #include <stdexcept>
 
 RidgeReadout::RidgeReadout(double alpha, bool include_bias)

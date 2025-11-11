@@ -1,5 +1,5 @@
 [project]
-name = "rcl"
+name = "rclib"
 version = "0.0.1"
 description = "A reservoir computing library"
 authors = [{ name = "Hiroshi Atsuta" }]
@@ -23,7 +23,7 @@ dev = [
 
 [tool.scikit-build]
 cmake.source-dir = "."
-wheel.packages = ["python/rcl"]
+wheel.packages = ["python/rclib"]
 
 [tool.pytest.ini_options]
 testpaths = [

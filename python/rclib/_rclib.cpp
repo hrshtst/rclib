@@ -2,16 +2,16 @@
 #include <pybind11/eigen.h>
 #include <pybind11/stl.h> // For std::vector, etc.
 
-#include "rcl/Model.h"
-#include "rcl/reservoirs/RandomSparseReservoir.h"
-#include "rcl/reservoirs/NvarReservoir.h"
-#include "rcl/readouts/RidgeReadout.h"
-#include "rcl/readouts/RlsReadout.h"
-#include "rcl/readouts/LmsReadout.h"
+#include "rclib/Model.h"
+#include "rclib/reservoirs/RandomSparseReservoir.h"
+#include "rclib/reservoirs/NvarReservoir.h"
+#include "rclib/readouts/RidgeReadout.h"
+#include "rclib/readouts/RlsReadout.h"
+#include "rclib/readouts/LmsReadout.h"
 
 namespace py = pybind11;
 
-PYBIND11_MODULE(_rcl, m) {
+PYBIND11_MODULE(_rclib, m) {
     m.doc() = "pybind11 example plugin"; // Optional module docstring
 
     // Bind Reservoir base class

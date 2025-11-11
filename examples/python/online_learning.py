@@ -1,6 +1,6 @@
 import numpy as np
 
-from rcl import ESN, readouts, reservoirs
+from rclib import ESN, readouts, reservoirs
 
 # 1. Create some dummy data for online training
 num_steps = 1000

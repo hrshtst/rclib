@@ -8,9 +8,9 @@
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 
-#include "rcl/Model.h"
-#include "rcl/reservoirs/RandomSparseReservoir.h"
-#include "rcl/readouts/RidgeReadout.h"
+#include "rclib/Model.h"
+#include "rclib/reservoirs/RandomSparseReservoir.h"
+#include "rclib/readouts/RidgeReadout.h"
 
 int main() {
     // --- Configuration Parameters ---

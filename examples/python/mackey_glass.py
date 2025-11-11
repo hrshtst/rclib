@@ -1,6 +1,6 @@
 import numpy as np
 
-from rcl import ESN, readouts, reservoirs
+from rclib import ESN, readouts, reservoirs
 
 
 def mackey_glass(n_samples=1500, tau=17, seed=0):

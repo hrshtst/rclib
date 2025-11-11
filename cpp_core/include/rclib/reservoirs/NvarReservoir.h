@@ -1,6 +1,6 @@
 #pragma once
 
-#include "rcl/Reservoir.h"
+#include "rclib/Reservoir.h"
 #include <Eigen/Dense>
 
 class NvarReservoir : public Reservoir {

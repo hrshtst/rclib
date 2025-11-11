@@ -1,4 +1,4 @@
-#include "rcl/readouts/RlsReadout.h"
+#include "rclib/readouts/RlsReadout.h"
 #include <stdexcept>
 
 RlsReadout::RlsReadout(double lambda, double delta, bool include_bias)

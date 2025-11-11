@@ -1,4 +1,4 @@
-#include "rcl/Model.h"
+#include "rclib/Model.h"
 #include <stdexcept>
 
 void Model::addReservoir(std::shared_ptr<Reservoir> res, std::string connection_type) {

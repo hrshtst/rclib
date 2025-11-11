@@ -5,9 +5,9 @@
 #include <random>
 #include <cmath>
 
-#include "rcl/Model.h"
-#include "rcl/reservoirs/RandomSparseReservoir.h"
-#include "rcl/readouts/RidgeReadout.h"
+#include "rclib/Model.h"
+#include "rclib/reservoirs/RandomSparseReservoir.h"
+#include "rclib/readouts/RidgeReadout.h"
 
 double run_esn_experiment_cpp(bool include_bias, double input_scaling = 1.0) {
     // --- Configuration Parameters ---

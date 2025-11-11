@@ -1,4 +1,4 @@
-#include "rcl/readouts/LmsReadout.h"
+#include "rclib/readouts/LmsReadout.h"
 #include <stdexcept>
 
 LmsReadout::LmsReadout(double learning_rate, bool include_bias)

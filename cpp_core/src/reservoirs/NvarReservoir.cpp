@@ -1,4 +1,4 @@
-#include "rcl/reservoirs/NvarReservoir.h"
+#include "rclib/reservoirs/NvarReservoir.h"
 
 NvarReservoir::NvarReservoir(int num_lags)
     : num_lags(num_lags), initialized(false) {

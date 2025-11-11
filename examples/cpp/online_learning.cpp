@@ -5,9 +5,9 @@
 
 #include <Eigen/Dense>
 
-#include "rcl/Model.h"
-#include "rcl/reservoirs/RandomSparseReservoir.h"
-#include "rcl/readouts/RlsReadout.h" // Using RlsReadout for online learning
+#include "rclib/Model.h"
+#include "rclib/reservoirs/RandomSparseReservoir.h"
+#include "rclib/readouts/RlsReadout.h" // Using RlsReadout for online learning
 
 #include <iomanip>
 

@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from rcl.model import ESN
-from rcl import reservoirs, readouts
+from rclib.model import ESN
+from rclib import reservoirs, readouts
 
 # 1. Generate Mackey-Glass time series data
 def mackey_glass(n_points=2000, tau=17, delta_t=1.0, x0=None, seed=0):

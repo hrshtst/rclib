@@ -1,4 +1,4 @@
-#include "rcl/reservoirs/RandomSparseReservoir.h"
+#include "rclib/reservoirs/RandomSparseReservoir.h"
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 

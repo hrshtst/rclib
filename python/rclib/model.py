@@ -1,5 +1,5 @@
 from . import (
-    _rcl,  # Import the C++ bindings
+    _rclib,  # Import the C++ bindings
     readouts,
     reservoirs,
 )
@@ -10,14 +10,14 @@ class ESN:
         self.connection_type = connection_type
         self._reservoirs_params = []  # Store parameters for Python-side reservoir objects
         self._readout_params = None  # Store parameters for Python-side readout object
-        self._cpp_model = _rcl.Model()  # Initialize the C++ Model object
+        self._cpp_model = _rclib.Model()  # Initialize the C++ Model object
 
     def add_reservoir(self, reservoir):
         # Store the Python reservoir object's parameters
         self._reservoirs_params.append(reservoir)
         # Create and add the C++ reservoir to the C++ model
         if isinstance(reservoir, reservoirs.RandomSparse):
-            cpp_res = _rcl.RandomSparseReservoir(
+            cpp_res = _rclib.RandomSparseReservoir(
                 reservoir.n_neurons,
                 reservoir.spectral_radius,
                 reservoir.sparsity,
@@ -35,13 +35,13 @@ class ESN:
         self._readout_params = readout
         # Create and set the C++ readout to the C++ model
         if isinstance(readout, readouts.Ridge):
-            cpp_readout = _rcl.RidgeReadout(readout.alpha, readout.include_bias)
+            cpp_readout = _rclib.RidgeReadout(readout.alpha, readout.include_bias)
             self._cpp_model.setReadout(cpp_readout)
         elif isinstance(readout, readouts.Rls):
-            cpp_readout = _rcl.RlsReadout(readout.lambda_, readout.delta, readout.include_bias)
+            cpp_readout = _rclib.RlsReadout(readout.lambda_, readout.delta, readout.include_bias)
             self._cpp_model.setReadout(cpp_readout)
         elif isinstance(readout, readouts.Lms):
-            cpp_readout = _rcl.LmsReadout(readout.learning_rate, readout.include_bias)
+            cpp_readout = _rclib.LmsReadout(readout.learning_rate, readout.include_bias)
             self._cpp_model.setReadout(cpp_readout)
         else:
             raise ValueError("Unsupported readout type")

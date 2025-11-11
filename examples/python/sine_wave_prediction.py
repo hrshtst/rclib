@@ -1,8 +1,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from rcl.model import ESN
-from rcl.readouts import Ridge
-from rcl.reservoirs import RandomSparse
+from rclib.model import ESN
+from rclib.readouts import Ridge
+from rclib.reservoirs import RandomSparse
 
 
 def main():

@@ -1,6 +1,6 @@
 #include <catch2/catch_all.hpp>
 
-#include "rcl/reservoirs/NvarReservoir.h"
+#include "rclib/reservoirs/NvarReservoir.h"
 #include <Eigen/Dense>
 
 TEST_CASE("NvarReservoir - Constructor and Initialization", "[NvarReservoir]") {

@@ -1,6 +1,6 @@
 #include <catch2/catch_all.hpp>
 
-#include "rcl/readouts/LmsReadout.h"
+#include "rclib/readouts/LmsReadout.h"
 #include <Eigen/Dense>
 
 TEST_CASE("LmsReadout - fit and predict", "[LmsReadout]") {
