@@ -60,5 +60,6 @@ PYBIND11_MODULE(_rcl, m) {
         .def("predict", &Model::predict, py::arg("inputs"), py::arg("reset_state_before_predict") = true)
         .def("getReservoir", &Model::getReservoir) // Added
         .def("getReadout", &Model::getReadout)    // Added
-        .def("predictOnline", &Model::predictOnline);
+        .def("predictOnline", &Model::predictOnline)
+        .def("predictGenerative", &Model::predictGenerative, py::arg("prime_inputs"), py::arg("n_steps"));
 }

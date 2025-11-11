@@ -12,3 +12,7 @@ target_link_libraries(compare_online_learning PRIVATE rcl_core)
 
 add_executable(sine_wave_prediction sine_wave_prediction.cpp)
 target_link_libraries(sine_wave_prediction PRIVATE rcl_core)
+
+add_executable(generative_prediction generative_prediction.cpp)
+target_link_libraries(generative_prediction PRIVATE rcl_core)
+

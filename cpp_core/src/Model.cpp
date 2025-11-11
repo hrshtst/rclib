@@ -160,3 +160,95 @@ std::shared_ptr<Readout> Model::getReadout() const {
     }
     return readout;
 }
+
+Eigen::MatrixXd Model::predictGenerative(const Eigen::MatrixXd& prime_inputs, int n_steps) {
+    if (reservoirs.empty() || !readout) {
+        throw std::runtime_error("Model is not fully configured. Add at least one reservoir and a readout.");
+    }
+
+    // 1. Priming phase
+    Eigen::MatrixXd last_state;
+    if (prime_inputs.rows() > 0) {
+        if (connection_type == "serial") {
+            Eigen::MatrixXd current_input = prime_inputs;
+            for (const auto& res : reservoirs) {
+                Eigen::MatrixXd res_states(prime_inputs.rows(), res->getState().cols());
+                for (int i = 0; i < prime_inputs.rows(); ++i) {
+                    res_states.row(i) = res->advance(current_input.row(i));
+                }
+                current_input = res_states;
+            }
+            last_state = current_input.row(current_input.rows() - 1);
+        } else { // parallel
+            std::vector<Eigen::MatrixXd> reservoir_outputs;
+            for (const auto& res : reservoirs) {
+                Eigen::MatrixXd res_states_for_all_inputs(prime_inputs.rows(), res->getState().cols());
+                for (int i = 0; i < prime_inputs.rows(); ++i) {
+                    res_states_for_all_inputs.row(i) = res->advance(prime_inputs.row(i));
+                }
+                reservoir_outputs.push_back(res_states_for_all_inputs.row(res_states_for_all_inputs.rows() - 1));
+            }
+            
+            int total_cols = 0;
+            for (const auto& mat : reservoir_outputs) {
+                total_cols += mat.cols();
+            }
+            last_state.resize(1, total_cols);
+            int current_col = 0;
+            for (const auto& mat : reservoir_outputs) {
+                last_state.middleCols(current_col, mat.cols()) = mat;
+                current_col += mat.cols();
+            }
+        }
+    } else {
+        // If no priming, start from the current state of the reservoirs
+        if (connection_type == "serial") {
+            last_state = reservoirs.back()->getState();
+        } else { // parallel
+            int total_cols = 0;
+            for (const auto& res : reservoirs) {
+                total_cols += res->getState().cols();
+            }
+            last_state.resize(1, total_cols);
+            int current_col = 0;
+            for (const auto& res : reservoirs) {
+                last_state.middleCols(current_col, res->getState().cols()) = res->getState();
+                current_col += res->getState().cols();
+            }
+        }
+    }
+
+    // First prediction is based on the last state of the priming phase
+    Eigen::MatrixXd next_input = readout->predict(last_state);
+
+    // 2. Generative phase
+    Eigen::MatrixXd generated_outputs(n_steps, next_input.cols());
+    if (n_steps > 0) {
+        generated_outputs.row(0) = next_input;
+    }
+
+    for (int i = 1; i < n_steps; ++i) {
+        Eigen::MatrixXd current_state;
+        if (connection_type == "serial") {
+            Eigen::MatrixXd current_step_input = next_input;
+            for (const auto& res : reservoirs) {
+                current_step_input = res->advance(current_step_input);
+            }
+            current_state = current_step_input;
+        } else { // parallel
+            for (const auto& res : reservoirs) {
+                Eigen::MatrixXd res_state = res->advance(next_input);
+                if (current_state.size() == 0) {
+                    current_state = res_state;
+                } else {
+                    current_state.conservativeResize(current_state.rows(), current_state.cols() + res_state.cols());
+                    current_state.rightCols(res_state.cols()) = res_state;
+                }
+            }
+        }
+        next_input = readout->predict(current_state);
+        generated_outputs.row(i) = next_input;
+    }
+
+    return generated_outputs;
+}

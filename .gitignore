@@ -37,6 +37,8 @@ CTestTestfile.cmake
 # Temporary files
 *.tmp
 *~
+*.png
+*.csv
 
 # IDEs
 .vscode/
