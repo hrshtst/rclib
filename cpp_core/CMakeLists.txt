@@ -13,7 +13,7 @@ set_target_properties(rcl_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 target_include_directories(rcl_core PUBLIC
     include
-    ${Eigen3_INCLUDE_DIRS}
+    ${EIGEN_INCLUDE_DIRS}
 )
 
 target_link_libraries(rcl_core PUBLIC
