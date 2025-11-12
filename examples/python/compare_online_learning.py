@@ -1,3 +1,5 @@
+import matplotlib.pyplot as plt
+import numpy as np
 from rclib import ESN, readouts, reservoirs
 
 
@@ -48,6 +50,7 @@ def main():
         spectral_radius=spectral_radius,
         sparsity=sparsity,
         leak_rate=leak_rate,
+        input_scaling=1.0,
         include_bias=include_bias,
     )
     readout_ridge = readouts.Ridge(alpha=ridge_alpha, include_bias=include_bias)
@@ -66,6 +69,7 @@ def main():
         spectral_radius=spectral_radius,
         sparsity=sparsity,
         leak_rate=leak_rate,
+        input_scaling=1.0,
         include_bias=include_bias,
     )
     readout_lms = readouts.Lms(learning_rate=lms_learning_rate, include_bias=include_bias)
@@ -95,6 +99,7 @@ def main():
         spectral_radius=spectral_radius,
         sparsity=sparsity,
         leak_rate=leak_rate,
+        input_scaling=1.0,
         include_bias=include_bias,
     )
     readout_rls = readouts.Rls(lambda_=rls_lambda, delta=rls_delta, include_bias=include_bias)
