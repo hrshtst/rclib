@@ -21,6 +21,8 @@ def main():
     include_bias = True
     reset_state_before_predict = False
 
+    plot_output_file = "sine_wave_prediction.png"
+
     # --- 1. Data Generation ---
     print("--- Generating Data ---")
     time_np = np.linspace(0, 80, n_total_samples)
@@ -80,6 +82,8 @@ def main():
         bbox=dict(boxstyle="round,pad=0.3", fc="wheat", alpha=0.7),
     )
     plt.tight_layout()
+    plt.savefig(plot_output_file)
+    print(f"Plot saved to {plot_output_file}")
     plt.show()
 
 
