@@ -62,6 +62,14 @@ class ESN:
         # Call the C++ model's predictGenerative method
         return self._cpp_model.predictGenerative(prime_data, n_steps)
 
+    def get_reservoir(self, index):
+        # Return the C++ reservoir object
+        return self._cpp_model.getReservoir(index)
+
+    def reset_reservoirs(self):
+        # Call the C++ model's resetReservoirs method
+        self._cpp_model.resetReservoirs()
+
     def partial_fit(self, X, y):
         # Assuming only one reservoir for simplicity in online learning for now.
         # If multiple reservoirs are present, the logic would need to be more complex

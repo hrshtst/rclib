@@ -1,6 +1,7 @@
 import numpy as np
 
-from rcl import ESN, readouts, reservoirs
+from rclib.model import ESN
+from rclib import readouts, reservoirs
 
 
 def test_model_creation():
@@ -48,3 +49,32 @@ def test_parallel_model_fit_predict():
 
     assert y_pred.shape == (200, 1)
     assert np.mean((y_pred - y_train) ** 2) < np.mean(y_train**2)
+
+
+def test_model_reset_reservoirs():
+    model = ESN()
+    res1 = reservoirs.RandomSparse(
+        n_neurons=10, spectral_radius=0.9, sparsity=0.1, leak_rate=0.2, include_bias=False, input_scaling=1.0
+    )
+    res2 = reservoirs.RandomSparse(
+        n_neurons=5, spectral_radius=0.8, sparsity=0.2, leak_rate=0.3, include_bias=False, input_scaling=1.0
+    )
+    model.add_reservoir(res1)
+    model.add_reservoir(res2)
+    readout = readouts.Ridge(alpha=1e-6, include_bias=False)
+    model.set_readout(readout)
+
+    # Advance states to ensure they are not zero
+    input_data = np.ones((10, 1))
+    model.predict(input_data, reset_state_before_predict=False)
+
+    # Check that states are not zero
+    assert np.linalg.norm(model.get_reservoir(0).getState()) > 0
+    assert np.linalg.norm(model.get_reservoir(1).getState()) > 0
+
+    model.reset_reservoirs()
+
+    # Check that states are reset to zero
+    assert np.linalg.norm(model.get_reservoir(0).getState()) == 0
+    assert np.linalg.norm(model.get_reservoir(1).getState()) == 0
+

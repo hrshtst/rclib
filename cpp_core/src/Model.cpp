@@ -19,9 +19,7 @@ void Model::fit(const Eigen::MatrixXd& inputs, const Eigen::MatrixXd& targets, i
         throw std::out_of_range("washout_len must be non-negative and less than the number of input rows.");
     }
 
-    for (auto& res : reservoirs) {
-        res->resetState();
-    }
+    resetReservoirs();
 
     // Collect states from all reservoirs for the entire input sequence
     Eigen::MatrixXd all_states_full;
@@ -73,9 +71,7 @@ Eigen::MatrixXd Model::predict(const Eigen::MatrixXd& inputs, bool reset_state_b
     }
 
     if (reset_state_before_predict) {
-        for (auto& res : reservoirs) {
-            res->resetState();
-        }
+        resetReservoirs();
     }
 
     // Collect states from all reservoirs
@@ -251,4 +247,10 @@ Eigen::MatrixXd Model::predictGenerative(const Eigen::MatrixXd& prime_inputs, in
     }
 
     return generated_outputs;
+}
+
+void Model::resetReservoirs() {
+    for (auto& res : reservoirs) {
+        res->resetState();
+    }
 }

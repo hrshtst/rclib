@@ -58,8 +58,9 @@ PYBIND11_MODULE(_rclib, m) {
         .def("setReadout", &Model::setReadout)
         .def("fit", &Model::fit, py::arg("inputs"), py::arg("targets"), py::arg("washout_len") = 0)
         .def("predict", &Model::predict, py::arg("inputs"), py::arg("reset_state_before_predict") = true)
-        .def("getReservoir", &Model::getReservoir) // Added
-        .def("getReadout", &Model::getReadout)    // Added
+        .def("getReservoir", &Model::getReservoir)
+        .def("getReadout", &Model::getReadout)
         .def("predictOnline", &Model::predictOnline)
-        .def("predictGenerative", &Model::predictGenerative, py::arg("prime_inputs"), py::arg("n_steps"));
+        .def("predictGenerative", &Model::predictGenerative, py::arg("prime_inputs"), py::arg("n_steps"))
+        .def("resetReservoirs", &Model::resetReservoirs);
 }

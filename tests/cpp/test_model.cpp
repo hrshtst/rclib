@@ -83,3 +83,24 @@ TEST_CASE("Model - parallel connection", "[Model]") {
     double original_error = targets.squaredNorm();
     REQUIRE(prediction_error < original_error);
 }
+
+TEST_CASE("Model - resetReservoirs", "[Model]") {
+    Model model;
+    auto res1 = std::make_shared<RandomSparseReservoir>(10, 0.9, 0.1, 0.2, 1.0);
+    auto res2 = std::make_shared<RandomSparseReservoir>(5, 0.8, 0.2, 0.3, 1.0);
+    model.addReservoir(res1);
+    model.addReservoir(res2);
+
+    // Advance states to ensure they are not zero
+    Eigen::MatrixXd input = Eigen::MatrixXd::Ones(1, 1);
+    res1->advance(input);
+    res2->advance(input);
+
+    REQUIRE(res1->getState().norm() > 0);
+    REQUIRE(res2->getState().norm() > 0);
+
+    model.resetReservoirs();
+
+    REQUIRE(res1->getState().norm() == 0);
+    REQUIRE(res2->getState().norm() == 0);
+}
