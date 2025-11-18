@@ -898,6 +898,7 @@ dependencies = [
     { name = "matplotlib" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.3.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "pandas" },
     { name = "pyqt6" },
     { name = "seaborn" },
 ]
@@ -912,6 +913,7 @@ dev = [
 requires-dist = [
     { name = "matplotlib", specifier = ">=3.10.7" },
     { name = "numpy" },
+    { name = "pandas", specifier = ">=2.3.3" },
     { name = "pyqt6", specifier = ">=6.10.0" },
     { name = "seaborn", specifier = ">=0.13.2" },
 ]
