@@ -18,4 +18,5 @@ target_include_directories(rcl_core PUBLIC
 
 target_link_libraries(rcl_core PUBLIC
     Eigen3::Eigen
+    OpenMP::OpenMP_CXX
 )
