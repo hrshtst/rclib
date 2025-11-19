@@ -30,7 +30,7 @@ printf "% -15s | % -s\n" "OMP_NUM_THREADS" "Status"
 echo "---------------------------------"
 
 # Create/clear the output file and write the header
-echo "threads,run,time_s" > "$OUTPUT_FILE"
+echo "threads,run,method,time_s,mse" > "$OUTPUT_FILE"
 
 for threads in "${THREAD_COUNTS[@]}"; do
     export OMP_NUM_THREADS=$threads
@@ -38,13 +38,11 @@ for threads in "${THREAD_COUNTS[@]}"; do
 
     # Run the executable multiple times and record each result
     for (( i=1; i<=NUM_RUNS; i++ )); do
-        # Use /usr/bin/time to get the real time, redirecting program output to /dev/null
-        run_time=$(/usr/bin/time -f "%e" "$EXECUTABLE" 2>&1 | tail -n 1)
-        
-        # Append to CSV file
-        echo "$threads,$i,$run_time" >> "$OUTPUT_FILE"
+        # Run the C++ benchmark program and capture its CSV output, skipping the header
+        # Use awk to prepend the thread count and run number
+        "$EXECUTABLE" | tail -n +2 | awk -v threads="$threads" -v run="$i" -F, '{print threads","run","$0}' >> "$OUTPUT_FILE"
     done
-    
+
     printf "\r% -15s | % -s\n" "$threads" "Done"
 
 done

@@ -6,8 +6,8 @@ import os
 
 def plot_results(csv_file: str):
     """
-    Reads benchmark results from a CSV file, calculates statistics,
-    and generates a plot with error bars.
+    Reads detailed benchmark results from a CSV file, calculates statistics,
+    and generates plots for performance and MSE.
 
     Args:
         csv_file (str): The path to the input CSV file.
@@ -17,58 +17,67 @@ def plot_results(csv_file: str):
         return
 
     # Read the raw data
-    df_raw = pd.read_csv(csv_file)
+    df = pd.read_csv(csv_file)
 
-    # Calculate mean and standard deviation for each thread count
-    df_agg = df_raw.groupby('threads')['time_s'].agg(['mean', 'std']).reset_index()
-    df_agg.rename(columns={'mean': 'avg_time_s', 'std': 'std_time_s'}, inplace=True)
+    # --- Compute 'offline_total' ---
+    # Group by threads and run to sum fit and predict times for each unique benchmark run
+    offline_grouped = df[df['method'].isin(['offline_fit', 'offline_predict'])].groupby(['threads', 'run'])['time_s'].sum().reset_index()
+    offline_total_df = pd.DataFrame({
+        'threads': offline_grouped['threads'],
+        'run': offline_grouped['run'],
+        'method': 'offline_total',
+        'time_s': offline_grouped['time_s'],
+        'mse': df[df['method'] == 'offline_predict'].groupby(['threads', 'run'])['mse'].mean().reset_index()['mse'] # Use predict MSE for total
+    })
+    df = pd.concat([df, offline_total_df], ignore_index=True)
 
-    # --- Plotting ---
+
+    # --- 1. Plot Performance (Time vs. Threads) in a single figure ---
     sns.set_theme(style="whitegrid")
-    plt.figure(figsize=(12, 7))
-
-    # Create a bar plot for the average time
-    ax = sns.barplot(x='threads', y='avg_time_s', data=df_agg, color='b', alpha=0.6, label='Execution Time')
+    plt.figure(figsize=(12, 8))
     
-    # Add error bars
-    ax.errorbar(
-        x=ax.get_xticks(),
-        y=df_agg['avg_time_s'],
-        yerr=df_agg['std_time_s'],
-        fmt='none',
-        capsize=5,
-        color='black',
-        label='Std Dev'
+    ax = sns.lineplot(
+        data=df,
+        x="threads",
+        y="time_s",
+        hue="method",
+        style="method",
+        marker="o",
+        markers=True,
+        dashes=True
     )
-
-    ax.set_ylabel('Average Time (s)')
-    ax.set_xlabel('Number of OpenMP Threads')
-    ax.set_title('Benchmark: Execution Time vs. Number of Threads')
-
-    # Calculate and plot speedup on a secondary y-axis
-    baseline_time = df_agg[df_agg['threads'] == 1]['avg_time_s'].iloc[0]
-    df_agg['speedup'] = baseline_time / df_agg['avg_time_s']
     
-    ax2 = ax.twinx()
-    sns.lineplot(x='threads', y='speedup', data=df_agg, marker='o', color='r', ax=ax2, label='Speedup')
-    ax2.set_ylabel('Speedup (relative to 1 thread)')
-    ax2.grid(False)
+    ax.set_title("Performance Benchmark: Time vs. Threads", fontsize=16)
+    ax.set_xlabel("Number of OpenMP Threads")
+    ax.set_ylabel("Average Time (s)")
+    ax.legend(title='Method')
+    ax.set_yscale('log') # Use a log scale for the y-axis to better see differences
 
-    # --- Final Touches ---
-    # Combine legends
-    handles, labels = ax.get_legend_handles_labels()
-    handles2, labels2 = ax2.get_legend_handles_labels()
-    # Manually add the error bar to the legend
-    from matplotlib.lines import Line2D
-    handles.append(Line2D([0], [0], color='black', lw=1, label='Std Dev'))
-    labels.append('Std Dev')
-    ax2.legend(handles=handles + handles2, labels=labels + labels2, loc='upper left')
+    # Save the performance plot
+    perf_output_filename = os.path.splitext(csv_file)[0] + '_performance.png'
+    plt.savefig(perf_output_filename)
+    print(f"Performance plot saved to '{perf_output_filename}'")
+    plt.show()
+
+
+    # --- 2. Plot MSE ---
+    # We only need the MSE for one run, as it should be consistent
+    df_mse = df.groupby('method')['mse'].mean().reset_index()
     
-    # Save the plot
-    output_filename = os.path.splitext(csv_file)[0] + '.png'
-    plt.savefig(output_filename)
-    print(f"Plot saved to '{output_filename}'")
+    plt.figure(figsize=(10, 6))
+    ax_mse = sns.barplot(data=df_mse, x='method', y='mse')
+    ax_mse.set_title('Comparison of Mean Squared Error (MSE)')
+    ax_mse.set_ylabel('MSE')
+    ax_mse.set_xlabel('Method')
+    
+    # Add MSE values on top of the bars
+    for index, row in df_mse.iterrows():
+        ax_mse.text(index, row.mse, f'{row.mse:.4f}', color='black', ha="center")
 
+    # Save the MSE plot
+    mse_output_filename = os.path.splitext(csv_file)[0] + '_mse.png'
+    plt.savefig(mse_output_filename)
+    print(f"MSE plot saved to '{mse_output_filename}'")
     plt.show()
 
 

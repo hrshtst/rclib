@@ -19,3 +19,7 @@ target_link_libraries(generative_prediction PRIVATE rcl_core)
 add_executable(multi_dimensional_prediction multi_dimensional_prediction.cpp)
 target_link_libraries(multi_dimensional_prediction PRIVATE rcl_core)
 
+add_executable(performance_benchmark performance_benchmark.cpp)
+target_link_libraries(performance_benchmark PRIVATE rcl_core)
+
+
