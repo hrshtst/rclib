@@ -35,7 +35,7 @@ def plot_results(csv_file: str):
     # --- 1. Plot Performance (Time vs. Threads) in a single figure ---
     sns.set_theme(style="whitegrid")
     plt.figure(figsize=(12, 8))
-    
+
     ax = sns.lineplot(
         data=df,
         x="threads",
@@ -46,7 +46,7 @@ def plot_results(csv_file: str):
         markers=True,
         dashes=True
     )
-    
+
     ax.set_title("Performance Benchmark: Time vs. Threads", fontsize=16)
     ax.set_xlabel("Number of OpenMP Threads")
     ax.set_ylabel("Average Time (s)")
@@ -59,19 +59,43 @@ def plot_results(csv_file: str):
     print(f"Performance plot saved to '{perf_output_filename}'")
     plt.show()
 
+    # --- 2. Plot RLS-only Performance ---
+    plt.figure(figsize=(10, 6))
+    df_rls = df[df['method'] == 'online_rls']
 
-    # --- 2. Plot MSE ---
+    ax_rls = sns.lineplot(
+        data=df_rls,
+        x="threads",
+        y="time_s",
+        marker="o"
+    )
+
+    ax_rls.set_title("RLS Performance: Time vs. Threads", fontsize=16)
+    ax_rls.set_xlabel("Number of OpenMP Threads")
+    ax_rls.set_ylabel("Average Time (s)")
+
+    # Save the RLS performance plot
+    rls_perf_output_filename = os.path.splitext(csv_file)[0] + '_rls_performance.png'
+    plt.savefig(rls_perf_output_filename)
+    print(f"RLS performance plot saved to '{rls_perf_output_filename}'")
+    plt.show()
+
+    # --- 3. Plot MSE ---
     # We only need the MSE for one run, as it should be consistent
     df_mse = df.groupby('method')['mse'].mean().reset_index()
-    
+
+    # Filter out offline_fit and offline_predict
+    methods_to_exclude = ['offline_fit', 'offline_predict']
+    df_mse_filtered = df_mse[~df_mse['method'].isin(methods_to_exclude)]
+
     plt.figure(figsize=(10, 6))
-    ax_mse = sns.barplot(data=df_mse, x='method', y='mse')
+    ax_mse = sns.barplot(data=df_mse_filtered, x='method', y='mse')
     ax_mse.set_title('Comparison of Mean Squared Error (MSE)')
     ax_mse.set_ylabel('MSE')
     ax_mse.set_xlabel('Method')
-    
+
     # Add MSE values on top of the bars
-    for index, row in df_mse.iterrows():
+    for index, row in df_mse_filtered.iterrows():
         ax_mse.text(index, row.mse, f'{row.mse:.4f}', color='black', ha="center")
 
     # Save the MSE plot
