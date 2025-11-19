@@ -43,7 +43,7 @@ for threads in "${THREAD_COUNTS[@]}"; do
         "$EXECUTABLE" | tail -n +2 | awk -v threads="$threads" -v run="$i" -F, '{print threads","run","$0}' >> "$OUTPUT_FILE"
     done
 
-    printf "\r% -15s | % -s\n" "$threads" "Done"
+    printf "\r% -15s | % -s\n" "$threads" "Done      "
 
 done
 
