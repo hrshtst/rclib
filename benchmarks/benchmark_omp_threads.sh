@@ -6,8 +6,8 @@
 # --- Configuration ---
 EXECUTABLE=$1
 OUTPUT_FILE=${2:-benchmarks/benchmark_results.csv} # Default output file
-NUM_RUNS=5
-THREAD_COUNTS=(1 2 4 8 12 16)
+NUM_RUNS=10
+THREAD_COUNTS=(1 2 4 8 12 16 24 32)
 
 # --- Validation ---
 if [ -z "$EXECUTABLE" ]; then
