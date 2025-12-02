@@ -1,25 +1,25 @@
 add_executable(quick_start quick_start.cpp)
-target_link_libraries(quick_start PRIVATE rcl_core)
+target_link_libraries(quick_start PRIVATE rclib_core)
 
 add_executable(mackey_glass mackey_glass.cpp)
-target_link_libraries(mackey_glass PRIVATE rcl_core)
+target_link_libraries(mackey_glass PRIVATE rclib_core)
 
 add_executable(online_learning online_learning.cpp)
-target_link_libraries(online_learning PRIVATE rcl_core)
+target_link_libraries(online_learning PRIVATE rclib_core)
 
 add_executable(compare_online_learning compare_online_learning.cpp)
-target_link_libraries(compare_online_learning PRIVATE rcl_core)
+target_link_libraries(compare_online_learning PRIVATE rclib_core)
 
 add_executable(sine_wave_prediction sine_wave_prediction.cpp)
-target_link_libraries(sine_wave_prediction PRIVATE rcl_core)
+target_link_libraries(sine_wave_prediction PRIVATE rclib_core)
 
 add_executable(generative_prediction generative_prediction.cpp)
-target_link_libraries(generative_prediction PRIVATE rcl_core)
+target_link_libraries(generative_prediction PRIVATE rclib_core)
 
 add_executable(multi_dimensional_prediction multi_dimensional_prediction.cpp)
-target_link_libraries(multi_dimensional_prediction PRIVATE rcl_core)
+target_link_libraries(multi_dimensional_prediction PRIVATE rclib_core)
 
 add_executable(performance_benchmark performance_benchmark.cpp)
-target_link_libraries(performance_benchmark PRIVATE rcl_core)
+target_link_libraries(performance_benchmark PRIVATE rclib_core)
 
 

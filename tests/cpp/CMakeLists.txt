@@ -2,29 +2,29 @@ include(CTest)
 include(Catch)
 
 add_executable(test_reservoir test_reservoir.cpp)
-target_link_libraries(test_reservoir PRIVATE rcl_core Catch2::Catch2WithMain)
+target_link_libraries(test_reservoir PRIVATE rclib_core Catch2::Catch2WithMain)
 catch_discover_tests(test_reservoir)
 
 add_executable(test_nvar_reservoir test_nvar_reservoir.cpp)
-target_link_libraries(test_nvar_reservoir PRIVATE rcl_core Catch2::Catch2WithMain)
+target_link_libraries(test_nvar_reservoir PRIVATE rclib_core Catch2::Catch2WithMain)
 catch_discover_tests(test_nvar_reservoir)
 
 add_executable(test_readout test_readout.cpp)
-target_link_libraries(test_readout PRIVATE rcl_core Catch2::Catch2WithMain)
+target_link_libraries(test_readout PRIVATE rclib_core Catch2::Catch2WithMain)
 catch_discover_tests(test_readout)
 
 add_executable(test_rls_readout test_rls_readout.cpp)
-target_link_libraries(test_rls_readout PRIVATE rcl_core Catch2::Catch2WithMain)
+target_link_libraries(test_rls_readout PRIVATE rclib_core Catch2::Catch2WithMain)
 catch_discover_tests(test_rls_readout)
 
 add_executable(test_lms_readout test_lms_readout.cpp)
-target_link_libraries(test_lms_readout PRIVATE rcl_core Catch2::Catch2WithMain)
+target_link_libraries(test_lms_readout PRIVATE rclib_core Catch2::Catch2WithMain)
 catch_discover_tests(test_lms_readout)
 
 add_executable(test_model test_model.cpp)
-target_link_libraries(test_model PRIVATE rcl_core Catch2::Catch2WithMain)
+target_link_libraries(test_model PRIVATE rclib_core Catch2::Catch2WithMain)
 catch_discover_tests(test_model)
 
 add_executable(test_bias_effect test_bias_effect.cpp)
-target_link_libraries(test_bias_effect PRIVATE rcl_core Catch2::Catch2WithMain)
+target_link_libraries(test_bias_effect PRIVATE rclib_core Catch2::Catch2WithMain)
 catch_discover_tests(test_bias_effect)
