@@ -1,3 +1,6 @@
+# Find OpenMP
+find_package(OpenMP)
+
 add_library(rcl_core STATIC
     src/Reservoir.cpp
     src/Readout.cpp
@@ -18,5 +21,11 @@ target_include_directories(rcl_core PUBLIC
 
 target_link_libraries(rcl_core PUBLIC
     Eigen3::Eigen
-    OpenMP::OpenMP_CXX
 )
+
+if(OpenMP_FOUND)
+    target_link_libraries(rcl_core PUBLIC OpenMP::OpenMP_CXX)
+    target_compile_definitions(rcl_core PUBLIC EIGEN_DONT_PARALLELIZE=0)
+else()
+    message(WARNING "OpenMP not found. The project will be built without parallelization.")
+endif()
