@@ -54,3 +54,14 @@ CTestTestfile.cmake
 .skbuild-info.json
 .cmake/
 CMakeInit.txt
+
+# LaTeX build artifacts in docs/
+/docs/*.aux
+/docs/*.log
+/docs/*.tex
+/docs/*.fls
+/docs/*.fdb_latexmk
+/docs/*.synctex.gz
+/docs/*.toc
+/docs/*.out
+/docs/listings_setup.tex
