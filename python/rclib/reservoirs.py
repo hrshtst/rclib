@@ -1,5 +1,13 @@
 class RandomSparse:
-    def __init__(self, n_neurons, spectral_radius, sparsity, leak_rate, input_scaling, include_bias):
+    def __init__(
+        self,
+        n_neurons,
+        spectral_radius,
+        sparsity=0.1,
+        leak_rate=1.0,
+        input_scaling=1.0,
+        include_bias=False,
+    ):
         self.n_neurons = n_neurons
         self.spectral_radius = spectral_radius
         self.sparsity = sparsity

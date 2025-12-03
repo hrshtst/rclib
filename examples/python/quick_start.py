@@ -10,7 +10,9 @@ X_test = np.linspace(0, 1, 100).reshape(-1, 1)
 y_test = np.sin(X_test * 10)
 
 # 2. Configure Reservoir
-res = reservoirs.RandomSparse(n_neurons=1000, spectral_radius=0.9, sparsity=0.1, leak_rate=0.3, include_bias=True)
+res = reservoirs.RandomSparse(
+    n_neurons=1000, spectral_radius=0.9, sparsity=0.1, leak_rate=0.3, include_bias=True, input_scaling=0.5
+)
 
 # 3. Configure Readout
 readout = readouts.Ridge(alpha=1e-8, include_bias=True)
