@@ -7,10 +7,8 @@
 
 # --- Configuration ---
 OUTPUT_FILE=${1:-benchmarks/parallel_comparison_results.csv}
-# NUM_RUNS=${2:-10}
-# THREAD_COUNTS=(1 2 4 8 12 16 24 32)
-NUM_RUNS=${2:-3}
-THREAD_COUNTS=(1 2 4)
+NUM_RUNS=${2:-10}
+THREAD_COUNTS=(1 2 4 8 12 16 24 32)
 
 # Ensure we are in the project root
 cd "$(dirname "$0")/.." || exit 1
