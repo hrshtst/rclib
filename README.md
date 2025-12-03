@@ -17,6 +17,8 @@
 *   **CMake:** Version 3.15 or higher.
 *   **Python:** Version 3.10 or higher (for Python bindings).
 *   **Build Tool:** `uv` is recommended for managing the Python environment, but standard `pip` works too.
+*   **OpenMP:** Required for parallelization.
+    *   Ubuntu/Debian: `sudo apt install libomp-dev`
 
 ### Building from Source
 
@@ -33,7 +35,7 @@
 
 2.  **Build C++ Core and Examples:**
     ```bash
-    cmake -S . -B build -DBUILD_EXAMPLES=ON
+    cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DBUILD_EXAMPLES=ON -DCMAKE_BUILD_TYPE=Release
     cmake --build build --config Release -j $(nproc)
     ```
 
@@ -131,7 +133,7 @@ uv run pytest
 
 *   **Configuration:**
     ```bash
-    cmake -S . -B build -DRCLIB_USE_OPENMP=ON -DRCLIB_ENABLE_EIGEN_PARALLELIZATION=OFF
+    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DRCLIB_USE_OPENMP=ON -DRCLIB_ENABLE_EIGEN_PARALLELIZATION=OFF
     ```
 *   **How it works:** `rclib` uses OpenMP `#pragma omp parallel for` loops to parallelize high-level operations (e.g., updating state for multiple reservoirs in a parallel architecture, or processing batches). Eigen is forced to run in single-threaded mode to avoid **oversubscription** (too many threads competing for resources).
 
@@ -140,7 +142,7 @@ uv run pytest
 
 *   **Configuration:**
     ```bash
-    cmake -S . -B build -DRCLIB_USE_OPENMP=ON -DRCLIB_ENABLE_EIGEN_PARALLELIZATION=ON
+    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DRCLIB_USE_OPENMP=ON -DRCLIB_ENABLE_EIGEN_PARALLELIZATION=ON
     ```
 *   **How it works:** `rclib` disables its own OpenMP loops. Instead, it lets Eigen use the OpenMP thread pool to parallelize internal matrix operations (like large dense matrix multiplications). This is useful when the reservoir state size is huge.
 
@@ -149,7 +151,7 @@ uv run pytest
 
 *   **Configuration:**
     ```bash
-    cmake -S . -B build -DRCLIB_USE_OPENMP=OFF
+    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DRCLIB_USE_OPENMP=OFF
     ```
 
 ## Performance Benchmarking

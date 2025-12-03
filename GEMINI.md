@@ -53,7 +53,7 @@ rclib/
 
 2.  **Build C++ Core and Examples:**
     ```bash
-    cmake -S . -B build -DBUILD_EXAMPLES=ON
+    cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DBUILD_EXAMPLES=ON -DCMAKE_BUILD_TYPE=Release
     cmake --build build --config Release -j $(nproc)
     ```
 
@@ -114,7 +114,7 @@ uv run pytest
 
 *   **Configuration:**
     ```bash
-    cmake -S . -B build -DRCLIB_USE_OPENMP=ON -DRCLIB_ENABLE_EIGEN_PARALLELIZATION=OFF
+    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DRCLIB_USE_OPENMP=ON -DRCLIB_ENABLE_EIGEN_PARALLELIZATION=OFF
     ```
 
 #### 2. Eigen-Level Parallelism
@@ -122,7 +122,7 @@ uv run pytest
 
 *   **Configuration:**
     ```bash
-    cmake -S . -B build -DRCLIB_USE_OPENMP=ON -DRCLIB_ENABLE_EIGEN_PARALLELIZATION=ON
+    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DRCLIB_USE_OPENMP=ON -DRCLIB_ENABLE_EIGEN_PARALLELIZATION=ON
     ```
 
 #### 3. Serial (Single-Threaded)
@@ -130,7 +130,7 @@ uv run pytest
 
 *   **Configuration:**
     ```bash
-    cmake -S . -B build -DRCLIB_USE_OPENMP=OFF
+    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DRCLIB_USE_OPENMP=OFF
     ```
 
 ## Performance Benchmarking
