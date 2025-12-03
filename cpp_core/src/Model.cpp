@@ -29,6 +29,9 @@ void Model::fit(const Eigen::MatrixXd& inputs, const Eigen::MatrixXd& targets, i
         Eigen::MatrixXd current_input = inputs;
         for (const auto& res : reservoirs) {
             Eigen::MatrixXd res_states(inputs.rows(), res->getState().cols());
+            #ifdef RCLIB_ENABLE_USER_PARALLELIZATION
+            #pragma omp parallel for
+            #endif
             for (int i = 0; i < inputs.rows(); ++i) {
                 res_states.row(i) = res->advance(current_input.row(i));
             }
@@ -36,13 +39,17 @@ void Model::fit(const Eigen::MatrixXd& inputs, const Eigen::MatrixXd& targets, i
         }
         all_states_full = current_input;
     } else if (connection_type == "parallel") {
-        std::vector<Eigen::MatrixXd> reservoir_outputs;
-        for (const auto& res : reservoirs) {
+        std::vector<Eigen::MatrixXd> reservoir_outputs(reservoirs.size());
+        #ifdef RCLIB_ENABLE_USER_PARALLELIZATION
+        #pragma omp parallel for
+        #endif
+        for (size_t r = 0; r < reservoirs.size(); ++r) {
+            auto& res = reservoirs[r];
             Eigen::MatrixXd res_states_for_all_inputs(inputs.rows(), res->getState().cols());
             for (int i = 0; i < inputs.rows(); ++i) {
                 res_states_for_all_inputs.row(i) = res->advance(inputs.row(i));
             }
-            reservoir_outputs.push_back(res_states_for_all_inputs);
+            reservoir_outputs[r] = res_states_for_all_inputs;
         }
 
         if (!reservoir_outputs.empty()) {
@@ -82,6 +89,9 @@ Eigen::MatrixXd Model::predict(const Eigen::MatrixXd& inputs, bool reset_state_b
         Eigen::MatrixXd current_input = inputs;
         for (const auto& res : reservoirs) {
             Eigen::MatrixXd res_states(inputs.rows(), res->getState().cols());
+            #ifdef RCLIB_ENABLE_USER_PARALLELIZATION
+            #pragma omp parallel for
+            #endif
             for (int i = 0; i < inputs.rows(); ++i) {
                 res_states.row(i) = res->advance(current_input.row(i));
             }
@@ -89,13 +99,17 @@ Eigen::MatrixXd Model::predict(const Eigen::MatrixXd& inputs, bool reset_state_b
         }
         all_states = current_input;
     } else if (connection_type == "parallel") {
-        std::vector<Eigen::MatrixXd> reservoir_outputs;
-        for (const auto& res : reservoirs) {
+        std::vector<Eigen::MatrixXd> reservoir_outputs(reservoirs.size());
+        #ifdef RCLIB_ENABLE_USER_PARALLELIZATION
+        #pragma omp parallel for
+        #endif
+        for (size_t r = 0; r < reservoirs.size(); ++r) {
+            auto& res = reservoirs[r];
             Eigen::MatrixXd res_states_for_all_inputs(inputs.rows(), res->getState().cols());
             for (int i = 0; i < inputs.rows(); ++i) {
                 res_states_for_all_inputs.row(i) = res->advance(inputs.row(i));
             }
-            reservoir_outputs.push_back(res_states_for_all_inputs);
+            reservoir_outputs[r] = res_states_for_all_inputs;
         }
 
         if (!reservoir_outputs.empty()) {
@@ -251,7 +265,10 @@ Eigen::MatrixXd Model::predictGenerative(const Eigen::MatrixXd& prime_inputs, in
 }
 
 void Model::resetReservoirs() {
-    for (auto& res : reservoirs) {
-        res->resetState();
+    #ifdef RCLIB_ENABLE_USER_PARALLELIZATION
+    #pragma omp parallel for
+    #endif
+    for (int i = 0; i < static_cast<int>(reservoirs.size()); ++i) {
+        reservoirs[i]->resetState();
     }
 }
