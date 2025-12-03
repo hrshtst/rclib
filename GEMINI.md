@@ -1,203 +1,197 @@
-# **Project Specification: "rclib" (Reservoir Computing Library)**
+# rclib: Reservoir Computing Library
 
-## **1. Project Goal**
+**rclib** is a high-performance, scalable, and general-purpose reservoir computing framework implemented in C++ with Python bindings. It is designed to handle both small-scale networks and very large-scale (40,000+ neurons) architectures, supporting deep (stacked) and parallel reservoir configurations.
 
-The primary goal is to create a high-performance, scalable, and general-purpose reservoir computing framework, "rclib." It must be capable of handling both small-scale (100 neurons) and very large-scale (40,000+ neurons) networks, as well as deep (stacked) and parallel reservoir architectures.
+## Project Goals
 
-The core library will be implemented in C++ for maximum computational performance, available as both a standalone C++ library and with comprehensive Python bindings for the machine learning community.
+*   **Performance:** Core logic in C++17 using Eigen for linear algebra.
+*   **Scalability:** Efficient handling of large sparse reservoirs and complex architectures.
+*   **Flexibility:** Modular design separating Reservoirs and Readouts.
+*   **Ease of Use:** Pythonic interface via `pybind11` and `scikit-learn` style API.
 
-## **2. Core Technology Stack**
-
-* **Core Logic:** C++ (C++17 or newer).
-* **Build System:** `CMake`. This will manage the C++ core, C++ tests, and the `pybind11` module compilation.
-* **Python Interface:** Python 3.10+.
-* **Python Project Management:** `uv` (preferred over venv/pip).
-* **Python Formatter/Linter:** `Ruff`.
-* **Python Dependencies:** `numpy`. The Python API will primarily accept and return NumPy arrays.
-* **Testing:**
-  * **C++:** `Catch2` (preferred).
-  * **Python:** `pytest`.
-* **Fixed C++ Dependencies:**
-  * `Eigen`: `3.4.1` (for C++ Linear Algebra)
-  * `Catch2`: `v3.11.0` (for C++ Testing)
-  * `pybind11`: `v3.0.1` (for Python Bindings)
-
-## **3. Build & Dependency Management**
-
-This project uses `git submodule` to manage C++ dependencies. They will be downloaded into `cpp_core/third_party/` and built from source using `CMake`.
-
-**Instructions for Gemini CLI (or User):** When scaffolding, the following commands must be used to add the dependencies.
-
-``` shell
-# Ensure you are in the project root 'rclib/'
-git submodule add https://gitlab.com/libeigen/eigen.git cpp_core/third_party/eigen
-git submodule add https://github.com/catchorg/Catch2.git cpp_core/third_party/catch2
-git submodule add https://github.com/pybind/pybind11.git cpp_core/third_party/pybind11
-```
-
-The root `CMakeLists.txt` will then add these directories:
-* `add_subdirectory(cpp_core/third_party/catch2)`
-* `add_subdirectory(cpp_core/third_party/pybind11)`
-* `add_subdirectory(cpp_core/third_party/eigen)` (Eigen is header-only but this helps CMake find it)
-
-## **4. Key Architectural Principles**
-
-1. **Modularity:** The **Reservoir** and **Readout** components MUST be implemented as separate, swappable modules.
-2. **Performance:** C++ implementations should prioritize computational efficiency and memory management, especially for large, sparse matrices (`Eigen::SparseMatrix`).
-3. **Scalability:** The design must naturally support:
-   * **Large Reservoirs:** Efficiently handle single reservoirs with 40,000+ neurons.
-   * **Deep ESNs:** Allow straightforward serial stacking of reservoir layers.
-   * **Parallel ESNs:** Allow multiple reservoirs to be processed in parallel, with their states concatenated before reaching the readout.
-4. **Configurability:** All key parameters (spectral radius, sparsity, leak rate, regularization, **bias inclusion**, etc.) MUST be easily configurable from both the C++ and Python APIs.
-
-## **5. Proposed Directory Structure**
+## Current Directory Structure
 
 ```
 rclib/
-├── .gitmodules            # <- Will be created by git submodule
+├── benchmarks/            # Performance benchmarking scripts
+├── build/                 # Build directory (default)
+├── cpp_core/              # C++ source
+│   ├── include/rclib/     # Public headers
+│   ├── src/               # Source files
+│   └── third_party/       # Dependencies (Eigen, Catch2, pybind11)
+├── examples/              # Examples
+│   ├── cpp/
+│   └── python/
+├── python/                # Python package structure
+│   └── rclib/
+├── tests/                 # Unit and integration tests
+│   ├── cpp/
+│   └── python/
 ├── CMakeLists.txt         # Main CMake build file
 ├── README.md
-├── GEMINI.md              # This file
-├── pyproject.toml         # For uv and Ruff configuration
-├── cpp_core/              # C++ source
-│   ├── CMakeLists.txt
-│   ├── include/
-│   │   ├── rclib/
-│   │   │   ├── Reservoir.h
-│   │   │   ├── Readout.h
-│   │   │   ├── Model.h
-│   │   │   └── reservoirs/
-│   │   │       ├── RandomSparseReservoir.h
-│   │   │       └── NvarReservoir.h
-│   │   │   └── readouts/
-│   │   │       ├── RidgeReadout.h
-│   │   │       ├── RlsReadout.h
-│   │   │       └── LmsReadout.h
-│   ├── src/
-│   │   ├── Reservoir.cpp
-│   │   ├── ... (other .cpp files)
-│   └── third_party/
-│       ├── eigen/           # <- Git Submodule
-│       ├── pybind11/        # <- Git Submodule
-│       └── catch2/          # <- Git Submodule
-├── python/                # Python package
-│   ├── CMakeLists.txt     # For pybind11 module
-│   ├── rclib/
-│   │   ├── __init__.py
-│   │   ├── model.py       # Python wrapper class for Model
-│   │   └── _rclib.cpp       # Pybind11 binding definitions
-│   └── setup.py           # To build and install the Python package
-├── tests/
-│   ├── cpp/               # C++ tests (using Catch2)
-│   │   ├── test_reservoir.cpp
-│   │   └── ...
-│   └── python/            # Python tests
-│       ├── test_model.py
-│       └── ...
-└── examples/
-    ├── cpp/               # C++ examples
-    │   ├── quick_start.cpp
-    │   └── mackey_glass.cpp
-    └── python/            # Python examples
-        ├── quick_start.py
-        └── mackey_glass.py
+├── pyproject.toml         # Python project configuration
+└── GEMINI.md              # This context file
 ```
 
-## **5. C++ API Design (High-Level)**
+## Getting Started
 
-### **CMake Configuration (`cpp_core/CMakeLists.txt`)**
+### Prerequisites
 
-* The C++ core will be built as a static library (e.g., rclib_core).
-* It must use `add_subdirectory` for `catch2` and `pybind11` (as specified in Section 3).
-* It must find `Eigen` via `find_package(Eigen REQUIRED)` or by linking to the `Eigen3::Eigen` target if `add_subdirectory(eigen)` provides it.
+*   **C++ Compiler:** GCC, Clang, or MSVC supporting C++17.
+*   **CMake:** Version 3.15 or higher.
+*   **Python:** Version 3.10 or higher (for Python bindings).
+*   **Build Tool:** `uv` is recommended for managing the Python environment, but standard `pip` works too.
 
-### **Reservoir Interface (`Reservoir.h`)**
+### Building from Source
 
-* An abstract base class `Reservoir` will define the interface.
-* **Key methods:**
-  * `virtual Eigen::MatrixXd& advance(const Eigen::MatrixXd& input) = 0;` (Advances state by one step).
-  * `virtual void resetState() = 0;` (Resets internal state to zero).
-  * `virtual const Eigen::MatrixXd& getState() const = 0;`
-* **Implementations:**
-  * `RandomSparseReservoir`: Standard ESN. Configurable sparsity, spectral radius, leak rate, weight scaling, and **optional input/reservoir bias**. Uses `Eigen::SparseMatrix` for `W_res`.
-  * `NvarReservoir`: Nonlinear Vector Autoregression. Will use a different state update logic based on input lags.
+1.  **Clone the repository:**
+    ```bash
+    git clone --recursive https://github.com/hrshtst/rclib.git
+    cd rclib
+    ```
+    *Note: The `--recursive` flag is crucial to fetch dependencies (Eigen, Catch2, pybind11) located in `cpp_core/third_party`.*
 
-### **Readout Interface (`Readout.h`)**
+2.  **Build C++ Core and Examples:**
+    ```bash
+    cmake -S . -B build -DBUILD_EXAMPLES=ON
+    cmake --build build --config Release -j $(nproc)
+    ```
 
-* An abstract base class `Readout` will define the interface.
-* **Key methods:**
-  * `virtual void fit(const Eigen::MatrixXd& states, const Eigen::MatrixXd& targets) = 0;` (Batch training).
-  * `virtual void partialFit(const Eigen::MatrixXd& state, const Eigen::MatrixXd& target) = 0;` (Online training, for RLS/LMS).
-  * `virtual Eigen::MatrixXd predict(const Eigen::MatrixXd& states) = 0;`
-* **Implementations:**
-  * `RidgeReadout`: Batch-trained Ridge Regression. Solves `(X^T * X + lambda * I)^-1 * X^T * Y`. Must support an **optional bias (intercept) term**.
-  * `RlsReadout`: Recursive Least Squares algorithm for online learning.
-  * `LmsReadout`: Least Mean Squares algorithm for online learning.
+3.  **Run a C++ Example:**
+    ```bash
+    # Run the Mackey-Glass time series prediction example
+    ./build/examples/cpp/mackey_glass
+    ```
 
-### **Model Class (`Model.h`)**
+### Using the Python Interface
 
-* Manages the collection of reservoirs and the final readout.
-* Will store `std::vector<std::shared_ptr<Reservoir>>` reservoirs.
-* Will store `std::shared_ptr<Readout>` readout.
-* **Key methods:**
-  * `addReservoir(std::shared_ptr<Reservoir> res, std::string connection_type = "serial");` (Connection type can be 'serial' for deep, 'parallel' for parallel).
-  * `setReadout(std::shared_ptr<Readout> readout);`
-  * `fit(const Eigen::MatrixXd& inputs, const Eigen::MatrixXd& targets);`
-  * `predict(const Eigen::MatrixXd& inputs);`
-  * `predictOnline(const Eigen::MatrixXd& input);` (For online prediction).
+You can set up the environment and run Python examples using `uv`:
 
-## **6. Python API (Pythonic Interface)**
+```bash
+# Sync dependencies and run a script
+rm -rf .venv && uv sync --no-cache
+uv run python examples/python/quick_start.py
+```
 
-The `pybind11` module (`_rclib.cpp`) will expose the C++ classes. A Python wrapper (`model.py`) will provide a `scikit-learn`-style API.
+## Running Tests
 
-**Example Python Usage (`model.py`):**
+### C++ Tests
+The project uses `Catch2` for C++ unit testing.
 
-``` python
-# This is the target API we are aiming for.
+```bash
+cmake -S . -B build -DBUILD_TESTING=ON
+cmake --build build --config Release -j $(nproc)
+ctest --test-dir build --output-on-failure
+```
 
+### Python Tests
+The project uses `pytest` for Python integration testing.
+
+```bash
+# Ensure the C++ library is built and installed into the python/ directory
+cmake -S . -B build
+cmake --build build --config Release -j $(nproc) --target _rclib
+
+# Run pytest (via uv)
+uv run pytest
+```
+
+## Parallelization Configuration
+
+`rclib` provides flexible options to control parallelization strategies, allowing you to optimize for your specific workload and hardware. This is managed via CMake options.
+
+### Options
+
+| Option | Default | Description |
+| :--- | :--- | :--- |
+| `RCLIB_USE_OPENMP` | `ON` | Enables OpenMP support. Required for any multi-threading. |
+| `RCLIB_ENABLE_EIGEN_PARALLELIZATION` | `OFF` | Enables Eigen's internal parallelization (using OpenMP). |
+
+### Recommended Configurations
+
+#### 1. User-Level Parallelism (Default)
+**Best for:** Training multiple reservoirs, batch processing, or typical workloads.
+
+*   **Configuration:**
+    ```bash
+    cmake -S . -B build -DRCLIB_USE_OPENMP=ON -DRCLIB_ENABLE_EIGEN_PARALLELIZATION=OFF
+    ```
+
+#### 2. Eigen-Level Parallelism
+**Best for:** Very large single networks or dense matrix operations where linear algebra is the bottleneck.
+
+*   **Configuration:**
+    ```bash
+    cmake -S . -B build -DRCLIB_USE_OPENMP=ON -DRCLIB_ENABLE_EIGEN_PARALLELIZATION=ON
+    ```
+
+#### 3. Serial (Single-Threaded)
+**Best for:** Debugging or systems without OpenMP.
+
+*   **Configuration:**
+    ```bash
+    cmake -S . -B build -DRCLIB_USE_OPENMP=OFF
+    ```
+
+## Performance Benchmarking
+
+The `benchmarks/` directory contains scripts to evaluate performance across different thread counts and parallelization modes.
+
+1.  **Run the Benchmark Suite:**
+    ```bash
+    ./benchmarks/benchmark_parallel_comparison.sh
+    ```
+
+2.  **Visualize Results:**
+    ```bash
+    uv run python benchmarks/plot_parallel_comparison.py
+    ```
+
+## Architecture & API Reference
+
+### Key Architectural Principles
+
+1.  **Modularity:** The **Reservoir** and **Readout** components are implemented as separate, swappable modules.
+2.  **Performance:** C++ implementations prioritize computational efficiency and memory management, especially for large, sparse matrices (`Eigen::SparseMatrix`).
+3.  **Scalability:** Supports large reservoirs (40,000+ neurons), deep ESNs (serial stacking), and parallel ESNs.
+4.  **Configurability:** Key parameters (spectral radius, sparsity, leak rate, regularization, bias, etc.) are configurable via C++ and Python APIs.
+
+### C++ API Design
+
+**Reservoir Interface (`Reservoir.h`)**
+*   `virtual Eigen::MatrixXd advance(const Eigen::MatrixXd& input) = 0;`
+*   `virtual void resetState() = 0;`
+*   `virtual const Eigen::MatrixXd& getState() const = 0;`
+
+**Readout Interface (`Readout.h`)**
+*   `virtual void fit(const Eigen::MatrixXd& states, const Eigen::MatrixXd& targets) = 0;`
+*   `virtual void partialFit(const Eigen::MatrixXd& state, const Eigen::MatrixXd& target) = 0;`
+*   `virtual Eigen::MatrixXd predict(const Eigen::MatrixXd& states) = 0;`
+
+**Model Class (`Model.h`)**
+*   Manages collections of reservoirs and readouts.
+*   Supports `addReservoir` (serial/parallel) and `setReadout`.
+
+### Python API
+
+The Python interface (`rclib`) mirrors the C++ structure using `pybind11` and provides a `scikit-learn` compatible API.
+
+**Example Usage:**
+
+```python
 from rclib import reservoirs, readouts
 from rclib.model import ESN
 
-# 1. Configure Reservoir(s)
-res1 = reservoirs.RandomSparse(
-    n_neurons=1000,
-    spectral_radius=0.9,
-    sparsity=0.1,
-    leak_rate=0.3,
-    include_bias=True
-)
-
-res2 = reservoirs.RandomSparse(
-    n_neurons=2000,
-    spectral_radius=1.1,
-    sparsity=0.05,
-    leak_rate=0.1,
-    include_bias=False
-)
-
-# 2. Configure Readout
-# 'rls' and 'lms' will also be available
+# Configure
+res1 = reservoirs.RandomSparse(n_neurons=1000, spectral_radius=0.9, include_bias=True)
 readout = readouts.Ridge(alpha=1e-8, include_bias=True)
 
-# 3. Configure Model (Deep ESN)
-# 'parallel' connection will also be an option
+# Model
 model = ESN(connection_type='serial')
 model.add_reservoir(res1)
-model.add_reservoir(res2) # Output of res1 feeds into res2
 model.set_readout(readout)
 
-# 4. Fit and Predict
-# X_train and Y_train are numpy arrays
+# Train & Predict
 model.fit(X_train, Y_train)
 Y_pred = model.predict(X_test)
 ```
-
-## **7. Python Example Execution**
-
-To execute Python examples or tests within this project, use the following command structure:
-
-```bash
-rm -rf .venv && uv sync --no-cache && uv run python examples/python/your_script_name.py
-```
-
-Replace `examples/python/your_script_name.py` with the actual path to the Python script you wish to run. This command ensures that the project's Python environment is correctly set up and dependencies are managed by `uv` before execution.
