@@ -16,34 +16,57 @@ void RlsReadout::fit(const Eigen::MatrixXd& states, const Eigen::MatrixXd& targe
 }
 
 void RlsReadout::partialFit(const Eigen::MatrixXd& state, const Eigen::MatrixXd& target) {
-    Eigen::MatrixXd x = state;
-    if (include_bias) {
-        x.conservativeResize(1, x.cols() + 1);
-        x(0, x.cols() - 1) = 1.0;
-    }
+    int n_in = state.cols();
+    int n_features = n_in + (include_bias ? 1 : 0);
 
     if (!initialized) {
         // Initialize W_out and P
-        int n_features = x.cols();
         int n_targets = target.cols();
 
         W_out = Eigen::MatrixXd::Zero(n_features, n_targets);
         P = (1.0 / delta) * Eigen::MatrixXd::Identity(n_features, n_features);
+
+        // Pre-allocate buffers
+        x_aug.resize(n_features);
+        k.resize(n_features);
+        Px.resize(n_features);
+
         initialized = true;
     }
 
+    // Prepare input vector x_aug
+    x_aug.head(n_in) = state.row(0).transpose();
+    if (include_bias) {
+        x_aug(n_in) = 1.0;
+    }
+
     // RLS update equations
-    Eigen::MatrixXd Px = P * x.transpose();
-    double denominator = lambda + (x * Px)(0,0);
-    Eigen::MatrixXd k = Px / denominator;
-    Eigen::MatrixXd y_hat = x * W_out;
-    Eigen::MatrixXd error = target - y_hat;
 
-    W_out = W_out + k * error;
+    // 1. Compute Px = P * x using symmetry (Upper triangle)
+    // P is symmetric, so we use selfadjointView to optimize multiplication
+    Px.noalias() = P.selfadjointView<Eigen::Upper>() * x_aug;
 
-    // Optimized P update: (1.0 / lambda) * (P - k * (x * P))
-    Eigen::MatrixXd xP = x * P;
-    P = (1.0 / lambda) * (P - k * xP);
+    // 2. Compute denominator = lambda + x^T * Px
+    double denominator = lambda + x_aug.dot(Px);
+
+    // 3. Compute Kalman gain vector k = Px / denominator
+    k = Px / denominator;
+
+    // 4. Compute prediction y_hat = x^T * W_out and error
+    Eigen::MatrixXd error = target - (x_aug.transpose() * W_out);
+
+    // 5. Update weights: W_out = W_out + k * error
+    W_out.noalias() += k * error;
+
+    // 6. Update P: P = (1/lambda) * (P - (Px * Px^T) / denominator)
+    // We exploit symmetry and rank-1 update structure.
+    // First scale P (only upper triangle needed)
+    P.triangularView<Eigen::Upper>() *= (1.0 / lambda);
+
+    // Then apply rank-1 update: P -= alpha * v * v^T
+    // alpha = 1 / (lambda * denominator)
+    // v = Px
+    P.selfadjointView<Eigen::Upper>().rankUpdate(Px, -1.0 / (lambda * denominator));
 }
 
 Eigen::MatrixXd RlsReadout::predict(const Eigen::MatrixXd& states) {

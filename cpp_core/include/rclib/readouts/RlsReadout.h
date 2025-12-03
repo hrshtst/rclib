@@ -19,4 +19,10 @@ private:
     Eigen::MatrixXd W_out; // Weight matrix
     Eigen::MatrixXd P;     // Inverse covariance matrix
     bool initialized;
+
+    // Pre-allocated temporaries to avoid reallocation in partialFit
+    Eigen::VectorXd x_aug;
+    Eigen::VectorXd k;
+    Eigen::VectorXd Px;
+    Eigen::RowVectorXd xP;
 };
