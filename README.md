@@ -127,6 +127,6 @@ The `benchmarks/` directory contains scripts to evaluate performance across diff
 
 2.  **Visualize Results:**
     ```bash
-    python benchmarks/plot_parallel_comparison.py
+    uv run python benchmarks/plot_parallel_comparison.py
     ```
     This generates plots comparing execution time and MSE for different methods and configurations.
