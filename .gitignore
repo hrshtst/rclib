@@ -1,6 +1,9 @@
 # Build artifacts
 build/
 _build/
+build_serial/
+build_user_omp/
+build_eigen_omp/
 
 # Python
 .venv/
