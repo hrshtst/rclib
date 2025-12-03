@@ -5,6 +5,7 @@ enable_testing()
 
 # Add subdirectories for third-party dependencies
 add_subdirectory(cpp_core/third_party/catch2)
+set(PYBIND11_FINDPYTHON NEW)
 add_subdirectory(cpp_core/third_party/pybind11)
 add_subdirectory(cpp_core/third_party/eigen)
 
