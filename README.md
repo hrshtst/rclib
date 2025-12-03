@@ -53,6 +53,43 @@ rm -rf .venv && uv sync --no-cache
 uv run python examples/python/quick_start.py
 ```
 
+### Integrating `rclib_core` into Your C++ Project (CMake)
+
+If you wish to use `rclib_core` as a static library in your own C++ project, the recommended approach is to add it as a Git submodule.
+
+1.  **Add `rclib` as a Git Submodule:**
+    Navigate to your project's root directory and add `rclib` as a submodule:
+    ```bash
+    git submodule add https://github.com/hrshtst/rclib.git third_party/rclib
+    git submodule update --init --recursive third_party/rclib
+    ```
+    (Adjust `third_party/rclib` to your desired path.)
+
+2.  **Integrate with Your `CMakeLists.txt`:**
+    In your project's `CMakeLists.txt` file, add `rclib` as a subdirectory and link against its `rclib_core` target. Ensure you propagate relevant build options like OpenMP if needed.
+
+    ```cmake
+    # Add rclib as a subdirectory
+    add_subdirectory(third_party/rclib)
+
+    # Example of how to link rclib_core to your target executable or library
+    add_executable(my_rc_app main.cpp)
+    target_link_libraries(my_rc_app PRIVATE rclib_core)
+
+    # Note: rclib_core internally handles its Eigen dependency.
+    # If your project directly uses Eigen, ensure it's properly configured in your CMakeLists.txt.
+    ```
+
+3.  **Configure Parallelization (Optional):**
+    If your project also uses OpenMP or needs to control `rclib`'s parallelization, you can set the `RCLIB_USE_OPENMP` and `RCLIB_ENABLE_EIGEN_PARALLELIZATION` CMake options *before* calling `add_subdirectory(third_party/rclib)`.
+
+    ```cmake
+    set(RCLIB_USE_OPENMP ON CACHE BOOL "Enable OpenMP support in rclib_core")
+    set(RCLIB_ENABLE_EIGEN_PARALLELIZATION OFF CACHE BOOL "Enable Eigen's internal parallelization in rclib_core")
+    add_subdirectory(third_party/rclib)
+    # ... rest of your project's CMakeLists.txt
+    ```
+
 ## Running Tests
 
 ### C++ Tests
