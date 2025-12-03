@@ -22,15 +22,19 @@
 
 1.  **Clone the repository:**
     ```bash
-    git clone --recursive https://github.com/yourusername/rclib.git
+    git clone --recursive https://github.com/hrshtst/rclib.git
     cd rclib
     ```
     *Note: The `--recursive` flag is crucial to fetch dependencies (Eigen, Catch2, pybind11) located in `cpp_core/third_party`.*
+    *If you cloned without `--recursive`, run:*
+    ```bash
+    git submodule update --init --recursive
+    ```
 
 2.  **Build C++ Core and Examples:**
     ```bash
     cmake -S . -B build -DBUILD_EXAMPLES=ON
-    cmake --build build
+    cmake --build build --config Release -j $(nproc)
     ```
 
 3.  **Run a C++ Example:**
@@ -56,7 +60,7 @@ The project uses `Catch2` for C++ unit testing.
 
 ```bash
 cmake -S . -B build -DBUILD_TESTING=ON
-cmake --build build
+cmake --build build --config Release -j $(nproc)
 ctest --test-dir build --output-on-failure
 ```
 
@@ -66,7 +70,7 @@ The project uses `pytest` for Python integration testing.
 ```bash
 # Ensure the C++ library is built and installed into the python/ directory
 cmake -S . -B build
-cmake --build build --target _rclib
+cmake --build build --config Release -j $(nproc) --target _rclib
 
 # Run pytest (via uv)
 uv run pytest
