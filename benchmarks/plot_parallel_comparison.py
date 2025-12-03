@@ -171,6 +171,42 @@ def plot_comparison(csv_file: str):
 
     plot_mse()
 
+    # Plot 7: Focused Online MSE Comparison
+    def plot_online_mse():
+        # Filter for relevant modes and ONLY online methods
+        subset = combined_df[combined_df['mode'].isin(['user_omp', 'eigen_omp'])]
+        subset = subset[subset['method'].str.contains('Online')]
+        if subset.empty:
+            return
+
+        # Aggregate to get mean MSE across threads/runs
+        mse_agg = subset.groupby(['mode', 'method'])['mse'].mean().reset_index()
+
+        plt.figure(figsize=(10, 6))
+        ax = sns.barplot(
+            data=mse_agg,
+            x="method",
+            y="mse",
+            hue="mode",
+            hue_order=['user_omp', 'eigen_omp']
+        )
+
+        plt.title("Online Learning MSE Comparison: LMS vs RLS", fontsize=16)
+        plt.ylabel("Mean Squared Error (MSE)")
+        plt.xlabel("Method")
+        plt.legend(title="Parallelization Mode")
+
+        # Add values on top of bars
+        for container in ax.containers:
+            ax.bar_label(container, fmt='%.2e', padding=3)
+
+        output_file = os.path.splitext(csv_file)[0] + '_online_mse_comparison.png'
+        plt.savefig(output_file)
+        print(f"Saved plot to {output_file}")
+        plt.close()
+
+    plot_online_mse()
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Visualize parallel benchmark results.")
     parser.add_argument(
