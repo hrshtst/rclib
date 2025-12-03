@@ -29,9 +29,6 @@ void Model::fit(const Eigen::MatrixXd& inputs, const Eigen::MatrixXd& targets, i
         Eigen::MatrixXd current_input = inputs;
         for (const auto& res : reservoirs) {
             Eigen::MatrixXd res_states(inputs.rows(), res->getState().cols());
-            #ifdef RCLIB_ENABLE_USER_PARALLELIZATION
-            #pragma omp parallel for
-            #endif
             for (int i = 0; i < inputs.rows(); ++i) {
                 res_states.row(i) = res->advance(current_input.row(i));
             }
@@ -89,9 +86,6 @@ Eigen::MatrixXd Model::predict(const Eigen::MatrixXd& inputs, bool reset_state_b
         Eigen::MatrixXd current_input = inputs;
         for (const auto& res : reservoirs) {
             Eigen::MatrixXd res_states(inputs.rows(), res->getState().cols());
-            #ifdef RCLIB_ENABLE_USER_PARALLELIZATION
-            #pragma omp parallel for
-            #endif
             for (int i = 0; i < inputs.rows(); ++i) {
                 res_states.row(i) = res->advance(current_input.row(i));
             }
