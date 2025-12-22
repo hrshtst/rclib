@@ -1,30 +1,49 @@
+[build-system]
+requires = ["scikit-build-core", "pybind11"]
+build-backend = "scikit_build_core.build"
+
 [project]
 name = "rclib"
 version = "0.0.1"
 description = "A reservoir computing library"
 authors = [{ name = "Hiroshi Atsuta" }]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "matplotlib>=3.10.7",
-    "numpy",
+    "numpy>=2.3.0",
     "pandas>=2.3.3",
-    "pyqt6>=6.10.0",
     "seaborn>=0.13.2",
 ]
-
-[build-system]
-requires = ["scikit-build-core", "pybind11"]
-build-backend = "scikit_build_core.build"
 
 [dependency-groups]
 dev = [
     "pytest>=8.4.2",
     "ruff>=0.14.3",
 ]
+build = [
+    "pybind11>=3.0.1",
+    "scikit-build-core>=0.11.6",
+]
+
+[tool.uv]
+# Disable build isolation, but only for the current package in development.
+# Ref: https://github.com/astral-sh/uv/issues/13998
+no-build-isolation-package = ["rclib"]
+default-groups = "all"
 
 [tool.scikit-build]
 cmake.source-dir = "."
 wheel.packages = ["python/rclib"]
+
+# Turn on verbose output for the editable mode rebuilds.
+editable.verbose = true
+
+# Rebuild the project when the package is imported.
+# Ref: https://github.com/astral-sh/uv/issues/13998
+editable.rebuild = true
+
+# The CMake build directory. Defaults to a unique temporary directory.
+build-dir = "build/{wheel_tag}"
 
 [tool.pytest.ini_options]
 testpaths = [
