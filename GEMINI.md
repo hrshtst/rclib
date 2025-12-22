@@ -65,13 +65,22 @@ rclib/
 
 ### Using the Python Interface
 
-You can set up the environment and run Python examples using `uv`:
+This project provides Python bindings for the core C++ code, leveraging `uv`, `scikit-build-core`, and `pybind11`.
+
+To enable fast incremental builds and automatic rebuilding when C++ source files change (see [astral-sh/uv#13998](https://github.com/astral-sh/uv/issues/13998)), use the following two-step installation process:
 
 ```bash
-# Sync dependencies and run a script
-rm -rf .venv && uv sync --no-cache
+# 1. Install build dependencies without installing the project
+uv sync --no-install-project --only-group build
+
+# 2. Install the project and remaining dependencies
+uv sync
+
+# Run the quick start example
 uv run python examples/python/quick_start.py
 ```
+
+With this configuration, any changes to the C++ source code in `cpp_core` will automatically trigger a rebuild of the Python extension module upon the next import, ensuring your Python environment always uses the latest C++ logic without manual recompilation.
 
 ## Running Tests
 
