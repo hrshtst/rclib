@@ -35,13 +35,14 @@
 
 2.  **Build C++ Core and Examples:**
     ```bash
-    cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DBUILD_EXAMPLES=ON -DCMAKE_BUILD_TYPE=Release
+    # Build with examples enabled (defaults: Release type, Export Compile Commands ON)
+    cmake -S . -B build -DBUILD_EXAMPLES=ON
     cmake --build build --config Release -j $(nproc)
     ```
 
 3.  **Run a C++ Example:**
     ```bash
-    # Run the Mackey-Glass time series prediction example
+    # Run the Mackey-Glass time series prediction example (if built with -DBUILD_EXAMPLES=ON)
     ./build/examples/cpp/mackey_glass
     ```
 
@@ -142,7 +143,7 @@ uv run pytest
 
 *   **Configuration:**
     ```bash
-    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DRCLIB_USE_OPENMP=ON -DRCLIB_ENABLE_EIGEN_PARALLELIZATION=OFF
+    cmake -S . -B build -DRCLIB_USE_OPENMP=ON -DRCLIB_ENABLE_EIGEN_PARALLELIZATION=OFF
     ```
 *   **How it works:** `rclib` uses OpenMP `#pragma omp parallel for` loops to parallelize high-level operations (e.g., updating state for multiple reservoirs in a parallel architecture, or processing batches). Eigen is forced to run in single-threaded mode to avoid **oversubscription** (too many threads competing for resources).
 
@@ -151,7 +152,7 @@ uv run pytest
 
 *   **Configuration:**
     ```bash
-    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DRCLIB_USE_OPENMP=ON -DRCLIB_ENABLE_EIGEN_PARALLELIZATION=ON
+    cmake -S . -B build -DRCLIB_USE_OPENMP=ON -DRCLIB_ENABLE_EIGEN_PARALLELIZATION=ON
     ```
 *   **How it works:** `rclib` disables its own OpenMP loops. Instead, it lets Eigen use the OpenMP thread pool to parallelize internal matrix operations (like large dense matrix multiplications). This is useful when the reservoir state size is huge.
 
@@ -160,7 +161,7 @@ uv run pytest
 
 *   **Configuration:**
     ```bash
-    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DRCLIB_USE_OPENMP=OFF
+    cmake -S . -B build -DRCLIB_USE_OPENMP=OFF
     ```
 
 ## Performance Benchmarking
