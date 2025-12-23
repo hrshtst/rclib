@@ -37,7 +37,13 @@ Repository = "https://github.com/hrshtst/rclib"
 
 [dependency-groups]
 dev = [
+  "nox>=2025.11.12",
+  "pre-commit>=4.5.0",
+  "pyright>=1.1.407",
   "pytest>=8.4.2",
+  "pytest-cov>=7.0.0",
+  "pytest-randomly>=4.0.1",
+  "pytest-xdist>=3.8.0",
   "ruff>=0.14.3",
 ]
 build = [
