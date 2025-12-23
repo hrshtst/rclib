@@ -66,3 +66,4 @@ CMakeInit.txt
 /docs/*.toc
 /docs/*.out
 /docs/listings_setup.tex
+site/
