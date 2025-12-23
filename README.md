@@ -187,7 +187,8 @@ The `benchmarks/` directory contains scripts to evaluate performance across diff
 The project uses several tools to ensure code quality:
 
 *   **Ruff:** For Python linting and formatting.
-*   **Pyright:** For static type checking.
+*   **Basedpyright:** For static type checking.
+*   **cmake-format / cmake-lint:** For CMake formatting and linting.
 *   **pre-commit:** To enforce checks before committing.
 
 ### Setting up pre-commit
