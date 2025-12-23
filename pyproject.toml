@@ -247,7 +247,7 @@ check_untyped_defs = true       # Type-checks the interior of functions without 
     "pandas.*",
     "scienceplots.*",
     "scipy.*",
-    "sklearn.*",
+    "seaborn.*",
     "tomli.*",
   ]
   ignore_missing_imports = true
