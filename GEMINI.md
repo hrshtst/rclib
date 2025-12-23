@@ -28,8 +28,11 @@ rclib/
 │   ├── cpp/
 │   └── python/
 ├── CMakeLists.txt         # Main CMake build file
+├── LICENSE                # Apache License 2.0
 ├── README.md
 ├── pyproject.toml         # Python project configuration
+├── .pre-commit-config.yaml # Pre-commit hooks configuration
+├── .geminiignore          # Files ignored by Gemini
 └── GEMINI.md              # This context file
 ```
 
@@ -53,13 +56,14 @@ rclib/
 
 2.  **Build C++ Core and Examples:**
     ```bash
-    cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DBUILD_EXAMPLES=ON -DCMAKE_BUILD_TYPE=Release
+    # Build with examples enabled (defaults: Release type, Export Compile Commands ON)
+    cmake -S . -B build -DBUILD_EXAMPLES=ON
     cmake --build build --config Release -j $(nproc)
     ```
 
 3.  **Run a C++ Example:**
     ```bash
-    # Run the Mackey-Glass time series prediction example
+    # Run the Mackey-Glass time series prediction example (if built with -DBUILD_EXAMPLES=ON)
     ./build/examples/cpp/mackey_glass
     ```
 
@@ -82,9 +86,25 @@ uv run python examples/python/quick_start.py
 
 With this configuration, any changes to the C++ source code in `cpp_core` will automatically trigger a rebuild of the Python extension module upon the next import, ensuring your Python environment always uses the latest C++ logic without manual recompilation.
 
-## Running Tests
+## Development Workflow
 
-### C++ Tests
+### Code Quality Tools
+
+The project uses several tools to ensure code quality:
+
+*   **Ruff:** For Python linting and formatting.
+*   **Pyright:** For static type checking.
+*   **Pre-commit:** To enforce checks before committing.
+
+### Setting up Pre-commit
+
+```bash
+uv run pre-commit install
+```
+
+### Running Tests
+
+#### C++ Tests
 The project uses `Catch2` for C++ unit testing.
 
 ```bash
@@ -93,7 +113,7 @@ cmake --build build --config Release -j $(nproc)
 ctest --test-dir build --output-on-failure
 ```
 
-### Python Tests
+#### Python Tests
 The project uses `pytest` for Python integration testing.
 
 ```bash
@@ -123,7 +143,7 @@ uv run pytest
 
 *   **Configuration:**
     ```bash
-    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DRCLIB_USE_OPENMP=ON -DRCLIB_ENABLE_EIGEN_PARALLELIZATION=OFF
+    cmake -S . -B build -DRCLIB_USE_OPENMP=ON -DRCLIB_ENABLE_EIGEN_PARALLELIZATION=OFF
     ```
 
 #### 2. Eigen-Level Parallelism
@@ -131,7 +151,7 @@ uv run pytest
 
 *   **Configuration:**
     ```bash
-    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DRCLIB_USE_OPENMP=ON -DRCLIB_ENABLE_EIGEN_PARALLELIZATION=ON
+    cmake -S . -B build -DRCLIB_USE_OPENMP=ON -DRCLIB_ENABLE_EIGEN_PARALLELIZATION=ON
     ```
 
 #### 3. Serial (Single-Threaded)
@@ -139,7 +159,7 @@ uv run pytest
 
 *   **Configuration:**
     ```bash
-    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DRCLIB_USE_OPENMP=OFF
+    cmake -S . -B build -DRCLIB_USE_OPENMP=OFF
     ```
 
 ## Performance Benchmarking
@@ -204,3 +224,7 @@ model.set_readout(readout)
 model.fit(X_train, Y_train)
 Y_pred = model.predict(X_test)
 ```
+
+## License
+
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
