@@ -1,6 +1,12 @@
 cmake_minimum_required(VERSION 3.15)
 project(rclib LANGUAGES CXX)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
+endif()
+
 enable_testing()
 
 # Add subdirectories for third-party dependencies
@@ -20,7 +26,7 @@ if(BUILD_TESTING)
     add_subdirectory(tests/cpp)
 endif()
 
-option(BUILD_EXAMPLES "Build examples" ON)
+option(BUILD_EXAMPLES "Build examples" OFF)
 if(BUILD_EXAMPLES)
     add_subdirectory(examples/cpp)
 endif()
