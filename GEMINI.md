@@ -93,7 +93,8 @@ With this configuration, any changes to the C++ source code in `cpp_core` will a
 The project uses several tools to ensure code quality:
 
 *   **Ruff:** For Python linting and formatting.
-*   **Pyright:** For static type checking.
+*   **Basedpyright:** For static type checking.
+*   **cmake-format / cmake-lint:** For CMake formatting and linting.
 *   **Pre-commit:** To enforce checks before committing.
 
 ### Setting up Pre-commit
