@@ -21,7 +21,6 @@ classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",
   "Intended Audience :: Science/Research",
-  "License :: OSI Approved :: Apache Software License",
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.11",
@@ -57,14 +56,17 @@ cmake.source-dir = "."
 wheel.packages = ["python/rclib"]
 
 # Turn on verbose output for the editable mode rebuilds.
-editable.verbose = true
+editable.verbose = false
 
 # Rebuild the project when the package is imported.
 # Ref: https://github.com/astral-sh/uv/issues/13998
 editable.rebuild = true
 
 # The CMake build directory. Defaults to a unique temporary directory.
-build-dir = "build/{wheel_tag}"
+build-dir = "build_scikit/{wheel_tag}"
+
+# Enable concurrent job execution to speed up compilation.
+build.tool-args = ["-j8"]
 
 [tool.ruff]
 line-length = 120
