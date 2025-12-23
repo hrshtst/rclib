@@ -103,6 +103,7 @@ exclude = [
   "_build",
   "buck-out",
   "build",
+  "cpp_core/third_party",
   "dist",
   "node_modules",
   "site-packages",
