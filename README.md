@@ -180,6 +180,24 @@ The `benchmarks/` directory contains scripts to evaluate performance across diff
     ```
     This generates plots comparing execution time and MSE for different methods and configurations.
 
+## Development
+
+### Code Quality Tools
+
+The project uses several tools to ensure code quality:
+
+*   **Ruff:** For Python linting and formatting.
+*   **Pyright:** For static type checking.
+*   **pre-commit:** To enforce checks before committing.
+
+### Setting up pre-commit
+
+To ensure all code follows the project's style and quality standards, it is recommended to set up `pre-commit`:
+
+```bash
+uv run pre-commit install
+```
+
 ## License
 
 This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
