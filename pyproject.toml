@@ -37,9 +37,9 @@ Repository = "https://github.com/hrshtst/rclib"
 
 [dependency-groups]
 dev = [
+  "basedpyright>=1.36.2",
   "nox>=2025.11.12",
   "pre-commit>=4.5.0",
-  "pyright>=1.1.407",
   "pytest>=8.4.2",
   "pytest-cov>=7.0.0",
   "pytest-randomly>=4.0.1",
@@ -173,8 +173,8 @@ docstring-code-format = true
 # enabled.
 docstring-code-line-length = "dynamic"
 
-[tool.pyright]
-include = ["python", "tests", "examples"]
+[tool.basedpyright]
+include = ["python", "tests", "examples", "benchmarks"]
 exclude = [
   ".venv",
   "**/node_modules",
@@ -237,7 +237,7 @@ markers = [
 ]
 
 [tool.mypy]
-files = ["python", "tests", "examples"]
+files = ["python", "tests", "examples", "benchmarks"]
 python_executable = ".venv/bin/python"
 check_untyped_defs = true       # Type-checks the interior of functions without type annotations.
 

@@ -24,3 +24,12 @@ repos:
       # Run the formatter
       - id: ruff-format
         files: \.py$
+
+  - repo: local
+    hooks:
+      - id: basedpyright
+        name: basedpyright
+        entry: uv run basedpyright
+        language: system
+        types: [python]
+        pass_filenames: false # Pyright needs full project context, not just changed files
