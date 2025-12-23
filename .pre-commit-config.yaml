@@ -49,6 +49,17 @@ repos:
       - id: remove-tabs
         exclude: ^(docs|.gitmodules|[Mm]akefile)
 
+  # CMake formatting
+  - repo: https://github.com/cheshirekow/cmake-format-precommit
+    rev: v0.6.13
+    hooks:
+      - id: cmake-format
+        additional_dependencies: [pyyaml>=5.1]
+        types: [file]
+        files: (\.cmake|CMakeLists.txt)(.in)?$
+      - id: cmake-lint
+        additional_dependencies: [pyyaml>=5.1]
+
   - repo: local
     hooks:
       - id: basedpyright
