@@ -178,3 +178,7 @@ The `benchmarks/` directory contains scripts to evaluate performance across diff
     uv run python benchmarks/plot_parallel_comparison.py
     ```
     This generates plots comparing execution time and MSE for different methods and configurations.
+
+## License
+
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.

@@ -6,13 +6,19 @@ build-backend = "scikit_build_core.build"
 name = "rclib"
 version = "0.0.1"
 description = "A reservoir computing library"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICEN[CS]E*"]
 authors = [{ name = "Hiroshi Atsuta" }]
 requires-python = ">=3.11"
 dependencies = [
     "matplotlib>=3.10.7",
-    "numpy>=2.3.0",
+    "numpy>=2.0.0",
     "pandas>=2.3.3",
     "seaborn>=0.13.2",
+]
+classifiers = [
+  "License :: OSI Approved :: Apache Software License",
 ]
 
 [dependency-groups]
