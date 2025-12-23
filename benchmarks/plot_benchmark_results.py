@@ -1,24 +1,27 @@
 #!/usr/bin/env python3
+"""Plotting script for benchmark results."""
 
 from __future__ import annotations
 
 import argparse
-import os
+import sys
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
 
-def plot_results(csv_file: str):
-    """
-    Reads detailed benchmark results from a CSV file, calculates statistics,
-    and generates plots for performance and MSE.
+def plot_results(csv_file: str) -> None:
+    """Read detailed benchmark results from a CSV file, calculate statistics.
+
+    And generate plots for performance and MSE.
 
     Args:
         csv_file (str): The path to the input CSV file.
     """
-    if not os.path.exists(csv_file):
+    path = Path(csv_file)
+    if not path.exists():
         print(f"Error: File not found at '{csv_file}'")
         return
 
@@ -62,10 +65,12 @@ def plot_results(csv_file: str):
     ax.set_yscale("log")  # Use a log scale for the y-axis to better see differences
 
     # Save the performance plot
-    perf_output_filename = os.path.splitext(csv_file)[0] + "_performance.png"
-    plt.savefig(perf_output_filename)
-    print(f"Performance plot saved to '{perf_output_filename}'")
-    plt.show()
+    perf_output_path = path.with_name(f"{path.stem}_performance.png")
+    plt.savefig(perf_output_path)
+    print(f"Performance plot saved to '{perf_output_path}'")
+
+    if sys.stdout.isatty():
+        plt.show()
 
     # --- 2. Plot RLS-only Performance ---
     plt.figure(figsize=(10, 6))
@@ -78,10 +83,12 @@ def plot_results(csv_file: str):
     ax_rls.set_ylabel("Average Time (s)")
 
     # Save the RLS performance plot
-    rls_perf_output_filename = os.path.splitext(csv_file)[0] + "_rls_performance.png"
-    plt.savefig(rls_perf_output_filename)
-    print(f"RLS performance plot saved to '{rls_perf_output_filename}'")
-    plt.show()
+    rls_output_path = path.with_name(f"{path.stem}_rls_performance.png")
+    plt.savefig(rls_output_path)
+    print(f"RLS performance plot saved to '{rls_output_path}'")
+
+    if sys.stdout.isatty():
+        plt.show()
 
     # --- 3. Plot MSE ---
     # We only need the MSE for one run, as it should be consistent
@@ -102,10 +109,12 @@ def plot_results(csv_file: str):
         ax_mse.text(index, row.mse, f"{row.mse:.4f}", color="black", ha="center")
 
     # Save the MSE plot
-    mse_output_filename = os.path.splitext(csv_file)[0] + "_mse.png"
-    plt.savefig(mse_output_filename)
-    print(f"MSE plot saved to '{mse_output_filename}'")
-    plt.show()
+    mse_output_path = path.with_name(f"{path.stem}_mse.png")
+    plt.savefig(mse_output_path)
+    print(f"MSE plot saved to '{mse_output_path}'")
+
+    if sys.stdout.isatty():
+        plt.show()
 
 
 if __name__ == "__main__":

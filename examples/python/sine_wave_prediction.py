@@ -1,4 +1,8 @@
+"""Sine wave prediction example."""
+
 from __future__ import annotations
+
+import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -7,7 +11,8 @@ from rclib.readouts import Ridge
 from rclib.reservoirs import RandomSparse
 
 
-def main():
+def main() -> None:
+    """Run the sine wave prediction example."""
     # --- Configuration Parameters ---
     n_total_samples = 1000
     n_train_samples = 800
@@ -27,9 +32,10 @@ def main():
 
     # --- 1. Data Generation ---
     print("--- Generating Data ---")
+    rng = np.random.default_rng(seed=0)
     time_np = np.linspace(0, 80, n_total_samples)
     clean_data = np.sin(time_np)
-    noise = noise_amplitude * np.random.randn(n_total_samples)
+    noise = noise_amplitude * rng.standard_normal(n_total_samples)
     data = (clean_data + noise).reshape(-1, 1).astype(np.float64)
 
     input_data, target_data = data[:-1], data[1:]
@@ -67,7 +73,7 @@ def main():
     # --- 3. Plot Results ---
     print("\nPlotting results...")
     plt.style.use("seaborn-v0_8-whitegrid")
-    fig, ax = plt.subplots(figsize=(15, 6))
+    fig, ax = plt.subplots(figsize=(15, 6))  # noqa: RUF059
     plot_range = range(min(200, len(test_target)))
     ax.plot(test_target[plot_range], "b", label="True Target (with noise)", linewidth=2, alpha=0.7)
     ax.plot(predictions[plot_range], "r--", label="ESN Prediction", linewidth=2)
@@ -75,18 +81,20 @@ def main():
     ax.set_xlabel("Time Step")
     ax.set_ylabel("Value")
     ax.legend(loc="upper right")
-    ax.grid(True, which="both", linestyle="--", linewidth=0.5)
+    ax.grid(visible=True, which="both", linestyle="--", linewidth=0.5)
     ax.text(
         0.02,
         0.1,
         f"MSE: {mse:.6f}",
         transform=ax.transAxes,
-        bbox=dict(boxstyle="round,pad=0.3", fc="wheat", alpha=0.7),
+        bbox={"boxstyle": "round,pad=0.3", "fc": "wheat", "alpha": 0.7},
     )
     plt.tight_layout()
     plt.savefig(plot_output_file)
     print(f"Plot saved to {plot_output_file}")
-    plt.show()
+
+    if sys.stdout.isatty():
+        plt.show()
 
 
 if __name__ == "__main__":

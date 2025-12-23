@@ -1,22 +1,38 @@
+"""Generative prediction example."""
+
 from __future__ import annotations
+
+import sys
+from typing import TYPE_CHECKING
 
 import matplotlib.pyplot as plt
 import numpy as np
 from rclib import readouts, reservoirs
 from rclib.model import ESN
 
+if TYPE_CHECKING:
+    from numpy.typing import ArrayLike
+
 
 # 1. Generate Mackey-Glass time series data
-def mackey_glass(n_points=2000, tau=17, delta_t=1.0, x0=None, seed=0):
-    if seed is not None:
-        np.random.seed(seed)
+def mackey_glass(
+    n_points: int = 2000,
+    tau: int = 17,
+    delta_t: float = 1.0,  # noqa: ARG001
+    x0: ArrayLike | None = None,
+    seed: int = 0,
+) -> np.ndarray:
+    """Generate Mackey-Glass time series data."""
+    rng = np.random.default_rng(seed=seed)
 
     x = np.empty(n_points)
     if x0 is None:
-        x0 = np.random.rand(tau)
+        x0_val = rng.random(tau)
+    else:
+        x0_val = np.array(x0)
 
     # Initial values
-    x[:tau] = x0[:tau]
+    x[:tau] = x0_val[:tau]
 
     # Generate the series
     for t in range(tau, n_points):
@@ -26,7 +42,8 @@ def mackey_glass(n_points=2000, tau=17, delta_t=1.0, x0=None, seed=0):
     return x
 
 
-def main():
+def main() -> None:
+    """Run the generative prediction example."""
     print("Running Generative Prediction Example...")
 
     # Generate data
@@ -40,8 +57,8 @@ def main():
     train_data = data[:train_len]
     test_data = data[train_len:]
 
-    X_train, y_train = train_data[:-1], train_data[1:]
-    X_test, y_test = test_data[:-1], test_data[1:]
+    x_train, y_train = train_data[:-1], train_data[1:]
+    x_test, y_test = test_data[:-1], test_data[1:]
 
     # 3. Configure and build the ESN model
     res = reservoirs.RandomSparse(
@@ -57,12 +74,12 @@ def main():
     # 4. Train the model
     print("Training the model...")
     washout = 100
-    model.fit(X_train, y_train, washout_len=washout)
+    model.fit(x_train, y_train, washout_len=washout)
 
     # 5. Prime the model and perform generative prediction
     print("Performing generative prediction...")
-    prime_data = X_test[:prime_len]
-    n_generate_steps = len(X_test) - prime_len
+    prime_data = x_test[:prime_len]
+    n_generate_steps = len(x_test) - prime_len
 
     # The model's internal state is now primed.
     # We can now call predict_generative.
@@ -72,7 +89,7 @@ def main():
 
     # 6. Visualize the results
     print("Plotting results...")
-    fig, ax = plt.subplots(1, 1, figsize=(12, 6))
+    fig, ax = plt.subplots(1, 1, figsize=(12, 6))  # noqa: RUF059
 
     # Full test sequence (ground truth)
     full_test_y = y_test.flatten()
@@ -92,12 +109,14 @@ def main():
     ax.set_xlabel("Time Steps")
     ax.set_ylabel("Value")
     ax.legend()
-    ax.grid(True)
+    ax.grid(visible=True)
 
     plt.tight_layout()
     plt.savefig("generative_prediction_result.png")
     print("Plot saved to generative_prediction_result.png")
-    # plt.show()
+
+    if sys.stdout.isatty():
+        plt.show()
 
 
 if __name__ == "__main__":

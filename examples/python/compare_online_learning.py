@@ -1,14 +1,19 @@
+"""Example script comparing online learning methods."""
+
 from __future__ import annotations
+
+import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
 from rclib import ESN, readouts, reservoirs
 
 
-def main():
+def main() -> None:
     """
-    An example script demonstrating online learning with LMS and RLS
-    to adapt to a changing sine wave frequency using the rclib library.
+    An example script demonstrating online learning with LMS and RLS.
+
+    The task is to adapt to a changing sine wave frequency using the rclib library.
     """
     # --- 1. Configuration (Simplified) ---
     print("--- Configuration ---")
@@ -91,7 +96,7 @@ def main():
         pred_lms_step = esn_lms.predict_online(current_input)
         preds_lms[i] = pred_lms_step
 
-        # Adapt (partial_fit)
+        # Adapt model using partial_fit
         esn_lms.partial_fit(current_input, current_target)
 
     # --- 5. Online Adaptation (RLS) ---
@@ -121,7 +126,7 @@ def main():
         pred_rls_step = esn_rls.predict_online(current_input)
         preds_rls[i] = pred_rls_step
 
-        # Adapt (partial_fit)
+        # Adapt model using partial_fit
         esn_rls.partial_fit(current_input, current_target)
 
     # --- 6. Plot Results ---
@@ -139,12 +144,14 @@ def main():
     plt.xlabel("Time Step", fontsize=12)
     plt.ylabel("Value", fontsize=12)
     plt.legend()
-    plt.grid(True)
+    plt.grid(visible=True)
     plt.ylim(-2, 2)
     plt.tight_layout()
     plt.savefig(plot_output_file)
     print(f"Plot saved to {plot_output_file}")
-    plt.show()  # Commented out for non-interactive environment
+
+    if sys.stdout.isatty():
+        plt.show()
 
 
 if __name__ == "__main__":

@@ -1,10 +1,13 @@
+"""Tests for Reservoir classes."""
+
 from __future__ import annotations
 
 import numpy as np
 from rclib import _rclib  # Import the C++ bindings
 
 
-def test_random_sparse_reservoir_init():
+def test_random_sparse_reservoir_init() -> None:
+    """Test RandomSparseReservoir initialization."""
     n_neurons = 10
     spectral_radius = 0.9
     sparsity = 0.5
@@ -12,14 +15,22 @@ def test_random_sparse_reservoir_init():
     input_scaling = 1.0  # Added missing argument
     include_bias = True
 
-    res = _rclib.RandomSparseReservoir(n_neurons, spectral_radius, sparsity, leak_rate, input_scaling, include_bias)
+    res = _rclib.RandomSparseReservoir(
+        n_neurons=n_neurons,
+        spectral_radius=spectral_radius,
+        sparsity=sparsity,
+        leak_rate=leak_rate,
+        input_scaling=input_scaling,
+        include_bias=include_bias,
+    )
 
     state = res.getState()
     assert state.shape == (1, n_neurons)
     assert np.all(state == 0)
 
 
-def test_random_sparse_reservoir_advance():
+def test_random_sparse_reservoir_advance() -> None:
+    """Test RandomSparseReservoir advance."""
     n_neurons = 10
     spectral_radius = 0.9
     sparsity = 0.5
@@ -27,8 +38,16 @@ def test_random_sparse_reservoir_advance():
     input_scaling = 1.0  # Added missing argument
     include_bias = True
 
-    res = _rclib.RandomSparseReservoir(n_neurons, spectral_radius, sparsity, leak_rate, input_scaling, include_bias)
-    input_data = np.random.rand(1, 5)
+    res = _rclib.RandomSparseReservoir(
+        n_neurons=n_neurons,
+        spectral_radius=spectral_radius,
+        sparsity=sparsity,
+        leak_rate=leak_rate,
+        input_scaling=input_scaling,
+        include_bias=include_bias,
+    )
+    rng = np.random.default_rng(seed=42)
+    input_data = rng.random((1, 5))
 
     for _ in range(10):
         res.advance(input_data)
@@ -37,7 +56,8 @@ def test_random_sparse_reservoir_advance():
         assert not np.all(state == 0)
 
 
-def test_random_sparse_reservoir_reset():
+def test_random_sparse_reservoir_reset() -> None:
+    """Test RandomSparseReservoir reset."""
     n_neurons = 10
     spectral_radius = 0.9
     sparsity = 0.5
@@ -45,31 +65,42 @@ def test_random_sparse_reservoir_reset():
     input_scaling = 1.0  # Added missing argument
     include_bias = True
 
-    res = _rclib.RandomSparseReservoir(n_neurons, spectral_radius, sparsity, leak_rate, input_scaling, include_bias)
-    input_data = np.random.rand(1, 5)
+    res = _rclib.RandomSparseReservoir(
+        n_neurons=n_neurons,
+        spectral_radius=spectral_radius,
+        sparsity=sparsity,
+        leak_rate=leak_rate,
+        input_scaling=input_scaling,
+        include_bias=include_bias,
+    )
+    rng = np.random.default_rng(seed=42)
+    input_data = rng.random((1, 5))
 
     res.advance(input_data)
     assert not np.all(res.getState() == 0)
 
-    res.resetState()  # Corrected method name: resetState
+    res.resetState()
     assert np.all(res.getState() == 0)
 
 
-def test_nvar_reservoir_init():
+def test_nvar_reservoir_init() -> None:
+    """Test NvarReservoir initialization."""
     num_lags = 3
-    res = _rclib.NvarReservoir(num_lags)  # Corrected class name: NvarReservoir
+    res = _rclib.NvarReservoir(num_lags=num_lags)
 
-    assert np.all(res.getState() == 0)  # Corrected method name: getState
+    assert np.all(res.getState() == 0)
 
 
-def test_nvar_reservoir_advance():
+def test_nvar_reservoir_advance() -> None:
+    """Test NvarReservoir advance."""
     num_lags = 3
     input_dim = 2
-    res = _rclib.NvarReservoir(num_lags)  # Corrected class name: NvarReservoir
+    res = _rclib.NvarReservoir(num_lags=num_lags)
 
-    input1 = np.random.rand(1, input_dim)
-    input2 = np.random.rand(1, input_dim)
-    input3 = np.random.rand(1, input_dim)
+    rng = np.random.default_rng(seed=42)
+    input1 = rng.random((1, input_dim))
+    input2 = rng.random((1, input_dim))
+    input3 = rng.random((1, input_dim))
 
     res.advance(input1)
     state = res.getState()
@@ -91,14 +122,16 @@ def test_nvar_reservoir_advance():
     assert np.allclose(state[:, 2 * input_dim : 3 * input_dim], input1)
 
 
-def test_nvar_reservoir_reset():
+def test_nvar_reservoir_reset() -> None:
+    """Test NvarReservoir reset."""
     num_lags = 3
     input_dim = 2
-    res = _rclib.NvarReservoir(num_lags)  # Corrected class name: NvarReservoir
-    input_data = np.random.rand(1, input_dim)
+    res = _rclib.NvarReservoir(num_lags=num_lags)
+    rng = np.random.default_rng(seed=42)
+    input_data = rng.random((1, input_dim))
 
     res.advance(input_data)
     assert not np.all(res.getState() == 0)
 
-    res.resetState()  # Corrected method name: resetState
+    res.resetState()
     assert np.all(res.getState() == 0)

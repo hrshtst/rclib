@@ -1,3 +1,5 @@
+"""Reservoir Computing Library (rclib)."""
+
 from __future__ import annotations
 
 from . import readouts, reservoirs

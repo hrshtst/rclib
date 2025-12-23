@@ -1,3 +1,5 @@
+"""Tests for bias effect."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -7,7 +9,7 @@ from rclib.readouts import Ridge
 from rclib.reservoirs import RandomSparse
 
 
-def _run_esn_experiment(include_bias: bool, input_scaling: float = 1.0) -> float:
+def _run_esn_experiment(*, include_bias: bool, input_scaling: float = 1.0) -> float:
     # --- Configuration Parameters ---
     n_total_samples = 200  # Smaller for faster tests
     n_train_samples = 150
@@ -20,9 +22,10 @@ def _run_esn_experiment(include_bias: bool, input_scaling: float = 1.0) -> float
     ridge_alpha = 1e-6
 
     # --- Data Generation ---
+    rng = np.random.default_rng(seed=42)
     time_np = np.linspace(0, 20, n_total_samples)
     clean_data = np.sin(time_np)
-    noise = noise_amplitude * np.random.randn(n_total_samples)
+    noise = noise_amplitude * rng.standard_normal(n_total_samples)
     data = (clean_data + noise).reshape(-1, 1).astype(np.float64)
 
     input_data, target_data = data[:-1], data[1:]
@@ -54,17 +57,12 @@ def _run_esn_experiment(include_bias: bool, input_scaling: float = 1.0) -> float
     return mse
 
 
-def test_bias_effect_on_performance():
+def test_bias_effect_on_performance() -> None:
+    """Test that bias parameter affects performance."""
     mse_with_bias = _run_esn_experiment(include_bias=True)
     mse_without_bias = _run_esn_experiment(include_bias=False)
 
     print(f"\nTest Bias Effect: MSE with bias={mse_with_bias:.6f}, MSE without bias={mse_without_bias:.6f}")
 
     # Assert that the MSE values are different, indicating that bias has an effect.
-    # We expect bias to generally improve performance for this type of task, but
-    # a simple difference check is sufficient for a unit test to confirm functionality.
     assert mse_with_bias != pytest.approx(mse_without_bias, abs=1e-5)
-
-    # Optionally, assert that with bias is better (or at least not significantly worse)
-    # This might be too strict for a general test as performance can vary.
-    # assert mse_with_bias < mse_without_bias # This might fail depending on random initialization

@@ -1,3 +1,5 @@
+"""Tests for the Model class."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -5,12 +7,14 @@ from rclib import readouts, reservoirs
 from rclib.model import ESN
 
 
-def test_model_creation():
+def test_model_creation() -> None:
+    """Test model creation."""
     model = ESN()
     assert model is not None
 
 
-def test_model_fit_predict():
+def test_model_fit_predict() -> None:
+    """Test model fitting and prediction."""
     model = ESN()
     res = reservoirs.RandomSparse(
         n_neurons=100, spectral_radius=0.9, sparsity=0.1, leak_rate=0.2, include_bias=False, input_scaling=1.0
@@ -19,17 +23,19 @@ def test_model_fit_predict():
     model.add_reservoir(res)
     model.set_readout(readout)
 
-    X_train = np.random.rand(200, 1)
-    y_train = np.random.rand(200, 1)
+    rng = np.random.default_rng(seed=42)
+    x_train = rng.random((200, 1))
+    y_train = rng.random((200, 1))
 
-    model.fit(X_train, y_train)
-    y_pred = model.predict(X_train)
+    model.fit(x_train, y_train)
+    y_pred = model.predict(x_train)
 
     assert y_pred.shape == (200, 1)
     assert np.mean((y_pred - y_train) ** 2) < np.mean(y_train**2)
 
 
-def test_parallel_model_fit_predict():
+def test_parallel_model_fit_predict() -> None:
+    """Test parallel model fitting and prediction."""
     model = ESN(connection_type="parallel")
     res1 = reservoirs.RandomSparse(
         n_neurons=50, spectral_radius=0.9, sparsity=0.1, leak_rate=0.2, include_bias=False, input_scaling=1.0
@@ -42,17 +48,19 @@ def test_parallel_model_fit_predict():
     model.add_reservoir(res2)
     model.set_readout(readout)
 
-    X_train = np.random.rand(200, 1)
-    y_train = np.random.rand(200, 1)
+    rng = np.random.default_rng(seed=42)
+    x_train = rng.random((200, 1))
+    y_train = rng.random((200, 1))
 
-    model.fit(X_train, y_train)
-    y_pred = model.predict(X_train)
+    model.fit(x_train, y_train)
+    y_pred = model.predict(x_train)
 
     assert y_pred.shape == (200, 1)
     assert np.mean((y_pred - y_train) ** 2) < np.mean(y_train**2)
 
 
-def test_model_reset_reservoirs():
+def test_model_reset_reservoirs() -> None:
+    """Test reservoir reset."""
     model = ESN()
     res1 = reservoirs.RandomSparse(
         n_neurons=10, spectral_radius=0.9, sparsity=0.1, leak_rate=0.2, include_bias=False, input_scaling=1.0

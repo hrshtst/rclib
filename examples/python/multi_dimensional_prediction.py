@@ -1,4 +1,9 @@
+"""Multi-dimensional prediction example (Lorenz Attractor)."""
+
 from __future__ import annotations
+
+import sys
+from typing import TYPE_CHECKING
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -6,9 +11,13 @@ from rclib.model import ESN
 from rclib.readouts import Ridge
 from rclib.reservoirs import RandomSparse
 
+if TYPE_CHECKING:
+    from numpy.typing import ArrayLike
 
-def lorenz(xyz, *, s=10, r=28, b=2.667):
-    """
+
+def lorenz(xyz: ArrayLike, *, s: float = 10, r: float = 28, b: float = 2.667) -> np.ndarray:
+    """Calculate the derivatives of the Lorenz attractor.
+
     Parameters
     ----------
     xyz : array-like, shape (3,)
@@ -28,7 +37,8 @@ def lorenz(xyz, *, s=10, r=28, b=2.667):
     return np.array([x_dot, y_dot, z_dot])
 
 
-def main():
+def main() -> None:
+    """Run the multi-dimensional prediction example."""
     # --- Configuration Parameters ---
     n_total_samples = 2000
     n_train_samples = 1500
@@ -92,7 +102,7 @@ def main():
     # --- 3. Plot Results ---
     print("\nPlotting results...")
     plt.style.use("seaborn-v0_8-whitegrid")
-    fig, axes = plt.subplots(3, 1, figsize=(15, 12), sharex=True)
+    _, axes = plt.subplots(3, 1, figsize=(15, 12), sharex=True)
     plot_range = range(min(300, len(test_target)))
 
     for i, (ax, dim_name) in enumerate(zip(axes, ["X", "Y", "Z"], strict=False)):
@@ -111,7 +121,7 @@ def main():
         )
         ax.set_ylabel("Value")
         ax.legend(loc="upper right")
-        ax.grid(True, which="both", linestyle="--", linewidth=0.5)
+        ax.grid(visible=True, which="both", linestyle="--", linewidth=0.5)
 
     axes[0].set_title(f"ESN: Lorenz Attractor Prediction (MSE: {mse:.6f})", fontsize=16)
     axes[-1].set_xlabel("Time Step")
@@ -147,7 +157,9 @@ def main():
     ax.legend()
     plt.savefig(plot_output_file_3d)
     print(f"3D plot saved to {plot_output_file_3d}")
-    # plt.show()
+
+    if sys.stdout.isatty():
+        plt.show()
 
 
 if __name__ == "__main__":

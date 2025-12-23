@@ -1,16 +1,31 @@
+"""Reservoir configurations."""
+
 from __future__ import annotations
 
 
 class RandomSparse:
+    """Random Sparse Reservoir configuration."""
+
     def __init__(
         self,
-        n_neurons,
-        spectral_radius,
-        sparsity=0.1,
-        leak_rate=1.0,
-        input_scaling=1.0,
-        include_bias=False,
-    ):
+        n_neurons: int,
+        spectral_radius: float,
+        sparsity: float = 0.1,
+        leak_rate: float = 1.0,
+        input_scaling: float = 1.0,
+        *,
+        include_bias: bool = False,
+    ) -> None:
+        """Initialize the Random Sparse Reservoir.
+
+        Args:
+            n_neurons: Number of neurons in the reservoir.
+            spectral_radius: Spectral radius of the reservoir weight matrix.
+            sparsity: Sparsity of the reservoir weight matrix (0.0 to 1.0).
+            leak_rate: Leaking rate of the neurons.
+            input_scaling: Scaling factor for the input weights.
+            include_bias: Whether to include a bias term.
+        """
         self.n_neurons = n_neurons
         self.spectral_radius = spectral_radius
         self.sparsity = sparsity
@@ -20,5 +35,12 @@ class RandomSparse:
 
 
 class Nvar:
-    def __init__(self, num_lags):
+    """NVAR Reservoir configuration."""
+
+    def __init__(self, num_lags: int) -> None:
+        """Initialize the NVAR Reservoir.
+
+        Args:
+            num_lags: Number of time lags to include.
+        """
         self.num_lags = num_lags
