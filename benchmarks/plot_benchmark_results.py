@@ -27,6 +27,9 @@ def plot_results(csv_file: str) -> None:
 
     # Read the raw data
     df = pd.read_csv(csv_file)
+    if not isinstance(df, pd.DataFrame):
+        print(f"Error: Expected DataFrame from {csv_file}, got {type(df)}")
+        return
 
     # --- Compute 'offline_total' ---
     # Group by threads and run to sum fit and predict times for each unique benchmark run
@@ -55,7 +58,14 @@ def plot_results(csv_file: str) -> None:
     plt.figure(figsize=(12, 8))
 
     ax = sns.lineplot(
-        data=df, x="threads", y="time_s", hue="method", style="method", marker="o", markers=True, dashes=True
+        data=df,
+        x="threads",
+        y="time_s",
+        hue="method",
+        style="method",
+        marker="o",
+        markers=True,
+        dashes=True,
     )
 
     ax.set_title("Performance Benchmark: Time vs. Threads", fontsize=16)
@@ -76,7 +86,7 @@ def plot_results(csv_file: str) -> None:
     plt.figure(figsize=(10, 6))
     df_rls = df[df["method"] == "online_rls"]
 
-    ax_rls = sns.lineplot(data=df_rls, x="threads", y="time_s", marker="o")
+    ax_rls = sns.lineplot(data=df_rls, x="threads", y="time_s", marker="o")  # type: ignore[reportArgumentType]
 
     ax_rls.set_title("RLS Performance: Time vs. Threads", fontsize=16)
     ax_rls.set_xlabel("Number of OpenMP Threads")
@@ -99,14 +109,14 @@ def plot_results(csv_file: str) -> None:
     df_mse_filtered = df_mse[~df_mse["method"].isin(methods_to_exclude)]
 
     plt.figure(figsize=(10, 6))
-    ax_mse = sns.barplot(data=df_mse_filtered, x="method", y="mse")
+    ax_mse = sns.barplot(data=df_mse_filtered, x="method", y="mse")  # type: ignore[reportArgumentType]
     ax_mse.set_title("Comparison of Mean Squared Error (MSE)")
     ax_mse.set_ylabel("MSE")
     ax_mse.set_xlabel("Method")
 
     # Add MSE values on top of the bars
     for index, row in df_mse_filtered.iterrows():
-        ax_mse.text(index, row.mse, f"{row.mse:.4f}", color="black", ha="center")
+        ax_mse.text(index, row.mse, f"{row.mse:.4f}", color="black", ha="center")  # type: ignore[reportArgumentType]
 
     # Save the MSE plot
     mse_output_path = path.with_name(f"{path.stem}_mse.png")

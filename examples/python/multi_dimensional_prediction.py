@@ -30,7 +30,8 @@ def lorenz(xyz: ArrayLike, *, s: float = 10, r: float = 28, b: float = 2.667) ->
     xyz_dot : array, shape (3,)
        Values of the Lorenz attractor's partial derivatives at `xyz`.
     """
-    x, y, z = xyz
+    xyz_arr = np.array(xyz)
+    x, y, z = xyz_arr
     x_dot = s * (y - x)
     y_dot = r * x - y - x * z
     z_dot = x * y - b * z

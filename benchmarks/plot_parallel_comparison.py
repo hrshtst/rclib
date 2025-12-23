@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
+from typing import cast
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -24,7 +25,7 @@ def plot_metric(data: pd.DataFrame, title: str, filename_suffix: str, path: Path
 
     if not parallel_data.empty:
         sns.lineplot(
-            data=parallel_data,
+            data=parallel_data,  # type: ignore[reportArgumentType]
             x="threads",
             y="time_s",
             hue="mode",
@@ -39,7 +40,7 @@ def plot_metric(data: pd.DataFrame, title: str, filename_suffix: str, path: Path
     # Plot serial baseline as a horizontal line
     serial_data = data[data["mode"] == "serial"]
     if not serial_data.empty:
-        serial_avg = serial_data["time_s"].mean()
+        serial_avg = float(serial_data["time_s"].mean())
         plt.axhline(y=serial_avg, color="r", linestyle="--", label=f"Serial Baseline ({serial_avg:.4f}s)")
 
     plt.title(title, fontsize=16)
@@ -51,7 +52,7 @@ def plot_metric(data: pd.DataFrame, title: str, filename_suffix: str, path: Path
     # Force integer ticks on x-axis if not too many
     max_threads = data["threads"].max()
     if max_threads <= MAX_THREADS_FOR_TICKS:
-        plt.xticks(data["threads"].unique())
+        plt.xticks(data["threads"].unique().tolist())
 
     output_path = path.with_name(f"{path.stem}_{filename_suffix}.png")
     plt.savefig(output_path)
@@ -70,7 +71,7 @@ def plot_mode_methods(df: pd.DataFrame, mode_name: str, nice_name: str, filename
 
     plt.figure(figsize=(10, 6))
     sns.lineplot(
-        data=subset,
+        data=subset,  # type: ignore[reportArgumentType]
         x="threads",
         y="time_s",
         hue="method",
@@ -90,7 +91,7 @@ def plot_mode_methods(df: pd.DataFrame, mode_name: str, nice_name: str, filename
     # Force integer ticks on x-axis if not too many
     max_threads = subset["threads"].max()
     if max_threads <= MAX_THREADS_FOR_TICKS:
-        plt.xticks(subset["threads"].unique())
+        plt.xticks(subset["threads"].unique().tolist())
 
     output_path = path.with_name(f"{path.stem}_{filename_suffix}.png")
     plt.savefig(output_path)
@@ -121,7 +122,7 @@ def plot_mse(df: pd.DataFrame, path: Path) -> None:
 
     # Add values on top of bars
     for container in ax.containers:
-        ax.bar_label(container, fmt="%.2e", padding=3)
+        ax.bar_label(container, fmt="%.2e", padding=3)  # type: ignore[reportArgumentType]
 
     output_path = path.with_name(f"{path.stem}_mse_comparison.png")
     plt.savefig(output_path)
@@ -153,7 +154,7 @@ def plot_online_mse(df: pd.DataFrame, path: Path) -> None:
 
     # Add values on top of bars
     for container in ax.containers:
-        ax.bar_label(container, fmt="%.2e", padding=3)
+        ax.bar_label(container, fmt="%.2e", padding=3)  # type: ignore[reportArgumentType]
 
     output_path = path.with_name(f"{path.stem}_online_mse_comparison.png")
     plt.savefig(output_path)
@@ -200,25 +201,25 @@ def plot_comparison(csv_file: str) -> None:
     sns.set_theme(style="whitegrid")
 
     # Plot 1: Offline Performance
-    plot_metric(offline_total, "Batch Training & Prediction Performance", "offline", path)
+    plot_metric(cast("pd.DataFrame", offline_total), "Batch Training & Prediction Performance", "offline", path)
 
     # Plot 2: Online RLS Performance
-    plot_metric(online_rls, "Online RLS Performance", "rls", path)
+    plot_metric(cast("pd.DataFrame", online_rls), "Online RLS Performance", "rls", path)
 
     # Plot 3: Online LMS Performance
-    plot_metric(online_lms, "Online LMS Performance", "lms", path)
+    plot_metric(cast("pd.DataFrame", online_lms), "Online LMS Performance", "lms", path)
 
     # Plot 4: Method Comparison for User OMP
-    plot_mode_methods(combined_df, "user_omp", "User Parallelism", "methods_user_omp", path)
+    plot_mode_methods(cast("pd.DataFrame", combined_df), "user_omp", "User Parallelism", "methods_user_omp", path)
 
     # Plot 5: Method Comparison for Eigen OMP
-    plot_mode_methods(combined_df, "eigen_omp", "Eigen Parallelism", "methods_eigen_omp", path)
+    plot_mode_methods(cast("pd.DataFrame", combined_df), "eigen_omp", "Eigen Parallelism", "methods_eigen_omp", path)
 
     # Plot 6: MSE Comparison
-    plot_mse(combined_df, path)
+    plot_mse(cast("pd.DataFrame", combined_df), path)
 
     # Plot 7: Focused Online MSE Comparison
-    plot_online_mse(combined_df, path)
+    plot_online_mse(cast("pd.DataFrame", combined_df), path)
 
 
 if __name__ == "__main__":

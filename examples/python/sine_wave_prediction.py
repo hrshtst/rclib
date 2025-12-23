@@ -73,7 +73,7 @@ def main() -> None:
     # --- 3. Plot Results ---
     print("\nPlotting results...")
     plt.style.use("seaborn-v0_8-whitegrid")
-    fig, ax = plt.subplots(figsize=(15, 6))  # noqa: RUF059
+    _, ax = plt.subplots(figsize=(15, 6))
     plot_range = range(min(200, len(test_target)))
     ax.plot(test_target[plot_range], "b", label="True Target (with noise)", linewidth=2, alpha=0.7)
     ax.plot(predictions[plot_range], "r--", label="ESN Prediction", linewidth=2)

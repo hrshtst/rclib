@@ -54,7 +54,7 @@ def _run_esn_experiment(*, include_bias: bool, input_scaling: float = 1.0) -> fl
     predictions = model.predict(test_input, reset_state_before_predict=True)
 
     mse = np.mean((predictions[: len(test_target)] - test_target) ** 2)
-    return mse
+    return float(mse)
 
 
 def test_bias_effect_on_performance() -> None:

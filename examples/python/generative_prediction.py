@@ -89,7 +89,7 @@ def main() -> None:
 
     # 6. Visualize the results
     print("Plotting results...")
-    fig, ax = plt.subplots(1, 1, figsize=(12, 6))  # noqa: RUF059
+    _, ax = plt.subplots(1, 1, figsize=(12, 6))
 
     # Full test sequence (ground truth)
     full_test_y = y_test.flatten()
