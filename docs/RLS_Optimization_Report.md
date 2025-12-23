@@ -1,6 +1,6 @@
 # RLS Optimization Report
 
-**Date:** December 4, 2025  
+**Date:** December 4, 2025
 **Author:** Gemini Agent
 
 ## Executive Summary
@@ -101,7 +101,7 @@ In the `rclib` implementation, this was achieved by using `P.selfadjointView<Eig
 --- Old
 +++ New
 @@ -17,12 +17,13 @@
- 
+
  void RlsReadout::partialFit(const Eigen::MatrixXd& state, const Eigen::MatrixXd& target) {
      Eigen::MatrixXd x = state;
 -    if (include_bias) {
@@ -109,7 +109,7 @@ In the `rclib` implementation, this was achieved by using `P.selfadjointView<Eig
 -        x(0, x.cols() - 1) = 1.0;
 -    }
 +    // ... Initialization of x_aug and buffers (omitted for brevity) ...
- 
+
      // RLS update equations
 -    Eigen::MatrixXd Px = P * x.transpose();
 -    double denominator = lambda + (x * Px)(0,0);
@@ -122,7 +122,7 @@ In the `rclib` implementation, this was achieved by using `P.selfadjointView<Eig
 -    // Optimized P update: (1.0 / lambda) * (P - k * (x * P))
 -    Eigen::MatrixXd xP = x * P;
 -    P = (1.0 / lambda) * (P - k * xP);
-+    
++
 +    // 1. Compute Px = P * x using symmetry (Upper triangle)
 +    Px.noalias() = P.selfadjointView<Eigen::Upper>() * x_aug;
 +
@@ -150,9 +150,9 @@ In the `rclib` implementation, this was achieved by using `P.selfadjointView<Eig
 
 Benchmarks were run on the `mackey_glass` time-series prediction task using the `performance_benchmark.cpp` executable.
 
-| Metric | Before Optimization | After Optimization | Improvement | 
+| Metric | Before Optimization | After Optimization | Improvement |
 | :--- | :--- | :--- | :--- |
-| **Time (s)** | 14.06s | 2.54s | **5.5x Faster** | 
-| **MSE** | 0.000213 | 0.000215 | Negligible Diff | 
+| **Time (s)** | 14.06s | 2.54s | **5.5x Faster** |
+| **MSE** | 0.000213 | 0.000215 | Negligible Diff |
 
 The optimizations successfully removed the bottleneck in the online learning loop, making RLS a viable option for high-frequency updates.

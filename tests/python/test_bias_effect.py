@@ -1,14 +1,17 @@
+from __future__ import annotations
+
 import numpy as np
 import pytest
 from rclib.model import ESN
 from rclib.readouts import Ridge
 from rclib.reservoirs import RandomSparse
 
+
 def _run_esn_experiment(include_bias: bool, input_scaling: float = 1.0) -> float:
     # --- Configuration Parameters ---
     n_total_samples = 200  # Smaller for faster tests
     n_train_samples = 150
-    noise_amplitude = 0.01 # Reduced noise for clearer bias effect
+    noise_amplitude = 0.01  # Reduced noise for clearer bias effect
 
     n_neurons = 100  # Smaller for faster tests
     spectral_radius = 0.9
@@ -26,7 +29,7 @@ def _run_esn_experiment(include_bias: bool, input_scaling: float = 1.0) -> float
     train_input = input_data[:n_train_samples]
     train_target = target_data[:n_train_samples]
     test_input = data[n_train_samples:-1]
-    test_target = data[n_train_samples + 1:]
+    test_target = data[n_train_samples + 1 :]
 
     # --- Instantiate, Train, and Predict ---
     reservoir = RandomSparse(
@@ -47,8 +50,9 @@ def _run_esn_experiment(include_bias: bool, input_scaling: float = 1.0) -> float
     model.fit(train_input, train_target)
     predictions = model.predict(test_input, reset_state_before_predict=True)
 
-    mse = np.mean((predictions[:len(test_target)] - test_target) ** 2)
+    mse = np.mean((predictions[: len(test_target)] - test_target) ** 2)
     return mse
+
 
 def test_bias_effect_on_performance():
     mse_with_bias = _run_esn_experiment(include_bias=True)

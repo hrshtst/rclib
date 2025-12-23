@@ -1,7 +1,8 @@
-import numpy as np
+from __future__ import annotations
 
-from rclib.model import ESN
+import numpy as np
 from rclib import readouts, reservoirs
+from rclib.model import ESN
 
 
 def test_model_creation():
@@ -77,4 +78,3 @@ def test_model_reset_reservoirs():
     # Check that states are reset to zero
     assert np.linalg.norm(model.get_reservoir(0).getState()) == 0
     assert np.linalg.norm(model.get_reservoir(1).getState()) == 0
-

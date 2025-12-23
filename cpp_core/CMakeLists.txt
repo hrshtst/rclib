@@ -32,7 +32,7 @@ target_link_libraries(rclib_core PUBLIC
 if(RCLIB_USE_OPENMP)
     if(OpenMP_FOUND)
         target_link_libraries(rclib_core PUBLIC OpenMP::OpenMP_CXX)
-        
+
         # Enable user-level parallelization only if Eigen's internal parallelization is disabled
         if(NOT RCLIB_ENABLE_EIGEN_PARALLELIZATION)
             target_compile_definitions(rclib_core PUBLIC RCLIB_ENABLE_USER_PARALLELIZATION)

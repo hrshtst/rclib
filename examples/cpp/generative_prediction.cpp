@@ -10,7 +10,7 @@
 Eigen::VectorXd mackey_glass(int n_points = 2000, int tau = 17, double delta_t = 1.0) {
     Eigen::VectorXd x = Eigen::VectorXd::Zero(n_points);
     // Use a fixed seed for reproducibility, similar to the Python example
-    srand(0); 
+    srand(0);
     for(int i = 0; i < tau; ++i) {
         x(i) = (double)rand() / RAND_MAX;
     }
@@ -30,7 +30,7 @@ void saveData(const std::string& filename, const Eigen::MatrixXd& truth, const E
     }
 
     file << "Time,GroundTruth,Prediction\n";
-    
+
     // Write ground truth for the whole test period
     for (int i = 0; i < truth.rows(); ++i) {
         file << i << "," << truth(i, 0) << ",";

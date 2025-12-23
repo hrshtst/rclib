@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import matplotlib.pyplot as plt
 import numpy as np
 from rclib.model import ESN
@@ -93,7 +95,7 @@ def main():
     fig, axes = plt.subplots(3, 1, figsize=(15, 12), sharex=True)
     plot_range = range(min(300, len(test_target)))
 
-    for i, (ax, dim_name) in enumerate(zip(axes, ["X", "Y", "Z"])):
+    for i, (ax, dim_name) in enumerate(zip(axes, ["X", "Y", "Z"], strict=False)):
         ax.plot(
             test_target[plot_range, i],
             "b",

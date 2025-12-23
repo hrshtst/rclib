@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+
 class Ridge:
     def __init__(self, alpha, include_bias):
         self.alpha = alpha

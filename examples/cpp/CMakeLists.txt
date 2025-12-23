@@ -21,5 +21,3 @@ target_link_libraries(multi_dimensional_prediction PRIVATE rclib_core)
 
 add_executable(performance_benchmark performance_benchmark.cpp)
 target_link_libraries(performance_benchmark PRIVATE rclib_core)
-
-

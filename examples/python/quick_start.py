@@ -1,5 +1,6 @@
-import numpy as np
+from __future__ import annotations
 
+import numpy as np
 from rclib import ESN, readouts, reservoirs
 
 # 1. Create some dummy data
