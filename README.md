@@ -271,6 +271,10 @@ If you identify problems, or find code that appears to be unoriginal or rights-p
 **Contributor Policy:**
 External contributors are welcome to use AI tools for assistance, provided they adhere to the same standard of review and responsibility. If you use AI to generate code for a Pull Request, please disclose it in the PR description and ensure you have thoroughly reviewed and tested the code.
 
+## Acknowledgments
+
+This project is supported by the **[MITOU Target Program](https://www.ipa.go.jp/jinzai/mitou/koubo/programs/target.html)** (Reservoir Computing field) of the [Information-technology Promotion Agency, Japan (IPA)](https://www.ipa.go.jp/en/index.html). Details of the supported project can be found in the [official summary](https://www.ipa.go.jp/jinzai/mitou/target/2025_reservoir/gaiyou-ky-1.html) (Japanese).
+
 ## License
 
 This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
