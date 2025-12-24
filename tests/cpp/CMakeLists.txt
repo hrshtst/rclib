@@ -28,3 +28,7 @@ catch_discover_tests(test_model)
 add_executable(test_bias_effect test_bias_effect.cpp)
 target_link_libraries(test_bias_effect PRIVATE rclib_core Catch2::Catch2WithMain)
 catch_discover_tests(test_bias_effect)
+
+add_executable(test_integration_mackey_glass test_integration_mackey_glass.cpp)
+target_link_libraries(test_integration_mackey_glass PRIVATE rclib_core Catch2::Catch2WithMain)
+catch_discover_tests(test_integration_mackey_glass)
