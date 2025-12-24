@@ -19,6 +19,7 @@ rclib/
 │   ├── include/rclib/     # Public headers
 │   ├── src/               # Source files
 │   └── third_party/       # Dependencies (Eigen, Catch2, pybind11)
+├── docs/                  # Documentation source (mkdocs)
 ├── examples/              # Examples
 │   ├── cpp/
 │   └── python/
@@ -30,8 +31,12 @@ rclib/
 ├── CMakeLists.txt         # Main CMake build file
 ├── LICENSE                # Apache License 2.0
 ├── README.md
+├── noxfile.py             # Automation configuration
+├── mkdocs.yml             # Documentation configuration
 ├── pyproject.toml         # Python project configuration
 ├── .pre-commit-config.yaml # Pre-commit hooks configuration
+├── .clang-format          # C++ formatting configuration
+├── .cmake-format.yaml     # CMake formatting configuration
 ├── .geminiignore          # Files ignored by Gemini
 └── GEMINI.md              # This context file
 ```
@@ -94,6 +99,7 @@ The project uses several tools to ensure code quality:
 
 *   **Ruff:** For Python linting and formatting.
 *   **Basedpyright:** For static type checking.
+*   **clang-format:** For C++ formatting (LLVM style).
 *   **cmake-format / cmake-lint:** For CMake formatting and linting.
 *   **Pre-commit:** To enforce checks before committing.
 
