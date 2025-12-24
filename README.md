@@ -8,6 +8,7 @@
 *   **Scalability:** Efficient handling of large sparse reservoirs and complex architectures.
 *   **Flexibility:** Modular design separating Reservoirs and Readouts.
 *   **Ease of Use:** Pythonic interface via `pybind11` and `scikit-learn` style API.
+*   **Reproducibility:** Deterministic results via explicit seeding of random reservoirs.
 
 ## Getting Started
 
@@ -232,6 +233,7 @@ The project uses several tools to ensure code quality, all of which are integrat
 *   **Ruff:** For Python linting and formatting.
 *   **Basedpyright:** For static type checking.
 *   **clang-format:** For C++ formatting (LLVM style).
+*   **shellcheck:** For shell script linting.
 *   **cmake-format / cmake-lint:** For CMake formatting and linting.
 *   **pre-commit:** To enforce checks before committing.
 
