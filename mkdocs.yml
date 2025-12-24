@@ -28,15 +28,15 @@ theme:
 nav:
   - Home: index.md
   - User Guide:
-    - Overview: user_guide/index.md
+      - Overview: user_guide/index.md
   - Theory:
-    - Overview: theory/index.md
+      - Overview: theory/index.md
   - API Reference:
-    - Overview: api/index.md
+      - Overview: api/index.md
   - Development:
-    - Overview: development/index.md
-    - Reports:
-      - RLS Optimization: development/reports/RLS_Optimization_Report.md
+      - Overview: development/index.md
+      - Reports:
+          - RLS Optimization: development/reports/RLS_Optimization_Report.md
 
 plugins:
   - search
@@ -44,8 +44,14 @@ plugins:
       handlers:
         python:
           paths: [python]
+          options:
+            docstring_style: numpy
+            show_source: true
+            show_root_heading: true
 
 markdown_extensions:
+  - admonition
+  - pymdownx.details
   - pymdownx.highlight:
       anchor_linenums: true
   - pymdownx.inlinehilite
