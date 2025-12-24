@@ -9,7 +9,22 @@ This document outlines the steps required to create a new release of `rclib`, in
 
 ## Step-by-Step Guide
 
-### 1. Tag and Push
+### 1. Update Version Number
+Update the `version` field in `pyproject.toml` to the new version (e.g., `0.1.0`).
+
+```bash
+# You can use a tool or edit manually
+# Example using sed (Linux):
+sed -i 's/^version = .*/version = "0.1.0"/' pyproject.toml
+```
+
+Commit this change:
+```bash
+git add pyproject.toml
+git commit -m "chore: bump version to 0.1.0"
+```
+
+### 2. Tag and Push
 When you are ready to release, create a new semantic version tag and push it to GitHub.
 
 ```bash
@@ -18,7 +33,7 @@ git tag -a v0.1.0 -m "Release v0.1.0"
 git push origin v0.1.0
 ```
 
-### 2. Review the Release Draft
+### 3. Review the Release Draft
 Pushing a tag starting with `v*` automatically triggers the **Create Release Draft** workflow.
 
 1.  Go to the **Releases** section of the GitHub repository.
@@ -27,14 +42,14 @@ Pushing a tag starting with `v*` automatically triggers the **Create Release Dra
 4.  Click **Edit** to add any manual highlights or breaking change notices.
 5.  Click **Publish release**.
 
-### 3. Automated Publishing
+### 4. Automated Publishing
 Once the release is published on GitHub, the **Publish to PyPI** workflow triggers automatically:
 
 *   It checks out the code (including submodules).
 *   It builds the source distribution and the C++ binary wheels.
 *   It securely uploads the artifacts to PyPI using OpenID Connect (OIDC).
 
-### 4. Documentation Deployment
+### 5. Documentation Deployment
 The documentation is automatically deployed to GitHub Pages whenever changes are merged into the `main` branch. If your release involved merging into `main`, your documentation at [https://hrshtst.github.io/rclib/](https://hrshtst.github.io/rclib/) will be updated.
 
 ## Versioning Policy
