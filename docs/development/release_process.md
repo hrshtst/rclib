@@ -10,18 +10,21 @@ This document outlines the steps required to create a new release of `rclib`, in
 ## Step-by-Step Guide
 
 ### 1. Update Version Number
-Update the `version` field in `pyproject.toml` to the new version (e.g., `0.1.0`).
+Use the provided script to increment the version in `pyproject.toml`.
 
 ```bash
-# You can use a tool or edit manually
-# Example using sed (Linux):
-sed -i 's/^version = .*/version = "0.1.0"/' pyproject.toml
+# Choose one based on the change type
+./scripts/bump_version.sh patch
+# or
+./scripts/bump_version.sh minor
+# or
+./scripts/bump_version.sh major
 ```
 
-Commit this change:
+Follow the printed instructions to commit the change:
 ```bash
 git add pyproject.toml
-git commit -m "chore: bump version to 0.1.0"
+git commit -m "chore: bump version to X.Y.Z"
 ```
 
 ### 2. Tag and Push
