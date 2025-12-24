@@ -1,0 +1,13 @@
+---
+# from: https://github.com/pybind/pybind11/blob/master/.clang-format.yaml
+# See all possible options and defaults with:
+# clang-format --style=llvm --dump-config
+BasedOnStyle: LLVM
+ColumnLimit: 120
+CommentPragmas: 'NOLINT:.*|^ IWYU pragma:'
+IncludeBlocks: Regroup
+IndentCaseLabels: true
+IndentPPDirectives: AfterHash
+Standard: c++17
+StatementMacros: ['PyObject_HEAD']
+...
