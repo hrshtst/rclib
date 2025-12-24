@@ -8,7 +8,7 @@ HEADER_TEX="listings_setup.tex"
 
 # Navigate to the docs directory if the script is run from project root
 if [ -d "docs" ]; then
-    cd docs
+    cd docs || exit
 fi
 
 # Check if input file exists
@@ -42,9 +42,7 @@ echo "Converting $INPUT_MD to $OUTPUT_TEX using pandoc..."
 # -s: standalone (creates a full latex file with preamble)
 # --listings: use listings package for code blocks
 # -H: include the custom header file
-pandoc "$INPUT_MD" -s --listings -H "$HEADER_TEX" -o "$OUTPUT_TEX"
-
-if [ $? -ne 0 ]; then
+if ! pandoc "$INPUT_MD" -s --listings -H "$HEADER_TEX" -o "$OUTPUT_TEX"; then
     echo "Error: Pandoc conversion failed."
     rm "$HEADER_TEX"
     exit 1
