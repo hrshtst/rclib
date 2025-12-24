@@ -49,8 +49,9 @@ Pushing a tag starting with `v*` automatically triggers the **Create Release Dra
 Once the release is published on GitHub, the **Publish to PyPI** workflow triggers automatically:
 
 *   It checks out the code (including submodules).
-*   It builds the source distribution and the C++ binary wheels.
-*   It securely uploads the artifacts to PyPI using OpenID Connect (OIDC).
+*   It builds the source distribution (`.tar.gz`).
+*   It builds **manylinux-compliant binary wheels** for multiple Python versions (3.11, 3.12, 3.13) using `cibuildwheel`.
+*   It securely uploads all artifacts to PyPI using OpenID Connect (OIDC).
 
 ### 5. Documentation Deployment
 The documentation is automatically deployed to GitHub Pages whenever changes are merged into the `main` branch. If your release involved merging into `main`, your documentation at [https://hrshtst.github.io/rclib/](https://hrshtst.github.io/rclib/) will be updated.
