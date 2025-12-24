@@ -8,6 +8,7 @@
 *   **Scalability:** Efficient handling of large sparse reservoirs and complex architectures.
 *   **Flexibility:** Modular design separating Reservoirs and Readouts.
 *   **Ease of Use:** Pythonic interface via `pybind11` and `scikit-learn` style API.
+*   **Reproducibility:** Deterministic results via explicit seeding of random reservoirs.
 
 ## Current Directory Structure
 
@@ -25,6 +26,7 @@ rclib/
 │   └── python/
 ├── python/                # Python package structure
 │   └── rclib/
+├── scripts/               # Helper scripts (e.g., version bumping)
 ├── tests/                 # Unit and integration tests
 │   ├── cpp/
 │   └── python/
@@ -100,6 +102,7 @@ The project uses several tools to ensure code quality:
 *   **Ruff:** For Python linting and formatting.
 *   **Basedpyright:** For static type checking.
 *   **clang-format:** For C++ formatting (LLVM style).
+*   **shellcheck:** For shell script linting.
 *   **cmake-format / cmake-lint:** For CMake formatting and linting.
 *   **Pre-commit:** To enforce checks before committing.
 
