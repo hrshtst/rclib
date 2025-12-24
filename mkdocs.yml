@@ -57,3 +57,7 @@ markdown_extensions:
           format: !!python/name:pymdownx.arithmatex.fence_mathjax_format
   - pymdownx.arithmatex:
       generic: true
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
