@@ -33,8 +33,7 @@ jobs:
 
       - name: Build package
         run: |
-          uv pip install scikit-build-core pybind11
-          uv build --no-build-isolation
+          uv run --with scikit-build-core --with pybind11 uv build --no-build-isolation
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1

@@ -40,6 +40,8 @@ jobs:
         run: uv run nox -s docs
 
       - name: Deploy documentation
-        run: uv run mkdocs gh-deploy --force --clean --verbose
+        run: |
+          uv run nox -s docs
+          uv run mkdocs gh-deploy --force --clean --verbose
         env:
           GH_TOKEN: ${{ github.token }}
