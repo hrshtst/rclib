@@ -87,6 +87,7 @@ CTestTestfile.cmake
 *.tmp
 *~
 *.png
+!/docs/assets/*.png
 *.csv
 
 # IDEs
