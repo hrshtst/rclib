@@ -36,3 +36,7 @@ catch_discover_tests(test_integration_mackey_glass)
 add_executable(test_integration_online_learning test_integration_online_learning.cpp)
 target_link_libraries(test_integration_online_learning PRIVATE rclib_core Catch2::Catch2WithMain)
 catch_discover_tests(test_integration_online_learning)
+
+add_executable(test_seed_consistency test_seed_consistency.cpp)
+target_link_libraries(test_seed_consistency PRIVATE rclib_core Catch2::Catch2WithMain)
+catch_discover_tests(test_seed_consistency)
