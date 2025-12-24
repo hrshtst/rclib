@@ -57,6 +57,7 @@ class ESN:
                 reservoir.leak_rate,
                 reservoir.input_scaling,
                 reservoir.include_bias,
+                reservoir.seed,
             )
             self._cpp_model.addReservoir(cpp_res, self.connection_type)
         # Add other reservoir types here as they are implemented

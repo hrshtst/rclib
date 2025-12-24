@@ -47,7 +47,8 @@ TEST_CASE("Integration: Mackey-Glass Accuracy", "[integration][accuracy]") {
     y_test(i, 0) = data[train_len + i + 1];
   }
 
-  auto res = std::make_shared<RandomSparseReservoir>(1000, 1.1, 0.05, 0.1, 0.5, true);
+  auto res = std::make_shared<RandomSparseReservoir>(1000, 1.1, 0.05, 0.1, 0.5, true, 42);
+
   auto readout = std::make_shared<RidgeReadout>(1e-8, true);
 
   Model model;

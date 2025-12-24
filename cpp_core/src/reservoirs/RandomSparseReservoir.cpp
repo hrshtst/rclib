@@ -6,10 +6,8 @@
 #include <vector>
 
 // Helper function to generate a sparse random matrix
-Eigen::SparseMatrix<double> generate_sparse_random_matrix(int size, double sparsity) {
+Eigen::SparseMatrix<double> generate_sparse_random_matrix(int size, double sparsity, std::mt19937 &gen) {
   std::vector<Eigen::Triplet<double>> triplets;
-  std::random_device rd;
-  std::mt19937 gen(rd());
   std::uniform_real_distribution<> dis(-1.0, 1.0);
   std::uniform_int_distribution<> pos_dis(0, size - 1);
 
@@ -42,13 +40,14 @@ double largest_eigenvalue(const Eigen::SparseMatrix<double> &mat, int iterations
 }
 
 RandomSparseReservoir::RandomSparseReservoir(int n_neurons, double spectral_radius, double sparsity, double leak_rate,
-                                             double input_scaling, bool include_bias)
+                                             double input_scaling, bool include_bias, unsigned int seed)
     : n_neurons(n_neurons), spectral_radius(spectral_radius), sparsity(sparsity), leak_rate(leak_rate),
       input_scaling(input_scaling), include_bias(include_bias), W_in_initialized(false) {
 
   state = Eigen::MatrixXd::Zero(1, n_neurons);
 
-  W_res = generate_sparse_random_matrix(n_neurons, sparsity);
+  std::mt19937 gen(seed);
+  W_res = generate_sparse_random_matrix(n_neurons, sparsity, gen);
 
   if (spectral_radius > 0) {
     double max_eigenvalue = largest_eigenvalue(W_res);
@@ -58,14 +57,22 @@ RandomSparseReservoir::RandomSparseReservoir(int n_neurons, double spectral_radi
   }
 
   if (include_bias) {
-    bias = Eigen::RowVectorXd::Random(n_neurons);
+    std::uniform_real_distribution<> dis(-1.0, 1.0);
+    bias = Eigen::RowVectorXd::NullaryExpr(n_neurons, [&]() { return dis(gen); });
   } else {
     bias = Eigen::RowVectorXd::Zero(n_neurons);
   }
+
+  // Store the generator state or re-seed later for W_in if needed.
+  // For now, let's re-create the generator with the same seed + offset for W_in to keep it deterministic.
+  this->seed = seed;
 }
 
 void RandomSparseReservoir::initialize_W_in(int input_dim) {
-  W_in = Eigen::MatrixXd::Random(input_dim, n_neurons) * input_scaling;
+  // Use a different seed sequence for W_in based on the original seed
+  std::mt19937 gen(seed + 1);
+  std::uniform_real_distribution<> dis(-1.0, 1.0);
+  W_in = Eigen::MatrixXd::NullaryExpr(input_dim, n_neurons, [&]() { return dis(gen); }) * input_scaling;
   W_in_initialized = true;
 }
 

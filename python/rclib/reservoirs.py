@@ -15,6 +15,7 @@ class RandomSparse:
         input_scaling: float = 1.0,
         *,
         include_bias: bool = False,
+        seed: int = 42,
     ) -> None:
         """Initialize the Random Sparse Reservoir.
 
@@ -25,6 +26,7 @@ class RandomSparse:
             leak_rate: Leaking rate of the neurons.
             input_scaling: Scaling factor for the input weights.
             include_bias: Whether to include a bias term.
+            seed: Random seed for weights initialization.
         """
         self.n_neurons = n_neurons
         self.spectral_radius = spectral_radius
@@ -32,6 +34,7 @@ class RandomSparse:
         self.leak_rate = leak_rate
         self.input_scaling = input_scaling
         self.include_bias = include_bias
+        self.seed = seed
 
 
 class Nvar:

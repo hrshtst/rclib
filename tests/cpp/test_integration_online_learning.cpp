@@ -24,7 +24,8 @@ double run_online_cpp_experiment(std::shared_ptr<Readout> readout) {
   int change_point = 300;
   auto data = generate_switching_sine(n_steps, change_point);
 
-  auto res = std::make_shared<RandomSparseReservoir>(100, 0.9, 0.1, 1.0, 1.0, true);
+  auto res = std::make_shared<RandomSparseReservoir>(100, 0.9, 0.1, 1.0, 1.0, true, 42);
+
   Model model;
   model.addReservoir(res);
   model.setReadout(readout);

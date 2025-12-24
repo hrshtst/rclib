@@ -7,7 +7,7 @@
 class RandomSparseReservoir : public Reservoir {
 public:
   RandomSparseReservoir(int n_neurons, double spectral_radius, double sparsity, double leak_rate, double input_scaling,
-                        bool include_bias = false);
+                        bool include_bias = false, unsigned int seed = 42);
 
   Eigen::MatrixXd advance(const Eigen::MatrixXd &input) override;
   void resetState() override;
@@ -22,6 +22,7 @@ private:
   double leak_rate;
   double input_scaling; // New member variable
   bool include_bias;
+  unsigned int seed;
   bool W_in_initialized;
 
   Eigen::MatrixXd state;
