@@ -79,6 +79,18 @@ build-dir = "build_scikit/{wheel_tag}"
 # Enable concurrent job execution to speed up compilation.
 build.tool-args = ["-j8"]
 
+[tool.cibuildwheel]
+build-verbosity = "1"
+# Build for specific Python versions and skip 32-bit/musl for now
+build = "cp311-* cp312-* cp313-*"
+skip = "*-musllinux_* *-manylinux_i686"
+test-command = "pytest {project}/tests/python"
+test-requires = ["pytest", "pytest-randomly"]
+
+[tool.cibuildwheel.linux]
+before-all = "apt-get update && apt-get install -y libomp-dev ninja-build"
+environment = { CMAKE_GENERATOR = "Ninja" }
+
 [tool.ruff]
 line-length = 120
 indent-width = 4

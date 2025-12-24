@@ -20,12 +20,6 @@ jobs:
 
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.22.0
-        env:
-          CIBW_BEFORE_ALL_LINUX: apt-get update && apt-get install -y libomp-dev ninja-build
-          CIBW_BUILD: "cp311-* cp312-* cp313-*"
-          CIBW_SKIP: "*-musllinux_* *-manylinux_i686"
-          # Ensure submodules are handled if not by checkout
-          CIBW_ENVIRONMENT: CMAKE_GENERATOR=Ninja
 
       - uses: actions/upload-artifact@v4
         with:
