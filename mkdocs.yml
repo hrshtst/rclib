@@ -35,6 +35,7 @@ nav:
       - Overview: api/index.md
   - Development:
       - Overview: development/index.md
+      - Release Process: development/release_process.md
       - Reports:
           - RLS Optimization: development/reports/RLS_Optimization_Report.md
 
