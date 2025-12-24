@@ -104,26 +104,69 @@ If you wish to use `rclib_core` as a static library in your own C++ project, the
 
 ## Running Tests
 
-### C++ Tests
-The project uses `Catch2` for C++ unit testing.
+### Using Nox (Recommended)
+`nox` automates environment setup and execution for both Python and C++.
 
 ```bash
+# Run all default sessions (Lint, Type Check, Python Tests)
+uv run nox
+
+# Run Python tests only
+uv run nox -s tests
+
+# Run C++ tests only
+uv run nox -s tests_cpp
+```
+
+### Manual Execution (Step-by-Step)
+
+If you prefer to run tests manually without `nox`:
+
+#### C++ Tests
+```bash
+# 1. Configure and build
 cmake -S . -B build -DBUILD_TESTING=ON
 cmake --build build --config Release -j $(nproc)
+
+# 2. Run tests
 ctest --test-dir build --output-on-failure
 ```
 
-### Python Tests
-The project uses `pytest` for Python integration testing.
-
+#### Python Tests
 ```bash
-# Ensure the C++ library is built and installed into the python/ directory
+# 1. Build and install the C++ extension in the current environment
 cmake -S . -B build
 cmake --build build --config Release -j $(nproc) --target _rclib
 
-# Run pytest (via uv)
+# 2. Run pytest
 uv run pytest
 ```
+
+## Documentation
+
+The project documentation is built using `mkdocs` and the Material theme. It includes theoretical background, user guides, and API references.
+
+### Using Nox (Recommended)
+```bash
+# Build the documentation
+uv run nox -s docs
+```
+
+### Manual Execution
+If you prefer to run `mkdocs` directly:
+
+```bash
+# 1. Install documentation dependencies
+uv sync --group docs
+
+# 2. Build the documentation
+uv run mkdocs build
+
+# 3. Serve the documentation locally with live-reloading
+uv run mkdocs serve
+```
+
+The documentation is automatically deployed to [https://hrshtst.github.io/rclib/](https://hrshtst.github.io/rclib/) on every push to the `main` branch.
 
 ## Parallelization Configuration
 
@@ -184,12 +227,23 @@ The `benchmarks/` directory contains scripts to evaluate performance across diff
 
 ### Code Quality Tools
 
-The project uses several tools to ensure code quality:
+The project uses several tools to ensure code quality, all of which are integrated into `pre-commit` and `nox`:
 
 *   **Ruff:** For Python linting and formatting.
 *   **Basedpyright:** For static type checking.
+*   **clang-format:** For C++ formatting (LLVM style).
 *   **cmake-format / cmake-lint:** For CMake formatting and linting.
 *   **pre-commit:** To enforce checks before committing.
+
+### Automation with Nox
+
+`nox` is used to automate various development tasks:
+
+*   `uv run nox -s lint`: Run linters.
+*   `uv run nox -s type_check`: Run type checkers.
+*   `uv run nox -s tests`: Run Python tests.
+*   `uv run nox -s tests_cpp`: Run C++ tests.
+*   `uv run nox -s docs`: Build documentation.
 
 ### Setting up pre-commit
 
