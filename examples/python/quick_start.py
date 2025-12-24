@@ -35,20 +35,21 @@ def main() -> None:
     y_pred = model.predict(x_test)
 
     # 6. Plot the results
+    mse = np.mean((y_pred - y_test) ** 2)
+    print(f"Test loss (MSE): {mse:.4e}")
+
     try:
         import matplotlib.pyplot as plt
 
         plt.figure(figsize=(10, 6))
         plt.plot(x_test, y_test, label="True")
         plt.plot(x_test, y_pred, label="Predicted")
-        mse = np.mean((y_pred - y_test) ** 2)
         plt.text(0.05, 0.95, f"MSE: {mse:.4e}", transform=plt.gca().transAxes, fontsize=12, verticalalignment="top")
         plt.legend()
         if sys.stdout.isatty():
             plt.show()
     except ImportError:
         print("Matplotlib not found. Skipping plot.")
-        print("Test loss (MSE):", np.mean((y_pred - y_test) ** 2))
 
 
 if __name__ == "__main__":
