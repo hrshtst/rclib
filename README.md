@@ -253,6 +253,24 @@ To ensure all code follows the project's style and quality standards, it is reco
 uv run pre-commit install
 ```
 
+## AI Assistance & Development Workflow
+
+This project is developed with the assistance of an AI coding agent using the [Gemini CLI](https://github.com/google-gemini/as-code) tool. The AI is also used to generate commit messages and parts of the documentation, including API and theoretical reference sections.
+
+**Workflow:**
+1.  **Context & Theory (Human):** The maintainer, **[Hiroshi Atsuta](https://github.com/hrshtst)**, establishes the project roadmap in `GEMINI.md` and writes the theoretical background implemented as documentation in [docs/theory/](docs/theory/).
+2.  **Implementation (AI):** The AI assistant uses these documents and the constraints defined in `GEMINI.md` to implement code scaffolding, core logic, tests, and documentation.
+3.  **Review & Revision (Human):** The maintainer reviews, tests, and revises the generated code to ensure quality and correctness. This iterative cycle ensures high standards while leveraging AI efficiency.
+
+**Responsibility:**
+All responsibilities for the code hosted in this repository lie with the maintainer. The AI serves strictly as an implementation assistant; final architectural decisions and code quality are human-led.
+
+**Feedback:**
+If you identify problems, or find code that appears to be unoriginal or rights-protected, please notify the maintainer immediately by filing an issue.
+
+**Contributor Policy:**
+External contributors are welcome to use AI tools for assistance, provided they adhere to the same standard of review and responsibility. If you use AI to generate code for a Pull Request, please disclose it in the PR description and ensure you have thoroughly reviewed and tested the code.
+
 ## License
 
 This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
