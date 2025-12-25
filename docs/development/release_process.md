@@ -10,7 +10,7 @@ This document outlines the steps required to create a new release of `rclib`, in
 ## Step-by-Step Guide
 
 ### 1. Update Version Number
-Use the provided script to increment the version in `pyproject.toml`.
+Use the provided script to increment the version in `pyproject.toml`, sync the lockfile, and create a git commit and tag automatically.
 
 ```bash
 # Choose one based on the change type
@@ -21,19 +21,11 @@ Use the provided script to increment the version in `pyproject.toml`.
 ./scripts/bump_version.sh major
 ```
 
-Follow the printed instructions to commit the change:
-```bash
-git add pyproject.toml
-git commit -m "chore: bump version to X.Y.Z"
-```
-
-### 2. Tag and Push
-When you are ready to release, create a new semantic version tag and push it to GitHub.
+### 2. Push to GitHub
+After the script completes, push the new commit and tag to GitHub.
 
 ```bash
-# Example for version 0.1.0
-git tag -a v0.1.0 -m "Release v0.1.0"
-git push origin v0.1.0
+git push origin main --tags
 ```
 
 ### 3. Review the Release Draft

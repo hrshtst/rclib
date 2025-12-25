@@ -52,10 +52,17 @@ NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
 # Note: Using a temporary file for cross-platform sed compatibility
 sed -E "s/^version = \".*\"/version = \"$NEW_VERSION\"/" "$FILE" > "${FILE}.tmp" && mv "${FILE}.tmp" "$FILE"
 
+# Sync uv.lock
+uv lock
+
 echo "Successfully bumped version from $CURRENT_VERSION to $NEW_VERSION"
 
+# Automate git commands
+git add "$FILE" uv.lock
+git commit -m "chore: bump version to $NEW_VERSION"
+git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION"
+
 echo ""
-echo "Next steps:"
-echo "  git add $FILE"
-echo "  git commit -m \"chore: bump version to $NEW_VERSION\""
-echo "  git tag -a v$NEW_VERSION -m \"Release v$NEW_VERSION\""
+echo "Done! Version bumped, committed, and tagged as v$NEW_VERSION."
+echo "To push the release, run:"
+echo "  git push origin main --tags"
