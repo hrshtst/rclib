@@ -25,7 +25,7 @@ Use the provided script to increment the version in `pyproject.toml`, sync the l
 After the script completes, push the new commit and tag to GitHub.
 
 ```bash
-git push origin main --tags
+git push origin main --atomic --tags
 ```
 
 ### 3. Review the Release Draft
