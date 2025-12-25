@@ -15,9 +15,11 @@ nox.options.reuse_existing_virtualenvs = True
 @nox.session(python="3.12", reuse_venv=True)
 def lint(session: nox.Session) -> None:
     """Run linting checks."""
-    session.install("ruff")
+    session.install("ruff", "shellcheck-py", "cmakelang", "PyYAML")
     session.run("ruff", "check", ".")
     session.run("ruff", "format", "--check", ".")
+    session.run("shellcheck", "scripts/bump_version.sh", "docs/development/reports/generate_pdf.sh")
+    session.run("cmake-format", "--check", "CMakeLists.txt", "cpp_core/CMakeLists.txt", "python/CMakeLists.txt")
 
 
 @nox.session(python="3.12", reuse_venv=True)
