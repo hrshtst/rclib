@@ -89,6 +89,7 @@ test-command = "pytest {project}/tests/python"
 test-requires = ["pytest", "pytest-randomly", "pytest-cov"]
 
 [tool.cibuildwheel.linux]
+manylinux-x86_64-image = "manylinux_2_28"
 before-all = "yum install -y libomp-devel"
 
 [tool.ruff]
