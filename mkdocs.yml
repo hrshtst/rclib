@@ -29,8 +29,14 @@ nav:
   - Home: index.md
   - User Guide:
       - Overview: user_guide/index.md
+      - Installation: user_guide/installation.md
+      - Quick Start: user_guide/quick_start.md
+      - Core Concepts: user_guide/core_concepts.md
+      - Advanced Usage: user_guide/advanced_usage.md
   - Theory:
       - Overview: theory/index.md
+      - Reservoir Computing: theory/reservoir_computing.md
+      - Readout Algorithms: theory/readout_algorithms.md
   - API Reference:
       - Overview: api/index.md
   - Development:
