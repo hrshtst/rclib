@@ -1,4 +1,4 @@
-"Benchmark comparing rclib and reservoirpy performance."
+"""Benchmark comparing rclib and reservoirpy performance."""
 
 from __future__ import annotations
 
@@ -94,11 +94,6 @@ def benchmark_reservoirpy(
         rc_connectivity=sparsity,
         lr=leak_rate,
         input_scaling=input_scaling,
-        # input_bias=True, # Removed, invalid param
-        # bias=1.0 # Let's try to enable bias if that's what this does,
-        # or we can check docs. For now, let's just match parameters that exist.
-        # If rclib has bias and reservoirpy doesn't, comparison is slightly off but
-        # acceptable for speed benchmark.
     )
 
     readout = Ridge(ridge=alpha)
@@ -154,7 +149,8 @@ def main() -> None:
         res_rc = benchmark_rclib(x_train, y_train, x_test, n, sr, sparsity, lr, input_scaling, alpha, washout)
         results.append(res_rc)
         print(
-            f"{res_rc['library']:<12} | {res_rc['n_neurons']:<8} | {res_rc['fit_time']:<10.4f} | {res_rc['pred_time']:<10.4f} | {res_rc['mse']:<10.4e}"
+            f"{res_rc['library']:<12} | {res_rc['n_neurons']:<8} | "
+            f"{res_rc['fit_time']:<10.4f} | {res_rc['pred_time']:<10.4f} | {res_rc['mse']:<10.4e}"
         )
 
         # reservoirpy
@@ -164,9 +160,10 @@ def main() -> None:
             )
             results.append(res_rpy)
             print(
-                f"{res_rpy['library']:<12} | {res_rpy['n_neurons']:<8} | {res_rpy['fit_time']:<10.4f} | {res_rpy['pred_time']:<10.4f} | {res_rpy['mse']:<10.4e}"
+                f"{res_rpy['library']:<12} | {res_rpy['n_neurons']:<8} | "
+                f"{res_rpy['fit_time']:<10.4f} | {res_rpy['pred_time']:<10.4f} | {res_rpy['mse']:<10.4e}"
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"reservoirpy failed for n={n}: {e}")
 
     df = pd.DataFrame(results)
@@ -184,7 +181,7 @@ def main() -> None:
         plt.title("Training Time: rclib vs reservoirpy")
         plt.ylabel("Time (s) - Log Scale")
         plt.xlabel("Number of Neurons - Log Scale")
-        plt.grid(True, which="both", ls="-", alpha=0.5)
+        plt.grid(visible=True, which="both", ls="-", alpha=0.5)
         plt.savefig("benchmarks/comparison_fit_time.png")
 
         plt.figure(figsize=(12, 6))
@@ -194,7 +191,7 @@ def main() -> None:
         plt.title("Prediction Time: rclib vs reservoirpy")
         plt.ylabel("Time (s) - Log Scale")
         plt.xlabel("Number of Neurons - Log Scale")
-        plt.grid(True, which="both", ls="-", alpha=0.5)
+        plt.grid(visible=True, which="both", ls="-", alpha=0.5)
         plt.savefig("benchmarks/comparison_pred_time.png")
         print("Plots saved as benchmarks/comparison_*.png")
     except ImportError:

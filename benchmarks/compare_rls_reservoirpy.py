@@ -12,7 +12,7 @@ from rclib import ESN, readouts, reservoirs
 from reservoirpy.nodes import RLS, Reservoir
 
 
-def mackey_glass(n_samples: int = 5000, tau: int = 17, seed: int = 0):
+def mackey_glass(n_samples: int = 5000, tau: int = 17, seed: int = 0) -> np.ndarray:
     """Generate Mackey-Glass time series."""
     rng = np.random.default_rng(seed=seed)
     x = np.zeros(n_samples + tau)
@@ -33,7 +33,7 @@ def benchmark_rclib_rls(
     leak_rate: float,
     input_scaling: float,
     lambda_: float,
-):
+) -> dict[str, Any]:
     """Benchmark rclib RLS."""
     # Setup
     res = reservoirs.RandomSparse(
@@ -45,6 +45,7 @@ def benchmark_rclib_rls(
         include_bias=True,
         seed=42,
     )
+
     # RLS Readout
     readout = readouts.Rls(lambda_=lambda_, delta=1.0, include_bias=True)
     model = ESN()
@@ -79,7 +80,7 @@ def benchmark_reservoirpy_rls(
     sparsity: float,
     leak_rate: float,
     input_scaling: float,
-):
+) -> dict[str, Any]:
     """Benchmark reservoirpy RLS (FORCE)."""
     rpy.set_seed(42)
 
@@ -90,6 +91,7 @@ def benchmark_reservoirpy_rls(
         lr=leak_rate,
         input_scaling=input_scaling,
     )
+
     # RLS is the node in reservoirpy
     readout = RLS()
     model = reservoir >> readout
@@ -118,14 +120,14 @@ def main() -> None:
     n_samples = 4000
     train_len = 3000
     data = mackey_glass(n_samples=n_samples)
-    
+
     # Train set
     x_train = data[:train_len]
     y_train = data[1 : train_len + 1]
-    
+
     # Test set
     x_test = data[train_len:-1]
-    y_test = data[train_len + 1:]
+    y_test = data[train_len + 1 :]
 
     # Common parameters
     sr = 0.9
@@ -137,7 +139,7 @@ def main() -> None:
     neuron_sizes = [100, 200, 500, 1000, 1500]
     results = []
 
-    print(f"{ 'Library':<12} | { 'Neurons':<8} | { 'Online Fit (s)':<15} | { 'MSE':<10}")
+    print(f"{'Library':<12} | {'Neurons':<8} | {'Online Fit (s)':<15} | {'MSE':<10}")
     print("-" * 55)
 
     for n in neuron_sizes:
@@ -145,16 +147,22 @@ def main() -> None:
         try:
             res_rc = benchmark_rclib_rls(x_train, y_train, x_test, y_test, n, sr, sparsity, lr, input_scaling, lambda_)
             results.append(res_rc)
-            print(f"{res_rc['library']:<12} | {res_rc['n_neurons']:<8} | {res_rc['online_fit_time']:<15.4f} | {res_rc['mse']:<10.4e}")
-        except Exception as e:
+            print(
+                f"{res_rc['library']:<12} | {res_rc['n_neurons']:<8} | "
+                f"{res_rc['online_fit_time']:<15.4f} | {res_rc['mse']:<10.4e}"
+            )
+        except Exception as e:  # noqa: BLE001
             print(f"rclib failed for n={n}: {e}")
 
         # reservoirpy
         try:
             res_rpy = benchmark_reservoirpy_rls(x_train, y_train, x_test, y_test, n, sr, sparsity, lr, input_scaling)
             results.append(res_rpy)
-            print(f"{res_rpy['library']:<12} | {res_rpy['n_neurons']:<8} | {res_rpy['online_fit_time']:<15.4f} | {res_rpy['mse']:<10.4e}")
-        except Exception as e:
+            print(
+                f"{res_rpy['library']:<12} | {res_rpy['n_neurons']:<8} | "
+                f"{res_rpy['online_fit_time']:<15.4f} | {res_rpy['mse']:<10.4e}"
+            )
+        except Exception as e:  # noqa: BLE001
             print(f"reservoirpy failed for n={n}: {e}")
 
     df = pd.DataFrame(results)
@@ -171,7 +179,7 @@ def main() -> None:
         plt.title("RLS Online Learning Time: rclib vs reservoirpy")
         plt.ylabel("Time (s) - Log Scale")
         plt.xlabel("Number of Neurons")
-        plt.grid(True, which="both", ls="-", alpha=0.5)
+        plt.grid(visible=True, which="both", ls="-", alpha=0.5)
         plt.savefig("benchmarks/rls_comparison_time.png")
         print("Plot saved as benchmarks/rls_comparison_time.png")
     except ImportError:
