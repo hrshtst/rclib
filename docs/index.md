@@ -1,11 +1,11 @@
 # rclib: Reservoir Computing Library
 
-**rclib** is a high-performance, scalable, and general-purpose reservoir computing framework implemented in C++ with Python bindings. It is designed to handle both small-scale networks and very large-scale (40,000+ neurons) architectures, supporting deep (stacked) and parallel reservoir configurations.
+**rclib** is a high-performance, scalable, and general-purpose reservoir computing framework implemented in C++ with Python bindings. It is designed to handle both small-scale networks and medium-to-large scale architectures, supporting deep (stacked) and parallel reservoir configurations.
 
 ## Project Goals
 
 *   **Performance:** Core logic in C++17 using Eigen for linear algebra.
-*   **Scalability:** Efficient handling of large sparse reservoirs and complex architectures.
+*   **Scalability:** Efficient handling of sparse reservoirs and complex architectures.
 *   **Flexibility:** Modular design separating Reservoirs and Readouts.
 *   **Ease of Use:** Pythonic interface via `pybind11` and `scikit-learn` style API.
 

@@ -37,5 +37,5 @@ Testing the library's resilience to extreme parameters.
 
 ## 6. Performance Benchmarking Regression
 *   **Target:** Computational efficiency.
-*   **Test Scenario:** Measure execution time for fitting a 40,000 neuron reservoir.
+*   **Test Scenario:** Measure execution time for fitting a large-scale reservoir.
 *   **Verification:** Establish a baseline and assert that new commits do not deviate by more than 10% from the baseline time on identical CI hardware.
