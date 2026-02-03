@@ -100,7 +100,7 @@ const Eigen::MatrixXd &RandomSparseReservoir::advance(const Eigen::MatrixXd &inp
   double *temp_ptr = temp_state.data();
 
 #ifdef RCLIB_USE_OPENMP
-#  pragma omp parallel for if (!omp_in_parallel())
+#  pragma omp parallel for if (!omp_in_parallel() && n_neurons > 1000)
 #endif
   for (int j = 0; j < n_neurons; ++j) {
     double dot = 0.0;

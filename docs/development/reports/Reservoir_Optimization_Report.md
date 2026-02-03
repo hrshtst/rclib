@@ -63,17 +63,20 @@ A `temp_state` member variable was added to the `RandomSparseReservoir` class. I
 ### 4. Optimized Parallelization Strategy
 
 **Problem:**
-Initial attempts to parallelize the inner loop (neurons) using OpenMP (`#pragma omp parallel for`) resulted in performance degradation for very small reservoirs due to thread management overhead.
+Initial attempts to parallelize the inner loop (neurons) using OpenMP (`#pragma omp parallel for`) resulted in a massive performance degradation (approx. 100x slower for N=1000).
+
+**Analysis:**
+For typical reservoir sizes (N=500 to 2000), the work per thread in a sparse matrix-vector product is very low. The overhead of spawning threads and, more importantly, the synchronization required (even implicit barriers), vastly outweighed the computational cost of the dot products.
 
 **Solution:**
-Inner-loop parallelization has been re-enabled with an `if (!omp_in_parallel())` clause. This ensures that:
-1.  **Parallel Execution:** Reservoir updates utilize multiple cores for significant speedups.
-2.  **No Oversubscription:** If the reservoir is already being advanced as part of a parallel `Model` operation (e.g., in a parallel ensemble), it stays single-threaded to avoid nested parallelism overhead.
+Inner-loop parallelization was re-introduced but strictly gated:
+1.  **Thresholding:** Parallelization is only enabled for $N > 1000$.
+2.  **No Oversubscription:** A check for `!omp_in_parallel()` ensures that if the reservoir is part of a parallel ensemble (already threaded), it runs serially to avoid thread explosion.
 
 The library now combines:
-1.  **Fine-Grained Parallelism:** Multi-threaded updates within a single reservoir.
+1.  **Fine-Grained Parallelism:** Multi-threaded updates for large single reservoirs.
 2.  **Course-Grained Parallelism:** Parallelizing at the `Model` level for ensembles.
-3.  **Vectorization:** Efficient sequential loops where parallelization is skipped.
+3.  **Vectorization:** Efficient sequential loops for small reservoirs ($N \le 1000$).
 
 ## Performance Benchmark
 
