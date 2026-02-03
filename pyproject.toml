@@ -46,6 +46,9 @@ dev = [
   "pytest-xdist>=3.8.0",
   "ruff>=0.14.3",
 ]
+benchmark = [
+  "reservoirpy>=0.3.11",
+]
 build = [
   "pybind11>=3.0.1",
   "scikit-build-core>=0.11.6",
