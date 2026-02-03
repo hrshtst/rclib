@@ -144,24 +144,26 @@ uv run pytest
 | Option | Default | Description |
 | :--- | :--- | :--- |
 | `RCLIB_USE_OPENMP` | `ON` | Enables OpenMP support. Required for any multi-threading. |
-| `RCLIB_ENABLE_EIGEN_PARALLELIZATION` | `OFF` | Enables Eigen's internal parallelization (using OpenMP). |
+| `RCLIB_ENABLE_EIGEN_PARALLELIZATION` | `ON` | Enables Eigen's internal parallelization (using OpenMP). |
 
 ### Recommended Configurations
 
-#### 1. User-Level Parallelism (Default)
-**Best for:** Training multiple reservoirs, batch processing, or typical workloads.
-
-*   **Configuration:**
-    ```bash
-    cmake -S . -B build -DRCLIB_USE_OPENMP=ON -DRCLIB_ENABLE_EIGEN_PARALLELIZATION=OFF
-    ```
-
-#### 2. Eigen-Level Parallelism
-**Best for:** Very large single networks or dense matrix operations where linear algebra is the bottleneck.
+#### 1. Default (Balanced Performance)
+**Best for:** Most workloads, from small to large reservoirs.
+*   `rclib` automatically parallelizes large reservoir updates (N > 1000).
+*   Eigen parallelizes dense matrix operations (beneficial for Ridge regression training).
 
 *   **Configuration:**
     ```bash
     cmake -S . -B build -DRCLIB_USE_OPENMP=ON -DRCLIB_ENABLE_EIGEN_PARALLELIZATION=ON
+    ```
+
+#### 2. User-Level Parallelism Only (Hybrid)
+**Best for:** Specific cases with many small reservoirs where Eigen's threading overhead might be excessive.
+
+*   **Configuration:**
+    ```bash
+    cmake -S . -B build -DRCLIB_USE_OPENMP=ON -DRCLIB_ENABLE_EIGEN_PARALLELIZATION=OFF
     ```
 
 #### 3. Serial (Single-Threaded)

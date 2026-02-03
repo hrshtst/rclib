@@ -39,10 +39,10 @@ You can optimize performance for your hardware by configuring CMake options duri
 | Option | Default | Best For |
 | :--- | :--- | :--- |
 | `RCLIB_USE_OPENMP` | `ON` | Multi-core CPUs |
-| `RCLIB_ENABLE_EIGEN_PARALLELIZATION` | `OFF` | Very large matrices (40k+ neurons) |
+| `RCLIB_ENABLE_EIGEN_PARALLELIZATION` | `ON` | Balanced performance (Default) |
 
 To change these, reinstall with:
 ```bash
-CMAKE_ARGS="-DRCLIB_ENABLE_EIGEN_PARALLELIZATION=ON" pip install .
+CMAKE_ARGS="-DRCLIB_ENABLE_EIGEN_PARALLELIZATION=OFF" pip install .
 ```
 or via direct CMake configuration if building manually.
