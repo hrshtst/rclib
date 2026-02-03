@@ -63,15 +63,17 @@ A `temp_state` member variable was added to the `RandomSparseReservoir` class. I
 ### 4. Optimized Parallelization Strategy
 
 **Problem:**
-Initial attempts to parallelize the inner loop (neurons) using OpenMP (`#pragma omp parallel for`) resulted in a massive performance degradation (approx. 100x slower for N=1000).
-
-**Analysis:**
-For typical reservoir sizes (N=500 to 2000), the work per thread in a sparse matrix-vector product is very low. The overhead of spawning threads and, more importantly, the synchronization required (even implicit barriers), vastly outweighed the computational cost of the dot products.
+Initial attempts to parallelize the inner loop (neurons) using OpenMP (`#pragma omp parallel for`) resulted in performance degradation for very small reservoirs due to thread management overhead.
 
 **Solution:**
-Inner-loop parallelization was removed. The library instead relies on:
-1.  **Vectorization:** The compiler auto-vectorizes the sequential loops efficiently.
-2.  **Course-Grained Parallelism:** `rclib` supports parallelizing at the `Model` level (e.g., training multiple reservoirs in an ensemble) which is a much more effective use of multi-core resources.
+Inner-loop parallelization has been re-enabled with an `if (!omp_in_parallel())` clause. This ensures that:
+1.  **Parallel Execution:** Reservoir updates utilize multiple cores for significant speedups.
+2.  **No Oversubscription:** If the reservoir is already being advanced as part of a parallel `Model` operation (e.g., in a parallel ensemble), it stays single-threaded to avoid nested parallelism overhead.
+
+The library now combines:
+1.  **Fine-Grained Parallelism:** Multi-threaded updates within a single reservoir.
+2.  **Course-Grained Parallelism:** Parallelizing at the `Model` level for ensembles.
+3.  **Vectorization:** Efficient sequential loops where parallelization is skipped.
 
 ## Performance Benchmark
 

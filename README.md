@@ -184,7 +184,7 @@ The documentation is automatically deployed to [https://hrshtst.github.io/rclib/
 
 #### 1. Default (Balanced Performance)
 **Best for:** Most workloads, from small to large reservoirs.
-*   `rclib` automatically parallelizes large reservoir updates (N > 1000).
+*   `rclib` automatically parallelizes reservoir updates using OpenMP.
 *   Eigen parallelizes dense matrix operations (beneficial for Ridge regression training).
 
 *   **Configuration:**
