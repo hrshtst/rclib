@@ -1,6 +1,8 @@
 #include "rclib/Model.h"
 
-#include <omp.h>
+#ifdef RCLIB_USE_OPENMP
+#  include <omp.h>
+#endif
 #include <stdexcept>
 
 void Model::addReservoir(std::shared_ptr<Reservoir> res, std::string connection_type) {
@@ -36,7 +38,7 @@ void Model::fit(const Eigen::MatrixXd &inputs, const Eigen::MatrixXd &targets, i
     all_states_full = current_input;
   } else if (connection_type == "parallel") {
     std::vector<Eigen::MatrixXd> reservoir_outputs(reservoirs.size());
-#ifdef RCLIB_ENABLE_USER_PARALLELIZATION
+#ifdef RCLIB_USE_OPENMP
 #  pragma omp parallel for
 #endif
     for (size_t r = 0; r < reservoirs.size(); ++r) {
@@ -93,7 +95,7 @@ Eigen::MatrixXd Model::predict(const Eigen::MatrixXd &inputs, bool reset_state_b
     all_states = current_input;
   } else if (connection_type == "parallel") {
     std::vector<Eigen::MatrixXd> reservoir_outputs(reservoirs.size());
-#ifdef RCLIB_ENABLE_USER_PARALLELIZATION
+#ifdef RCLIB_USE_OPENMP
 #  pragma omp parallel for
 #endif
     for (size_t r = 0; r < reservoirs.size(); ++r) {
@@ -258,7 +260,7 @@ Eigen::MatrixXd Model::predictGenerative(const Eigen::MatrixXd &prime_inputs, in
 }
 
 void Model::resetReservoirs() {
-#ifdef RCLIB_ENABLE_USER_PARALLELIZATION
+#ifdef RCLIB_USE_OPENMP
 #  pragma omp parallel for
 #endif
   for (int i = 0; i < static_cast<int>(reservoirs.size()); ++i) {

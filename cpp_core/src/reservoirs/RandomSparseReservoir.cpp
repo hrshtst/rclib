@@ -5,6 +5,10 @@
 #include <random>
 #include <vector>
 
+#ifdef RCLIB_USE_OPENMP
+#  include <omp.h>
+#endif
+
 // Helper function to generate a sparse random matrix
 Eigen::SparseMatrix<double> generate_sparse_random_matrix(int size, double sparsity, std::mt19937 &gen) {
   std::vector<Eigen::Triplet<double>> triplets;
@@ -95,6 +99,9 @@ const Eigen::MatrixXd &RandomSparseReservoir::advance(const Eigen::MatrixXd &inp
   const double *state_ptr = state.data();
   double *temp_ptr = temp_state.data();
 
+#ifdef RCLIB_USE_OPENMP
+#  pragma omp parallel for if (!omp_in_parallel() && n_neurons > 1000)
+#endif
   for (int j = 0; j < n_neurons; ++j) {
     double dot = 0.0;
     for (Eigen::SparseMatrix<double>::InnerIterator it(W_res, j); it; ++it) {
