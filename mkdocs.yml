@@ -45,6 +45,7 @@ nav:
       - Testing Roadmap: development/testing_roadmap.md
       - Reports:
           - RLS Optimization: development/reports/RLS_Optimization_Report.md
+          - Reservoir Optimization: development/reports/Reservoir_Optimization_Report.md
 
 plugins:
   - search
