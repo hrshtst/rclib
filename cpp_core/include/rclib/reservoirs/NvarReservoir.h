@@ -8,7 +8,7 @@ class NvarReservoir : public Reservoir {
 public:
   NvarReservoir(int num_lags);
 
-  Eigen::MatrixXd advance(const Eigen::MatrixXd &input) override;
+  const Eigen::MatrixXd &advance(const Eigen::MatrixXd &input) override;
   void resetState() override;
   const Eigen::MatrixXd &getState() const override;
 

@@ -9,7 +9,7 @@ public:
   RandomSparseReservoir(int n_neurons, double spectral_radius, double sparsity, double leak_rate, double input_scaling,
                         bool include_bias = false, unsigned int seed = 42);
 
-  Eigen::MatrixXd advance(const Eigen::MatrixXd &input) override;
+  const Eigen::MatrixXd &advance(const Eigen::MatrixXd &input) override;
   void resetState() override;
   const Eigen::MatrixXd &getState() const override;
 
@@ -26,6 +26,7 @@ private:
   bool W_in_initialized;
 
   Eigen::MatrixXd state;
+  Eigen::MatrixXd temp_state; // Pre-allocated temporary
   Eigen::SparseMatrix<double> W_res;
   Eigen::MatrixXd W_in;
   Eigen::RowVectorXd bias;

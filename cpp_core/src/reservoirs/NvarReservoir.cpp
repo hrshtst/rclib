@@ -9,7 +9,7 @@ void NvarReservoir::initialize(int input_dim) {
   initialized = true;
 }
 
-Eigen::MatrixXd NvarReservoir::advance(const Eigen::MatrixXd &input) {
+const Eigen::MatrixXd &NvarReservoir::advance(const Eigen::MatrixXd &input) {
   if (!initialized) {
     initialize(input.cols());
   }

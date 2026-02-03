@@ -55,6 +55,7 @@ RandomSparseReservoir::RandomSparseReservoir(int n_neurons, double spectral_radi
       W_res = W_res * (spectral_radius / max_eigenvalue);
     }
   }
+  W_res.makeCompressed();
 
   if (include_bias) {
     std::uniform_real_distribution<> dis(-1.0, 1.0);
@@ -76,12 +77,37 @@ void RandomSparseReservoir::initialize_W_in(int input_dim) {
   W_in_initialized = true;
 }
 
-Eigen::MatrixXd RandomSparseReservoir::advance(const Eigen::MatrixXd &input) {
+const Eigen::MatrixXd &RandomSparseReservoir::advance(const Eigen::MatrixXd &input) {
   if (!W_in_initialized) {
     initialize_W_in(input.cols());
+    temp_state.resize(state.rows(), state.cols());
   }
 
-  state = (1 - leak_rate) * state + leak_rate * (input * W_in + state * W_res + bias).array().tanh().matrix();
+  // 1. Initialize temp_state with (input * W_in + bias)
+  // This is dense-dense operation, usually fast.
+  temp_state.noalias() = input * W_in;
+  temp_state += bias;
+
+  // 2. Add recurrent contribution: state * W_res
+  // We perform this manually to ensure efficiency and enable threading.
+  // W_res is Column-Major. We compute output elements j (columns) independently.
+  // y_j = sum_i (x_i * A_{ij})
+  const double *state_ptr = state.data();
+  double *temp_ptr = temp_state.data();
+
+  for (int j = 0; j < n_neurons; ++j) {
+    double dot = 0.0;
+    for (Eigen::SparseMatrix<double>::InnerIterator it(W_res, j); it; ++it) {
+      // it.index() is the row index (i)
+      // it.value() is W_{ij}
+      dot += state_ptr[it.index()] * it.value();
+    }
+    temp_ptr[j] += dot;
+  }
+
+  // 3. Activation and Leak
+  state.array() = (1.0 - leak_rate) * state.array() + leak_rate * temp_state.array().tanh();
+
   return state;
 }
 
