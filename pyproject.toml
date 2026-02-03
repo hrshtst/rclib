@@ -267,6 +267,7 @@ check_untyped_defs = true       # Type-checks the interior of functions without 
     "joblib.*",
     "numpy.*",
     "pandas.*",
+    "reservoirpy.*",
     "scienceplots.*",
     "scipy.*",
     "seaborn.*",
