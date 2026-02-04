@@ -136,7 +136,7 @@ def main() -> None:
     input_scaling = 0.1
     lambda_ = 0.99  # Forgetting factor
 
-    neuron_sizes = [100, 200, 500, 1000, 1500, 2000, 4000]
+    neuron_sizes = [100, 200, 500, 1000, 1500, 2000, 4000, 8000, 10000]
     results = []
 
     print(f"{'Library':<12} | {'Neurons':<8} | {'Online Fit (s)':<15} | {'MSE':<10}")
