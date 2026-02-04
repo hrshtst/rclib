@@ -100,4 +100,4 @@ Training time (including `fit`) also improved significantly due to the faster st
 
 ## Conclusion
 
-By moving to low-level manual optimization for critical inner loops and eliminating unnecessary memory traffic, `rclib` now offers state-of-the-art performance for Reservoir Computing tasks in Python, surpassing the popular `reservoirpy` library.
+By moving to low-level manual optimization for critical inner loops and eliminating unnecessary memory traffic, `rclib` now offers competitive performance for Reservoir Computing tasks in Python, providing significant speedups over `reservoirpy` in our benchmarks.

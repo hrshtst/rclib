@@ -194,7 +194,7 @@ The `benchmarks/` directory contains scripts to evaluate performance across diff
 
 1.  **Modularity:** The **Reservoir** and **Readout** components are implemented as separate, swappable modules.
 2.  **Performance:** C++ implementations prioritize computational efficiency and memory management, especially for large, sparse matrices (`Eigen::SparseMatrix`).
-3.  **Scalability:** Supports large reservoirs (40,000+ neurons), deep ESNs (serial stacking), and parallel ESNs.
+3.  **Scalability:** Supports large-scale reservoirs, deep ESNs (serial stacking), and parallel ESNs.
 4.  **Configurability:** Key parameters (spectral radius, sparsity, leak rate, regularization, bias, etc.) are configurable via C++ and Python APIs.
 
 ### C++ API Design
