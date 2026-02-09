@@ -8,9 +8,9 @@ $$ \mathbf{y}(t) = \mathbf{W}_{out} \mathbf{x}(t) $$
 
 For batch training, we solve for $\mathbf{W}_{out}$ that minimizes the squared error with $L_2$ regularization:
 
-$$ \mathbf{W}_{out} = \mathbf{Y}_{target} \mathbf{X}^T (\mathbf{X}\mathbf{X}^T + \beta \mathbf{I})^{-1} $$
+$$ \mathbf{W}_{out} = \mathbf{Y}_{target} \mathbf{X}^T (\mathbf{X}\mathbf{X}^T + \alpha \mathbf{I})^{-1} $$
 
-Where $\mathbf{X}$ collects all state vectors over time, and $\beta$ is the regularization parameter.
+Where $\mathbf{X}$ collects all state vectors over time, and $\alpha$ is the regularization parameter.
 
 ## Recursive Least Squares (RLS) (Online)
 

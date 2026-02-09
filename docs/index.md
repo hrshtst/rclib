@@ -8,6 +8,7 @@
 *   **Scalability:** Efficient handling of sparse reservoirs and complex architectures.
 *   **Flexibility:** Modular design separating Reservoirs and Readouts.
 *   **Ease of Use:** Pythonic interface via `pybind11` and `scikit-learn` style API.
+*   **Reproducibility:** Deterministic results via explicit seeding of random reservoirs.
 
 ## Getting Started
 

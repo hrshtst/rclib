@@ -42,7 +42,7 @@ ctest --test-dir build
 ```bash
 # Ensure library is built
 cmake -S . -B build
-cmake --build build --target _rclib
+cmake --build build --config Release -j $(nproc) --target _rclib
 # Run pytest
 uv run pytest
 ```

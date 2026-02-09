@@ -60,6 +60,9 @@ class ESN:
                 reservoir.seed,
             )
             self._cpp_model.addReservoir(cpp_res, self.connection_type)
+        elif isinstance(reservoir, reservoirs.Nvar):
+            cpp_res = _rclib.NvarReservoir(reservoir.num_lags)
+            self._cpp_model.addReservoir(cpp_res, self.connection_type)
         # Add other reservoir types here as they are implemented
         else:
             msg = "Unsupported reservoir type"

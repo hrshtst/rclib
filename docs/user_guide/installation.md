@@ -6,6 +6,8 @@
 *   **C++ Compiler**: Must support C++17 (e.g., GCC 9+, Clang 10+, MSVC 2019+).
 *   **CMake**: Version 3.15 or higher.
 *   **Python**: Version 3.10 or higher.
+*   **OpenMP**: Required for parallelization.
+    *   Ubuntu/Debian: `sudo apt install libomp-dev`
 
 ## Installing with `uv` (Recommended)
 

@@ -11,7 +11,8 @@ res = reservoirs.RandomSparse(
     sparsity=0.1,        # Density of connections
     leak_rate=1.0,       # 1.0 = full update, < 1.0 = leaky integrator
     input_scaling=1.0,   # Scaling of input weights
-    include_bias=False   # Add bias neuron to reservoir
+    include_bias=False,  # Add bias neuron to reservoir
+    seed=42              # Random seed for reproducibility
 )
 ```
 
