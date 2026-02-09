@@ -85,7 +85,16 @@ class ESN:
         self._readout_params = readout
         # Create and set the C++ readout to the C++ model
         if isinstance(readout, readouts.Ridge):
-            cpp_readout = _rclib.RidgeReadout(readout.alpha, readout.include_bias)
+            solver_map = {
+                "cholesky": _rclib.RidgeReadout.Solver.CHOLESKY,
+                "conjugate_gradient": _rclib.RidgeReadout.Solver.CONJUGATE_GRADIENT,
+                "conjugate_gradient_implicit": _rclib.RidgeReadout.Solver.CONJUGATE_GRADIENT_IMPLICIT,
+            }
+            if readout.solver not in solver_map:
+                msg = f"Unsupported solver: {readout.solver}"
+                raise ValueError(msg)
+
+            cpp_readout = _rclib.RidgeReadout(readout.alpha, readout.include_bias, solver_map[readout.solver])
             self._cpp_model.setReadout(cpp_readout)
         elif isinstance(readout, readouts.Rls):
             cpp_readout = _rclib.RlsReadout(readout.lambda_, readout.delta, readout.include_bias)

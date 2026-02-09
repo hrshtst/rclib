@@ -1,8 +1,13 @@
 #include "rclib/readouts/RidgeReadout.h"
 
+#include "rclib/readouts/RidgeLinearOperator.h"
+
+#include <Eigen/Dense>
+#include <Eigen/IterativeLinearSolvers>
 #include <stdexcept>
 
-RidgeReadout::RidgeReadout(double alpha, bool include_bias) : alpha(alpha), include_bias(include_bias) {}
+RidgeReadout::RidgeReadout(double alpha, bool include_bias, Solver solver)
+    : alpha(alpha), include_bias(include_bias), solver(solver) {}
 
 void RidgeReadout::fit(const Eigen::MatrixXd &states, const Eigen::MatrixXd &targets) {
   Eigen::MatrixXd X = states;
@@ -11,11 +16,42 @@ void RidgeReadout::fit(const Eigen::MatrixXd &states, const Eigen::MatrixXd &tar
     X.col(X.cols() - 1) = Eigen::VectorXd::Ones(X.rows());
   }
 
-  Eigen::MatrixXd XtX = X.transpose() * X;
-  Eigen::MatrixXd I = Eigen::MatrixXd::Identity(XtX.rows(), XtX.cols());
-  Eigen::MatrixXd XtY = X.transpose() * targets;
+  // Common: Prepare target vector (assuming single output for now or handling multi-output loop inside solver?)
+  // Eigen's solvers handle multi-rhs, so XtY is fine.
 
-  W_out = (XtX + alpha * I).ldlt().solve(XtY);
+  if (solver == CONJUGATE_GRADIENT_IMPLICIT) {
+    // Matrix-Free CG
+    Eigen::MatrixXd XtY = X.transpose() * targets;
+
+    // We need to solve for each column of W_out (each output dimension)
+    W_out.resize(X.cols(), targets.cols());
+
+    RidgeLinearOperator<Eigen::MatrixXd> ridge_op(X, alpha);
+    Eigen::ConjugateGradient<RidgeLinearOperator<Eigen::MatrixXd>, Eigen::Lower | Eigen::Upper,
+                             Eigen::IdentityPreconditioner>
+        cg;
+    cg.compute(ridge_op);
+
+    for (int i = 0; i < targets.cols(); ++i) {
+      W_out.col(i) = cg.solve(XtY.col(i));
+    }
+
+  } else {
+    // Explicit Matrix Formation
+    Eigen::MatrixXd XtX = X.transpose() * X;
+    Eigen::MatrixXd I = Eigen::MatrixXd::Identity(XtX.rows(), XtX.cols());
+    Eigen::MatrixXd A = XtX + alpha * I;
+    Eigen::MatrixXd XtY = X.transpose() * targets;
+
+    if (solver == CONJUGATE_GRADIENT) {
+      Eigen::ConjugateGradient<Eigen::MatrixXd, Eigen::Lower | Eigen::Upper> cg;
+      cg.compute(A);
+      W_out = cg.solve(XtY);
+    } else {
+      // Default / Cholesky
+      W_out = A.ldlt().solve(XtY);
+    }
+  }
 }
 
 void RidgeReadout::partialFit(const Eigen::MatrixXd &state, const Eigen::MatrixXd &target) {

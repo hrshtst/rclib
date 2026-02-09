@@ -6,15 +6,17 @@ from __future__ import annotations
 class Ridge:
     """Ridge Regression Readout configuration."""
 
-    def __init__(self, alpha: float, *, include_bias: bool) -> None:
+    def __init__(self, alpha: float, *, include_bias: bool, solver: str = "conjugate_gradient") -> None:
         """Initialize the Ridge Readout.
 
         Args:
             alpha: Regularization parameter.
             include_bias: Whether to include a bias term.
+            solver: Solver to use ("cholesky", "conjugate_gradient", "conjugate_gradient_implicit").
         """
         self.alpha = alpha
         self.include_bias = include_bias
+        self.solver = solver
 
 
 class Rls:
