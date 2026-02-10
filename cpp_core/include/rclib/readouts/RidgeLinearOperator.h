@@ -44,18 +44,20 @@ public:
     Flags = Eigen::ColMajor
   };
 
-  Index rows() const { return X.cols(); }
-  Index cols() const { return X.cols(); }
+  Index rows() const { return X.cols() + (include_bias ? 1 : 0); }
+  Index cols() const { return X.cols() + (include_bias ? 1 : 0); }
 
   template <typename Rhs>
   Eigen::Product<RidgeLinearOperator, Rhs, Eigen::AliasFreeProduct> operator*(const Eigen::MatrixBase<Rhs> &x) const {
     return Eigen::Product<RidgeLinearOperator, Rhs, Eigen::AliasFreeProduct>(*this, x.derived());
   }
 
-  RidgeLinearOperator(const MatrixType &X_ref, Scalar alpha_val) : X(X_ref), alpha(alpha_val) {}
+  RidgeLinearOperator(const MatrixType &X_ref, Scalar alpha_val, bool bias)
+      : X(X_ref), alpha(alpha_val), include_bias(bias) {}
 
   const MatrixType &X;
   Scalar alpha;
+  bool include_bias;
 };
 
 namespace Eigen {
@@ -87,13 +89,30 @@ struct generic_product_impl<RidgeLinearOperator<MatrixType>, Rhs, SparseShape, D
   template <typename Dest>
   static void scaleAndAddTo(Dest &dst, const RidgeLinearOperator<MatrixType> &lhs, const Rhs &rhs, Scalar alpha) {
     // dst += alpha * (lhs * rhs)
-    // lhs * rhs = X^T * (X * rhs) + reg * rhs
+    // lhs * rhs = X_aug^T * (X_aug * rhs) + reg * rhs
 
-    // 1. Temp = X * rhs
-    Eigen::Matrix<Scalar, Eigen::Dynamic, 1> temp = lhs.X * rhs;
+    Index n_feats = lhs.X.cols();
 
-    // 2. Add X^T * Temp
-    dst.noalias() += alpha * (lhs.X.transpose() * temp);
+    // 1. Compute Temp = X_aug * rhs
+    // If bias: X_aug = [X, 1]. rhs = [w; b]
+    // Temp = X * w + b * 1
+    Eigen::Matrix<Scalar, Eigen::Dynamic, 1> temp;
+    if (lhs.include_bias) {
+      temp.noalias() = lhs.X * rhs.head(n_feats);
+      temp.array() += rhs(n_feats);
+    } else {
+      temp.noalias() = lhs.X * rhs;
+    }
+
+    // 2. Compute Res = X_aug^T * Temp
+    // Res_w = X^T * Temp
+    // Res_b = 1^T * Temp = sum(Temp)
+    if (lhs.include_bias) {
+      dst.head(n_feats).noalias() += alpha * (lhs.X.transpose() * temp);
+      dst(n_feats) += alpha * temp.sum();
+    } else {
+      dst.noalias() += alpha * (lhs.X.transpose() * temp);
+    }
 
     // 3. Add regularization part: alpha_reg * rhs
     dst.noalias() += (alpha * lhs.alpha) * rhs;
