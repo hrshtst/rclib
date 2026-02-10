@@ -33,6 +33,7 @@ def benchmark_rclib(
     input_scaling: float,
     alpha: float,
     washout: int,
+    solver: str = "conjugate_gradient",
 ) -> dict[str, Any]:
     """Benchmark rclib."""
     # Setup
@@ -45,7 +46,7 @@ def benchmark_rclib(
         include_bias=True,
         seed=42,
     )
-    readout = readouts.Ridge(alpha=alpha, include_bias=True)
+    readout = readouts.Ridge(alpha=alpha, include_bias=True, solver=solver)
     model = ESN()
     model.add_reservoir(res)
     model.set_readout(readout)
@@ -64,7 +65,7 @@ def benchmark_rclib(
     mse = np.mean((y_pred[:-1] - x_test[1:]) ** 2)
 
     return {
-        "library": "rclib",
+        "library": f"rclib ({solver})",
         "n_neurons": n_neurons,
         "fit_time": end_fit - start_fit,
         "pred_time": end_pred - start_pred,
@@ -140,18 +141,22 @@ def main() -> None:
 
     neuron_sizes = [500, 1000, 2000, 4000, 8000, 10000, 15000, 20000]
     results = []
+    rclib_solvers = ["cholesky", "conjugate_gradient", "conjugate_gradient_implicit"]
 
-    print(f"{'Library':<12} | {'Neurons':<8} | {'Fit (s)':<10} | {'Pred (s)':<10} | {'MSE':<10}")
-    print("-" * 60)
+    print(f"{'Library':<30} | {'Neurons':<8} | {'Fit (s)':<10} | {'Pred (s)':<10} | {'MSE':<10}")
+    print("-" * 80)
 
     for n in neuron_sizes:
         # rclib
-        res_rc = benchmark_rclib(x_train, y_train, x_test, n, sr, sparsity, lr, input_scaling, alpha, washout)
-        results.append(res_rc)
-        print(
-            f"{res_rc['library']:<12} | {res_rc['n_neurons']:<8} | "
-            f"{res_rc['fit_time']:<10.4f} | {res_rc['pred_time']:<10.4f} | {res_rc['mse']:<10.4e}"
-        )
+        for solver in rclib_solvers:
+            res_rc = benchmark_rclib(
+                x_train, y_train, x_test, n, sr, sparsity, lr, input_scaling, alpha, washout, solver
+            )
+            results.append(res_rc)
+            print(
+                f"{res_rc['library']:<30} | {res_rc['n_neurons']:<8} | "
+                f"{res_rc['fit_time']:<10.4f} | {res_rc['pred_time']:<10.4f} | {res_rc['mse']:<10.4e}"
+            )
 
         # reservoirpy
         try:
@@ -160,7 +165,7 @@ def main() -> None:
             )
             results.append(res_rpy)
             print(
-                f"{res_rpy['library']:<12} | {res_rpy['n_neurons']:<8} | "
+                f"{res_rpy['library']:<30} | {res_rpy['n_neurons']:<8} | "
                 f"{res_rpy['fit_time']:<10.4f} | {res_rpy['pred_time']:<10.4f} | {res_rpy['mse']:<10.4e}"
             )
         except Exception as e:  # noqa: BLE001
