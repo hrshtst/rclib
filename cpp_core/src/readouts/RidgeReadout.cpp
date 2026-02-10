@@ -6,8 +6,8 @@
 #include <Eigen/IterativeLinearSolvers>
 #include <stdexcept>
 
-RidgeReadout::RidgeReadout(double alpha, bool include_bias, Solver solver)
-    : alpha(alpha), include_bias(include_bias), solver(solver) {}
+RidgeReadout::RidgeReadout(double alpha, bool include_bias, Solver solver, double tolerance)
+    : alpha(alpha), include_bias(include_bias), solver(solver), tolerance(tolerance) {}
 
 void RidgeReadout::fit(const Eigen::MatrixXd &states, const Eigen::MatrixXd &targets) {
   Eigen::MatrixXd X = states;
@@ -31,6 +31,7 @@ void RidgeReadout::fit(const Eigen::MatrixXd &states, const Eigen::MatrixXd &tar
                              Eigen::IdentityPreconditioner>
         cg;
     cg.compute(ridge_op);
+    cg.setTolerance(tolerance);
 
     for (int i = 0; i < targets.cols(); ++i) {
       W_out.col(i) = cg.solve(XtY.col(i));
@@ -46,6 +47,7 @@ void RidgeReadout::fit(const Eigen::MatrixXd &states, const Eigen::MatrixXd &tar
     if (solver == CONJUGATE_GRADIENT) {
       Eigen::ConjugateGradient<Eigen::MatrixXd, Eigen::Lower | Eigen::Upper> cg;
       cg.compute(A);
+      cg.setTolerance(tolerance);
       W_out = cg.solve(XtY);
     } else {
       // Default / Cholesky

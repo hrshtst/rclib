@@ -94,7 +94,9 @@ class ESN:
                 msg = f"Unsupported solver: {readout.solver}"
                 raise ValueError(msg)
 
-            cpp_readout = _rclib.RidgeReadout(readout.alpha, readout.include_bias, solver_map[readout.solver])
+            cpp_readout = _rclib.RidgeReadout(
+                readout.alpha, readout.include_bias, solver_map[readout.solver], readout.tolerance
+            )
             self._cpp_model.setReadout(cpp_readout)
         elif isinstance(readout, readouts.Rls):
             cpp_readout = _rclib.RlsReadout(readout.lambda_, readout.delta, readout.include_bias)
