@@ -1,0 +1,2 @@
+add_executable(benchmark_ridge_all_solvers benchmark_ridge_all_solvers.cpp)
+target_link_libraries(benchmark_ridge_all_solvers PRIVATE rclib_core)

@@ -32,3 +32,8 @@ option(BUILD_EXAMPLES "Build examples" OFF)
 if(BUILD_EXAMPLES)
   add_subdirectory(examples/cpp)
 endif()
+
+option(BUILD_BENCHMARKS "Build benchmarks" OFF)
+if(BUILD_BENCHMARKS)
+  add_subdirectory(benchmarks)
+endif()
