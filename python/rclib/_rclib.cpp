@@ -47,7 +47,7 @@ PYBIND11_MODULE(_rclib, m) {
       .export_values();
 
   ridge.def(py::init<double, bool, RidgeReadout::Solver, double>(), py::arg("alpha"), py::arg("include_bias"),
-            py::arg("solver") = RidgeReadout::Solver::CONJUGATE_GRADIENT, py::arg("tolerance") = 1e-6);
+            py::arg("solver") = RidgeReadout::Solver::CONJUGATE_GRADIENT, py::arg("tolerance") = 1e-10);
 
   // Bind RlsReadout
   py::class_<RlsReadout, Readout, std::shared_ptr<RlsReadout>>(m, "RlsReadout")

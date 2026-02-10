@@ -12,7 +12,7 @@ class Ridge:
         *,
         include_bias: bool,
         solver: str = "conjugate_gradient",
-        tolerance: float = 1e-6,
+        tolerance: float = 1e-10,
     ) -> None:
         """Initialize the Ridge Readout.
 
