@@ -51,4 +51,6 @@ uv run pytest
 
 *   [Release Process](release_process.md): How to publish a new version.
 *   [Testing Roadmap](testing_roadmap.md): Plans for future test coverage.
+*   [Ridge Solver Optimization Report](reports/Ridge_Optimization_Report.md): Detailed report on Ridge Regression performance improvements.
 *   [RLS Optimization Report](reports/RLS_Optimization_Report.md): Detailed report on RLS performance improvements.
+*   [Reservoir Performance Optimization Report](reports/Reservoir_Optimization_Report.md): Detailed report on reservoir execution performance.

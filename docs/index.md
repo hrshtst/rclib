@@ -16,4 +16,6 @@ To get started with `rclib`, please refer to the [User Guide](user_guide/index.m
 
 For a deep dive into the underlying mathematics and architecture, check the [Theory](theory/index.md) section.
 
+For developers and contributors, see the [Development](development/index.md) guide and [Optimization Reports](development/index.md#documentation).
+
 Detailed class and function documentation can be found in the [API Reference](api/index.md).
