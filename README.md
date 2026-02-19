@@ -129,8 +129,13 @@ If you prefer to run tests manually without `nox`:
 cmake -S . -B build -DBUILD_TESTING=ON
 cmake --build build --config Release -j $(nproc)
 
-# 2. Run tests
+# 2. Run tests (excluding hidden slow tests)
 ctest --test-dir build --output-on-failure
+
+# 3. Run all tests including slow tests
+# Slow C++ tests are hidden by default using Catch2 tags.
+# To run them, execute the test binary with the tag explicitly:
+./build/tests/cpp/test_readout "[.slow]"
 ```
 
 #### Python Tests
@@ -139,8 +144,14 @@ ctest --test-dir build --output-on-failure
 cmake -S . -B build
 cmake --build build --config Release -j $(nproc) --target _rclib
 
-# 2. Run pytest
+# 2. Run pytest (excluding slow tests)
 uv run pytest
+
+# 3. Run all tests including slow tests
+uv run pytest -m "slow or not slow"
+
+# Note: Because slow tests are deselected by default in pyproject.toml,
+# you must use the "or" syntax to include them in the selection.
 ```
 
 ## Documentation

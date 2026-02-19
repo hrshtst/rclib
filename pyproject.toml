@@ -250,9 +250,11 @@ addopts = [
   "--strict-markers",
   "--strict-config",
   "--cov-branch",
+  "-m",
+  "not slow",
 ]
 markers = [
-  "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+  "slow: marks tests as slow (run with '-m \"slow or not slow\"')",
   "integration: marks tests as integration tests",
   "serious: marks as serious tests to be investigated on a priority basis",
 ]
