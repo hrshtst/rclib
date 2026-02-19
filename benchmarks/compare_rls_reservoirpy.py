@@ -174,6 +174,7 @@ def plot_results(df: pd.DataFrame, output_dir: Path, plot_suffix: str) -> None:
         plt.xlabel("Number of Neurons")
         plt.grid(visible=True, which="both", ls="-", alpha=0.5)
         plot_path = output_dir / f"rls_comparison_time{plot_suffix}"
+        plt.tight_layout()
         plt.savefig(plot_path)
         print(f"Plot saved to {plot_path}")
     except ImportError:

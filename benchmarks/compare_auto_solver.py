@@ -173,6 +173,7 @@ def plot_results(df: pd.DataFrame, output_dir: Path, plot_suffix: str) -> None:
         plt.xlabel("Number of Neurons - Log Scale")
         plt.grid(visible=True, which="both", ls="-", alpha=0.5)
         fit_plot_path = output_dir / f"comparison_auto_fit_time{plot_suffix}"
+        plt.tight_layout()
         plt.savefig(fit_plot_path)
 
         plt.figure(figsize=(12, 6))
@@ -184,6 +185,7 @@ def plot_results(df: pd.DataFrame, output_dir: Path, plot_suffix: str) -> None:
         plt.xlabel("Number of Neurons - Log Scale")
         plt.grid(visible=True, which="both", ls="-", alpha=0.5)
         pred_plot_path = output_dir / f"comparison_auto_pred_time{plot_suffix}"
+        plt.tight_layout()
         plt.savefig(pred_plot_path)
         print(f"Plots saved to {output_dir}/comparison_auto_*")
     except ImportError:
