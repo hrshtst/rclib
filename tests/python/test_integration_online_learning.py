@@ -44,7 +44,7 @@ def test_online_learning_adaptation() -> None:
 
             pred = model.predict_online(curr_x)
             errors.append(float(np.mean((pred - curr_y) ** 2)))
-            model.partial_fit(curr_x, curr_y)
+            model.partial_fit(None, curr_y)
 
         return float(np.mean(errors))
 

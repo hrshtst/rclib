@@ -93,6 +93,14 @@ class ESN:
         if self._readout_params is None:
             return
 
+        # Don't re-instantiate if already exists (to preserve online learning state)
+        try:
+            if self._cpp_model.getReadout() is not None:
+                return
+        except RuntimeError:
+            # getReadout() throws if not set
+            pass
+
         readout = self._readout_params
 
         # Create and set the C++ readout to the C++ model
@@ -211,13 +219,14 @@ class ESN:
         # Call the C++ model's resetReservoirs method
         self._cpp_model.resetReservoirs()
 
-    def partial_fit(self, x: ArrayLike, y: ArrayLike) -> None:
+    def partial_fit(self, x: ArrayLike | None, y: ArrayLike) -> None:
         """Update the model with a single sample (online learning).
 
         Parameters
         ----------
-        x : ArrayLike
-            Input data sample.
+        x : ArrayLike, optional
+            Input data sample. If None, the reservoir state is not advanced
+            (useful if predict_online was already called).
         y : ArrayLike
             Target data sample.
 
@@ -242,8 +251,10 @@ class ESN:
         # Get the C++ reservoir object (assuming the first one for now)
         cpp_res = self._cpp_model.getReservoir(0)
 
-        # Advance reservoir state
-        cpp_res.advance(x)
+        # Advance reservoir state if x is provided
+        if x is not None:
+            cpp_res.advance(x)
+
         current_state = cpp_res.getState()
 
         # Get the C++ readout object
