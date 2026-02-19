@@ -235,6 +235,12 @@ The `benchmarks/` directory contains scripts to evaluate performance across diff
     ```
     This generates plots comparing execution time and MSE for different methods and configurations.
 
+3.  **Compare with ReservoirPy:**
+    ```bash
+    uv run python benchmarks/compare_auto_solver.py
+    ```
+    This script compares `rclib`'s automatic solver selection (Cholesky vs. Implicit CG) against `reservoirpy` across various reservoir sizes.
+
 ## Development
 
 ### Code Quality Tools
