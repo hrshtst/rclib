@@ -6,11 +6,30 @@ $$ \mathbf{y}(t) = \mathbf{W}_{out} \mathbf{x}(t) $$
 
 ## Ridge Regression (Batch)
 
-For batch training, we solve for $\mathbf{W}_{out}$ that minimizes the squared error with $L_2$ regularization:
+Ridge regression (also known as Tikhonov regularization) minimizes the squared error while penalizing large weights to prevent overfitting. `rclib` implements several strategies to solve this efficiently.
 
-$$ \mathbf{W}_{out} = \mathbf{Y}_{target} \mathbf{X}^T (\mathbf{X}\mathbf{X}^T + \alpha \mathbf{I})^{-1} $$
+### Primal Formulation ($N \le T$)
 
-Where $\mathbf{X}$ collects all state vectors over time, and $\alpha$ is the regularization parameter.
+When the number of neurons ($N$) is less than or equal to the number of samples ($T$), we solve the normal equations:
+
+$$ \mathbf{W}_{out} = (\mathbf{X}^T \mathbf{X} + \alpha \mathbf{I})^{-1} \mathbf{X}^T \mathbf{Y} $$
+
+Where $\mathbf{X}$ is the $T \times N$ state matrix, $\mathbf{Y}$ is the $T \times O$ target matrix, and $\alpha$ is the regularization parameter. `rclib` uses optimized BLAS routines (symmetric rank-1 updates) to form the $N \times N$ covariance matrix $\mathbf{X}^T \mathbf{X}$ efficiently.
+
+### Dual Formulation ($N > T$)
+
+When the reservoir is very large ($N > T$), the dual formulation is more efficient as it operates in the $T \times T$ sample space:
+
+$$ \mathbf{W}_{out} = \mathbf{X}^T (\mathbf{X} \mathbf{X}^T + \alpha \mathbf{I})^{-1} \mathbf{Y} $$
+
+This approach significantly reduces computational complexity from $O(N^3)$ to $O(T^3)$ in underdetermined cases.
+
+### Adaptive Solver Selection
+
+`rclib` automatically selects the optimal solver based on the problem dimensions:
+- **Primal Cholesky**: Standard case ($N \le T$).
+- **Dual Cholesky**: High-dimensional case ($N > T$).
+- **Implicit Conjugate Gradient**: Very high-dimensional case ($N \ge 8,000$) where explicit matrix formation is avoided.
 
 ## Recursive Least Squares (RLS) (Online)
 

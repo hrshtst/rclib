@@ -44,6 +44,7 @@ nav:
       - Release Process: development/release_process.md
       - Testing Roadmap: development/testing_roadmap.md
       - Reports:
+          - Ridge Optimization: development/reports/Ridge_Optimization_Report.md
           - RLS Optimization: development/reports/RLS_Optimization_Report.md
           - Reservoir Optimization: development/reports/Reservoir_Optimization_Report.md
 

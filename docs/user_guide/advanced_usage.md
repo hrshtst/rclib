@@ -23,6 +23,28 @@ prime_data = x_test[:100]
 generated = model.predict_generative(prime_data, n_steps=200)
 ```
 
+## Ridge Regression Solver Selection
+
+`rclib` provides multiple strategies for batch training. While the `auto` mode is recommended, you can explicitly set the solver based on your specific needs.
+
+```python
+# Create a Ridge readout with an explicit solver
+# Available: "auto", "cholesky", "dual_cholesky",
+#            "conjugate_gradient", "conjugate_gradient_implicit"
+readout = readouts.Ridge(
+    alpha=1e-8,
+    include_bias=True,
+    solver="dual_cholesky"
+)
+```
+
+| Solver | Best For |
+| :--- | :--- |
+| `cholesky` | Small reservoirs or when $N \le T$. |
+| `dual_cholesky` | Large reservoirs with fewer samples ($N > T$). |
+| `conjugate_gradient_implicit` | Extremely large reservoirs ($N \ge 8,000$). |
+| `auto` (Default) | Automatically chooses the most efficient strategy. |
+
 ## Next-Generation RC (NVAR)
 
 `rclib` supports NVAR, which uses time-delayed features instead of a random network.
