@@ -137,7 +137,7 @@ def run_benchmarks(
 ) -> pd.DataFrame:
     """Run comparison benchmarks for rclib and reservoirpy."""
     results = []
-    rclib_solvers = ["cholesky", "conjugate_gradient", "conjugate_gradient_implicit"]
+    rclib_solvers = ["cholesky", "dual_cholesky", "conjugate_gradient", "conjugate_gradient_implicit"]
 
     print(f"{'Library':<30} | {'Neurons':<8} | {'Fit (s)':<10} | {'Pred (s)':<10} | {'MSE':<10}")
     print("-" * 80)
@@ -238,7 +238,7 @@ def main() -> None:
             x_train=x_train,
             y_train=y_train,
             x_test=x_test,
-            neuron_sizes=[500, 1000, 2000, 4000, 8000, 10000, 15000, 20000],
+            neuron_sizes=[100, 200, 400, 800, 1000, 1500, 2000, 3000, 4000, 8000, 10000, 16000, 24000],
             sr=0.9,
             sparsity=0.05,
             lr=0.1,
