@@ -18,6 +18,8 @@ void RidgeReadout::fit(const Eigen::MatrixXd &states, const Eigen::MatrixXd &tar
   if (solver == AUTO) {
     if (n_features >= 8000) {
       effective_solver = CONJUGATE_GRADIENT_IMPLICIT;
+    } else if (n_features > n_samples) {
+      effective_solver = DUAL_CHOLESKY;
     } else {
       effective_solver = CHOLESKY;
     }
@@ -47,18 +49,41 @@ void RidgeReadout::fit(const Eigen::MatrixXd &states, const Eigen::MatrixXd &tar
     cg.compute(ridge_op);
     cg.setTolerance(tolerance);
 
+#ifdef RCLIB_USE_OPENMP
+#  pragma omp parallel for
+#endif
     for (int i = 0; i < n_outputs; ++i) {
       W_out.col(i) = cg.solve(XtY.col(i));
     }
 
+  } else if (effective_solver == DUAL_CHOLESKY) {
+    // Dual Ridge Regression (N > T)
+    // 1. Form Kernel matrix K = X_aug * X_aug^T + alpha*I (T x T)
+    Eigen::MatrixXd K = Eigen::MatrixXd::Zero(n_samples, n_samples);
+    K.selfadjointView<Eigen::Lower>().rankUpdate(states);
+    if (include_bias) {
+      K.selfadjointView<Eigen::Lower>().rankUpdate(Eigen::VectorXd::Ones(n_samples));
+    }
+    K.diagonal().array() += alpha;
+
+    // 2. Solve K * beta = targets
+    Eigen::MatrixXd beta = K.selfadjointView<Eigen::Lower>().ldlt().solve(targets);
+
+    // 3. Compute W_out = X_aug^T * beta
+    W_out.resize(dim, n_outputs);
+    W_out.topRows(n_features).noalias() = states.transpose() * beta;
+    if (include_bias) {
+      W_out.bottomRows(1).noalias() = beta.colwise().sum();
+    }
+
   } else {
-    // Explicit Matrix Formation with Zero-Copy
+    // Explicit Matrix Formation (Primal)
     Eigen::MatrixXd XtX(dim, dim);
     Eigen::MatrixXd XtY(dim, n_outputs);
 
-    // 1. Fill XtX block-wise
-    // Top-Left: states^T * states
-    XtX.topLeftCorner(n_features, n_features).noalias() = states.transpose() * states;
+    // 1. Fill XtX using rankUpdate (BLAS SYRK)
+    XtX.setZero();
+    XtX.topLeftCorner(n_features, n_features).selfadjointView<Eigen::Lower>().rankUpdate(states.transpose());
 
     if (include_bias) {
       // Calculate column sums once
@@ -74,10 +99,11 @@ void RidgeReadout::fit(const Eigen::MatrixXd &states, const Eigen::MatrixXd &tar
       XtX(n_features, n_features) = static_cast<double>(n_samples);
     }
 
+    // Symmetry
+    XtX.triangularView<Eigen::Upper>() = XtX.transpose();
+
     // 2. Add Regularization
-    for (int i = 0; i < dim; ++i) {
-      XtX(i, i) += alpha;
-    }
+    XtX.diagonal().array() += alpha;
 
     // 3. Fill XtY block-wise
     XtY.topRows(n_features).noalias() = states.transpose() * targets;

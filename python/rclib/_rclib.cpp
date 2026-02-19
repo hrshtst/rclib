@@ -43,6 +43,7 @@ PYBIND11_MODULE(_rclib, m) {
   py::enum_<RidgeReadout::Solver>(ridge, "Solver")
       .value("AUTO", RidgeReadout::Solver::AUTO)
       .value("CHOLESKY", RidgeReadout::Solver::CHOLESKY)
+      .value("DUAL_CHOLESKY", RidgeReadout::Solver::DUAL_CHOLESKY)
       .value("CONJUGATE_GRADIENT", RidgeReadout::Solver::CONJUGATE_GRADIENT)
       .value("CONJUGATE_GRADIENT_IMPLICIT", RidgeReadout::Solver::CONJUGATE_GRADIENT_IMPLICIT)
       .export_values();

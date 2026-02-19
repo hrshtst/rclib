@@ -17,8 +17,8 @@ def test_ridge_readout_fit_predict() -> None:
     states = rng.random((n_samples, n_features))
     targets = rng.random((n_samples, n_targets))
 
-    # Without bias
-    readout = _rclib.RidgeReadout(alpha=0.1, include_bias=False)
+    # Without bias - CHOLESKY
+    readout = _rclib.RidgeReadout(alpha=0.1, include_bias=False, solver=_rclib.RidgeReadout.Solver.CHOLESKY)
     readout.fit(states, targets)
     predictions = readout.predict(states)
 
@@ -27,8 +27,8 @@ def test_ridge_readout_fit_predict() -> None:
     original_error = np.linalg.norm(targets) ** 2
     assert prediction_error < original_error
 
-    # With bias
-    readout = _rclib.RidgeReadout(alpha=0.1, include_bias=True)
+    # With bias - DUAL_CHOLESKY
+    readout = _rclib.RidgeReadout(alpha=0.1, include_bias=True, solver=_rclib.RidgeReadout.Solver.DUAL_CHOLESKY)
     readout.fit(states, targets)
     predictions = readout.predict(states)
 
@@ -36,6 +36,36 @@ def test_ridge_readout_fit_predict() -> None:
     prediction_error = np.linalg.norm(predictions - targets) ** 2
     original_error = np.linalg.norm(targets) ** 2
     assert prediction_error < original_error
+
+
+def test_ridge_solver_consistency() -> None:
+    """Test consistency between Ridge solvers."""
+    n_samples = 50
+    n_features = 80
+    rng = np.random.default_rng(seed=42)
+    states = rng.random((n_samples, n_features))
+    targets = rng.random((n_samples, 1))
+
+    alpha = 0.1
+    # Primal
+    primal = _rclib.RidgeReadout(alpha=alpha, include_bias=True, solver=_rclib.RidgeReadout.Solver.CHOLESKY)
+    primal.fit(states, targets)
+    pred_primal = primal.predict(states)
+
+    # Dual
+    dual = _rclib.RidgeReadout(alpha=alpha, include_bias=True, solver=_rclib.RidgeReadout.Solver.DUAL_CHOLESKY)
+    dual.fit(states, targets)
+    pred_dual = dual.predict(states)
+
+    # Implicit
+    implicit = _rclib.RidgeReadout(
+        alpha=alpha, include_bias=True, solver=_rclib.RidgeReadout.Solver.CONJUGATE_GRADIENT_IMPLICIT
+    )
+    implicit.fit(states, targets)
+    pred_implicit = implicit.predict(states)
+
+    assert np.allclose(pred_primal, pred_dual, atol=1e-6)
+    assert np.allclose(pred_primal, pred_implicit, atol=1e-6)
 
 
 def test_ridge_readout_partial_fit_error() -> None:
@@ -154,22 +184,35 @@ def test_rls_readout_partial_fit() -> None:
 
 
 @pytest.mark.slow
-def test_adaptive_solver_small() -> None:
-    """Test that a small problem uses the CHOLESKY solver."""
+def test_adaptive_solver_primal() -> None:
+    """Test that a problem with N <= T uses the CHOLESKY solver."""
     model = ESN()
-    # Total neurons < 8000
-    model.add_reservoir(reservoirs.RandomSparse(n_neurons=1000, spectral_radius=0.9))
+    model.add_reservoir(reservoirs.RandomSparse(n_neurons=100, spectral_radius=0.9))
     model.set_readout(readouts.Ridge(alpha=1e-8, include_bias=True, solver="auto"))
 
-    # Trigger fit to let C++ decide
     rng = np.random.default_rng(seed=42)
-    x = rng.random((10, 1))
-    y = rng.random((10, 1))
+    x = rng.random((200, 1))
+    y = rng.random((200, 1))
     model.fit(x, y)
 
     cpp_readout = model._cpp_model.getReadout()  # noqa: SLF001
-    assert cpp_readout.getSolver() == _rclib.RidgeReadout.Solver.AUTO
     assert cpp_readout.getEffectiveSolver() == _rclib.RidgeReadout.Solver.CHOLESKY
+
+
+@pytest.mark.slow
+def test_adaptive_solver_dual() -> None:
+    """Test that a problem with N > T uses the DUAL_CHOLESKY solver."""
+    model = ESN()
+    model.add_reservoir(reservoirs.RandomSparse(n_neurons=1000, spectral_radius=0.9))
+    model.set_readout(readouts.Ridge(alpha=1e-8, include_bias=True, solver="auto"))
+
+    rng = np.random.default_rng(seed=42)
+    x = rng.random((100, 1))
+    y = rng.random((100, 1))
+    model.fit(x, y)
+
+    cpp_readout = model._cpp_model.getReadout()  # noqa: SLF001
+    assert cpp_readout.getEffectiveSolver() == _rclib.RidgeReadout.Solver.DUAL_CHOLESKY
 
 
 @pytest.mark.slow

@@ -4,7 +4,7 @@
 
 class RidgeReadout : public Readout {
 public:
-  enum Solver { AUTO, CHOLESKY, CONJUGATE_GRADIENT, CONJUGATE_GRADIENT_IMPLICIT };
+  enum Solver { AUTO, CHOLESKY, DUAL_CHOLESKY, CONJUGATE_GRADIENT, CONJUGATE_GRADIENT_IMPLICIT };
 
   RidgeReadout(double alpha = 1e-8, bool include_bias = true, Solver solver = AUTO, double tolerance = 1e-10);
 

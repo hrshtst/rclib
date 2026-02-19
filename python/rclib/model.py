@@ -108,6 +108,7 @@ class ESN:
             solver_map = {
                 "auto": _rclib.RidgeReadout.Solver.AUTO,
                 "cholesky": _rclib.RidgeReadout.Solver.CHOLESKY,
+                "dual_cholesky": _rclib.RidgeReadout.Solver.DUAL_CHOLESKY,
                 "conjugate_gradient": _rclib.RidgeReadout.Solver.CONJUGATE_GRADIENT,
                 "conjugate_gradient_implicit": _rclib.RidgeReadout.Solver.CONJUGATE_GRADIENT_IMPLICIT,
             }
