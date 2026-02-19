@@ -68,6 +68,9 @@ class ESN:
             msg = "Unsupported reservoir type"
             raise TypeError(msg)
 
+        # Update readout in case it's using "auto" solver
+        self._update_readout()
+
     def set_readout(self, readout: Any) -> None:  # noqa: ANN401
         """Set the readout for the model.
 
@@ -83,9 +86,19 @@ class ESN:
         """
         # Store the Python readout object's parameters
         self._readout_params = readout
+        self._update_readout()
+
+    def _update_readout(self) -> None:
+        """Instantiate or update the C++ readout based on current parameters."""
+        if self._readout_params is None:
+            return
+
+        readout = self._readout_params
+
         # Create and set the C++ readout to the C++ model
         if isinstance(readout, readouts.Ridge):
             solver_map = {
+                "auto": _rclib.RidgeReadout.Solver.AUTO,
                 "cholesky": _rclib.RidgeReadout.Solver.CHOLESKY,
                 "conjugate_gradient": _rclib.RidgeReadout.Solver.CONJUGATE_GRADIENT,
                 "conjugate_gradient_implicit": _rclib.RidgeReadout.Solver.CONJUGATE_GRADIENT_IMPLICIT,
@@ -120,6 +133,8 @@ class ESN:
         washout_len : int, optional
             Number of initial samples to discard. Default is 0.
         """
+        # Ensure readout is correctly initialized (especially for "auto" solver)
+        self._update_readout()
         # Call the C++ model's fit method
         self._cpp_model.fit(x, y, washout_len)
 
@@ -220,6 +235,9 @@ class ESN:
         if not self._readout_params:
             msg = "No readout set for the model."
             raise RuntimeError(msg)
+
+        # Ensure readout is correctly initialized
+        self._update_readout()
 
         # Get the C++ reservoir object (assuming the first one for now)
         cpp_res = self._cpp_model.getReservoir(0)

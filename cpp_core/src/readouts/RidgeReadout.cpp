@@ -7,7 +7,7 @@
 #include <stdexcept>
 
 RidgeReadout::RidgeReadout(double alpha, bool include_bias, Solver solver, double tolerance)
-    : alpha(alpha), include_bias(include_bias), solver(solver), tolerance(tolerance) {}
+    : alpha(alpha), include_bias(include_bias), solver(solver), effective_solver(solver), tolerance(tolerance) {}
 
 void RidgeReadout::fit(const Eigen::MatrixXd &states, const Eigen::MatrixXd &targets) {
   Eigen::Index n_samples = states.rows();
@@ -15,7 +15,17 @@ void RidgeReadout::fit(const Eigen::MatrixXd &states, const Eigen::MatrixXd &tar
   Eigen::Index n_outputs = targets.cols();
   Eigen::Index dim = n_features + (include_bias ? 1 : 0);
 
-  if (solver == CONJUGATE_GRADIENT_IMPLICIT) {
+  if (solver == AUTO) {
+    if (n_features >= 8000) {
+      effective_solver = CONJUGATE_GRADIENT_IMPLICIT;
+    } else {
+      effective_solver = CHOLESKY;
+    }
+  } else {
+    effective_solver = solver;
+  }
+
+  if (effective_solver == CONJUGATE_GRADIENT_IMPLICIT) {
     // Matrix-Free CG with Zero-Copy
     // 1. Construct XtY directly
     Eigen::MatrixXd XtY(dim, n_outputs);
@@ -76,7 +86,7 @@ void RidgeReadout::fit(const Eigen::MatrixXd &states, const Eigen::MatrixXd &tar
     }
 
     // 4. Solve
-    if (solver == CONJUGATE_GRADIENT) {
+    if (effective_solver == CONJUGATE_GRADIENT) {
       Eigen::ConjugateGradient<Eigen::MatrixXd, Eigen::Lower | Eigen::Upper> cg;
       cg.compute(XtX);
       cg.setTolerance(tolerance);

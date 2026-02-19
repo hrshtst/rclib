@@ -41,13 +41,17 @@ PYBIND11_MODULE(_rclib, m) {
 
   // Bind Solver Enum
   py::enum_<RidgeReadout::Solver>(ridge, "Solver")
+      .value("AUTO", RidgeReadout::Solver::AUTO)
       .value("CHOLESKY", RidgeReadout::Solver::CHOLESKY)
       .value("CONJUGATE_GRADIENT", RidgeReadout::Solver::CONJUGATE_GRADIENT)
       .value("CONJUGATE_GRADIENT_IMPLICIT", RidgeReadout::Solver::CONJUGATE_GRADIENT_IMPLICIT)
       .export_values();
 
-  ridge.def(py::init<double, bool, RidgeReadout::Solver, double>(), py::arg("alpha"), py::arg("include_bias"),
-            py::arg("solver") = RidgeReadout::Solver::CHOLESKY, py::arg("tolerance") = 1e-10);
+  ridge
+      .def(py::init<double, bool, RidgeReadout::Solver, double>(), py::arg("alpha"), py::arg("include_bias"),
+           py::arg("solver") = RidgeReadout::Solver::AUTO, py::arg("tolerance") = 1e-10)
+      .def("getSolver", &RidgeReadout::getSolver)
+      .def("getEffectiveSolver", &RidgeReadout::getEffectiveSolver);
 
   // Bind RlsReadout
   py::class_<RlsReadout, Readout, std::shared_ptr<RlsReadout>>(m, "RlsReadout")

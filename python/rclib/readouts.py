@@ -11,7 +11,7 @@ class Ridge:
         alpha: float,
         *,
         include_bias: bool,
-        solver: str = "cholesky",
+        solver: str = "auto",
         tolerance: float = 1e-10,
     ) -> None:
         """Initialize the Ridge Readout.
@@ -19,7 +19,7 @@ class Ridge:
         Args:
             alpha: Regularization parameter.
             include_bias: Whether to include a bias term.
-            solver: Solver to use ("cholesky", "conjugate_gradient", "conjugate_gradient_implicit").
+            solver: Solver to use ("auto", "cholesky", "conjugate_gradient", "conjugate_gradient_implicit").
             tolerance: Convergence tolerance for iterative solvers (CG).
         """
         self.alpha = alpha
