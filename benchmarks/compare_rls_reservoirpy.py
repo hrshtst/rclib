@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import argparse
 import time
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -114,29 +116,19 @@ def benchmark_reservoirpy_rls(
     }
 
 
-def main() -> None:
-    """Run comparison."""
-    # Reduced samples for RLS as it is O(N^2)
-    n_samples = 4000
-    train_len = 3000
-    data = mackey_glass(n_samples=n_samples)
-
-    # Train set
-    x_train = data[:train_len]
-    y_train = data[1 : train_len + 1]
-
-    # Test set
-    x_test = data[train_len:-1]
-    y_test = data[train_len + 1 :]
-
-    # Common parameters
-    sr = 0.9
-    sparsity = 0.05
-    lr = 0.1
-    input_scaling = 0.1
-    lambda_ = 0.99  # Forgetting factor
-
-    neuron_sizes = [100, 200, 500, 1000, 1500, 2000, 4000, 8000, 10000]
+def run_benchmarks(
+    x_train: np.ndarray,
+    y_train: np.ndarray,
+    x_test: np.ndarray,
+    y_test: np.ndarray,
+    neuron_sizes: list[int],
+    sr: float,
+    sparsity: float,
+    lr: float,
+    input_scaling: float,
+    lambda_: float,
+) -> pd.DataFrame:
+    """Run comparison benchmarks for rclib and reservoirpy RLS."""
     results = []
 
     print(f"{'Library':<12} | {'Neurons':<8} | {'Online Fit (s)':<15} | {'MSE':<10}")
@@ -165,10 +157,11 @@ def main() -> None:
         except Exception as e:  # noqa: BLE001
             print(f"reservoirpy failed for n={n}: {e}")
 
-    df = pd.DataFrame(results)
-    df.to_csv("benchmarks/rls_comparison_results.csv", index=False)
-    print("\nResults saved to benchmarks/rls_comparison_results.csv")
+    return pd.DataFrame(results)
 
+
+def plot_results(df: pd.DataFrame, output_dir: Path, plot_suffix: str) -> None:
+    """Plot benchmark results."""
     try:
         import matplotlib.pyplot as plt
         import seaborn as sns
@@ -180,10 +173,65 @@ def main() -> None:
         plt.ylabel("Time (s) - Log Scale")
         plt.xlabel("Number of Neurons")
         plt.grid(visible=True, which="both", ls="-", alpha=0.5)
-        plt.savefig("benchmarks/rls_comparison_time.png")
-        print("Plot saved as benchmarks/rls_comparison_time.png")
+        plot_path = output_dir / f"rls_comparison_time{plot_suffix}"
+        plt.savefig(plot_path)
+        print(f"Plot saved to {plot_path}")
     except ImportError:
         print("Matplotlib/Seaborn not found. Skipping plot.")
+
+
+def main() -> None:
+    """Run comparison."""
+    parser = argparse.ArgumentParser(description="Benchmark comparing rclib and reservoirpy RLS.")
+    parser.add_argument("--output-dir", type=str, help="Directory to save output files.")
+    parser.add_argument("--plot-suffix", type=str, default=".png", help="Suffix for plot figures (e.g., .png, .pdf).")
+    parser.add_argument("--csv-data", type=str, help="Path to existing CSV data to skip benchmarks and only plot.")
+    args = parser.parse_args()
+
+    if args.output_dir:
+        output_dir = Path(args.output_dir)
+    elif args.csv_data:
+        output_dir = Path(args.csv_data).parent
+    else:
+        output_dir = Path("benchmarks")
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    if args.csv_data:
+        print(f"Loading existing data from {args.csv_data}")
+        df = pd.read_csv(args.csv_data)
+    else:
+        # Reduced samples for RLS as it is O(N^2)
+        n_samples = 4000
+        train_len = 3000
+        data = mackey_glass(n_samples=n_samples)
+
+        # Train set
+        x_train = data[:train_len]
+        y_train = data[1 : train_len + 1]
+
+        # Test set
+        x_test = data[train_len:-1]
+        y_test = data[train_len + 1 :]
+
+        df = run_benchmarks(
+            x_train=x_train,
+            y_train=y_train,
+            x_test=x_test,
+            y_test=y_test,
+            neuron_sizes=[100, 200, 500, 1000, 1500, 2000, 4000, 8000, 10000],
+            sr=0.9,
+            sparsity=0.05,
+            lr=0.1,
+            input_scaling=0.1,
+            lambda_=0.99,
+        )
+
+        csv_path = output_dir / "rls_comparison_results.csv"
+        df.to_csv(csv_path, index=False)
+        print(f"\nResults saved to {csv_path}")
+
+    plot_results(df, output_dir, args.plot_suffix)
 
 
 if __name__ == "__main__":
