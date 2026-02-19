@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import argparse
 import time
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -115,24 +117,19 @@ def benchmark_reservoirpy(
     }
 
 
-def main() -> None:
-    """Run comparison."""
-    n_samples = 10000
-    train_len = 8000
-    washout = 500
-
-    data = mackey_glass(n_samples=n_samples)
-    x_train = data[:train_len]
-    y_train = data[1 : train_len + 1]
-    x_test = data[train_len:-1]
-
-    sr = 0.9
-    sparsity = 0.05
-    lr = 0.1
-    input_scaling = 0.1
-    alpha = 1e-8
-
-    neuron_sizes = [500, 1000, 2000, 4000, 8000, 10000, 15000, 20000]
+def run_benchmarks(
+    x_train: np.ndarray,
+    y_train: np.ndarray,
+    x_test: np.ndarray,
+    neuron_sizes: list[int],
+    sr: float,
+    sparsity: float,
+    lr: float,
+    input_scaling: float,
+    alpha: float,
+    washout: int,
+) -> pd.DataFrame:
+    """Run comparison benchmarks for rclib (auto) and reservoirpy."""
     results = []
 
     print(f"{'Library':<40} | {'Neurons':<8} | {'Fit (s)':<10} | {'Pred (s)':<10} | {'MSE':<10}")
@@ -158,10 +155,11 @@ def main() -> None:
         except Exception as e:  # noqa: BLE001
             print(f"reservoirpy failed for n={n}: {e}")
 
-    df = pd.DataFrame(results)
-    df.to_csv("benchmarks/comparison_auto_results.csv", index=False)
-    print("\nResults saved to benchmarks/comparison_auto_results.csv")
+    return pd.DataFrame(results)
 
+
+def plot_results(df: pd.DataFrame, output_dir: Path, plot_suffix: str) -> None:
+    """Plot benchmark results."""
     try:
         import matplotlib.pyplot as plt
         import seaborn as sns
@@ -174,7 +172,8 @@ def main() -> None:
         plt.ylabel("Time (s) - Log Scale")
         plt.xlabel("Number of Neurons - Log Scale")
         plt.grid(visible=True, which="both", ls="-", alpha=0.5)
-        plt.savefig("benchmarks/comparison_auto_fit_time.png")
+        fit_plot_path = output_dir / f"comparison_auto_fit_time{plot_suffix}"
+        plt.savefig(fit_plot_path)
 
         plt.figure(figsize=(12, 6))
         sns.lineplot(data=df, x="n_neurons", y="pred_time", hue="library", marker="o")
@@ -184,10 +183,61 @@ def main() -> None:
         plt.ylabel("Time (s) - Log Scale")
         plt.xlabel("Number of Neurons - Log Scale")
         plt.grid(visible=True, which="both", ls="-", alpha=0.5)
-        plt.savefig("benchmarks/comparison_auto_pred_time.png")
-        print("Plots saved as benchmarks/comparison_auto_*.png")
+        pred_plot_path = output_dir / f"comparison_auto_pred_time{plot_suffix}"
+        plt.savefig(pred_plot_path)
+        print(f"Plots saved to {output_dir}/comparison_auto_*")
     except ImportError:
         print("Matplotlib/Seaborn not found. Skipping plots.")
+
+
+def main() -> None:
+    """Run comparison."""
+    parser = argparse.ArgumentParser(description="Benchmark comparing rclib (auto) and reservoirpy.")
+    parser.add_argument("--output-dir", type=str, help="Directory to save output files.")
+    parser.add_argument("--plot-suffix", type=str, default=".png", help="Suffix for plot figures (e.g., .png, .pdf).")
+    parser.add_argument("--csv-data", type=str, help="Path to existing CSV data to skip benchmarks and only plot.")
+    args = parser.parse_args()
+
+    if args.output_dir:
+        output_dir = Path(args.output_dir)
+    elif args.csv_data:
+        output_dir = Path(args.csv_data).parent
+    else:
+        output_dir = Path("benchmarks")
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    if args.csv_data:
+        print(f"Loading existing data from {args.csv_data}")
+        df = pd.read_csv(args.csv_data)
+    else:
+        n_samples = 10000
+        train_len = 8000
+        washout = 500
+
+        data = mackey_glass(n_samples=n_samples)
+        x_train = data[:train_len]
+        y_train = data[1 : train_len + 1]
+        x_test = data[train_len:-1]
+
+        df = run_benchmarks(
+            x_train=x_train,
+            y_train=y_train,
+            x_test=x_test,
+            neuron_sizes=[500, 1000, 2000, 4000, 8000, 10000, 15000, 20000],
+            sr=0.9,
+            sparsity=0.05,
+            lr=0.1,
+            input_scaling=0.1,
+            alpha=1e-8,
+            washout=washout,
+        )
+
+        csv_path = output_dir / "comparison_auto_results.csv"
+        df.to_csv(csv_path, index=False)
+        print(f"\nResults saved to {csv_path}")
+
+    plot_results(df, output_dir, args.plot_suffix)
 
 
 if __name__ == "__main__":
