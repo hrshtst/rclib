@@ -118,21 +118,30 @@ uv run pre-commit install
 The project uses `Catch2` for C++ unit testing.
 
 ```bash
+# 1. Configure and build
 cmake -S . -B build -DBUILD_TESTING=ON
 cmake --build build --config Release -j $(nproc)
+
+# 2. Run tests (excluding hidden slow tests)
 ctest --test-dir build --output-on-failure
+
+# 3. Run all tests including slow tests
+./build/tests/cpp/test_readout "[.slow]"
 ```
 
 #### Python Tests
 The project uses `pytest` for Python integration testing.
 
 ```bash
-# Ensure the C++ library is built and installed into the python/ directory
+# 1. Build and install the C++ extension in the current environment
 cmake -S . -B build
 cmake --build build --config Release -j $(nproc) --target _rclib
 
-# Run pytest (via uv)
+# 2. Run pytest (excluding slow tests)
 uv run pytest
+
+# 3. Run all tests including slow tests
+uv run pytest -m "slow or not slow"
 ```
 
 ## Parallelization Configuration
@@ -188,6 +197,12 @@ The `benchmarks/` directory contains scripts to evaluate performance across diff
     uv run python benchmarks/plot_parallel_comparison.py
     ```
 
+3.  **Compare with ReservoirPy:**
+    ```bash
+    uv run python benchmarks/compare_auto_solver.py
+    ```
+    This script compares `rclib`'s automatic solver selection (Cholesky vs. Implicit CG) against `reservoirpy` across various reservoir sizes.
+
 ## Architecture & API Reference
 
 ### Key Architectural Principles
@@ -195,7 +210,7 @@ The `benchmarks/` directory contains scripts to evaluate performance across diff
 1.  **Modularity:** The **Reservoir** and **Readout** components are implemented as separate, swappable modules.
 2.  **Performance:** C++ implementations prioritize computational efficiency and memory management, especially for large, sparse matrices (`Eigen::SparseMatrix`).
 3.  **Scalability:** Supports large-scale reservoirs, deep ESNs (serial stacking), and parallel ESNs.
-4.  **Configurability:** Key parameters (spectral radius, sparsity, leak rate, regularization, bias, etc.) are configurable via C++ and Python APIs.
+4.  **Configurability:** Key parameters (spectral radius, sparsity, leak rate, regularization, bias, etc.) are configurable via C++ and Python APIs. **Adaptive Solver Selection** automatically chooses the most efficient solver (e.g., Cholesky vs. Implicit CG) based on reservoir size to ensure optimal performance without manual tuning.
 
 ### C++ API Design
 
