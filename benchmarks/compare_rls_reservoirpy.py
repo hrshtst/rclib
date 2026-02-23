@@ -171,7 +171,7 @@ def plot_results(df: pd.DataFrame, output_dir: Path, plot_suffix: str) -> None:
         tick_fs = 14
         legend_fs = 14
 
-        plt.figure(figsize=(12, 6))
+        plt.figure(figsize=(10, 6))
         sns.lineplot(data=df, x="n_neurons", y="online_fit_time", hue="library", marker="o")
         plt.yscale("log")
         plt.title("RLS Online Learning Time: rclib vs reservoirpy", fontsize=title_fs)

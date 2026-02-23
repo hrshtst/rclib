@@ -181,7 +181,7 @@ def plot_results(df: pd.DataFrame, output_dir: Path, plot_suffix: str) -> None:
         tick_fs = 14
         legend_fs = 14
 
-        plt.figure(figsize=(12, 6))
+        plt.figure(figsize=(10, 6))
         sns.lineplot(data=df, x="n_neurons", y="fit_time", hue="library", marker="o")
         plt.yscale("log")
         plt.xscale("log")
@@ -196,7 +196,7 @@ def plot_results(df: pd.DataFrame, output_dir: Path, plot_suffix: str) -> None:
         plt.tight_layout()
         plt.savefig(fit_plot_path)
 
-        plt.figure(figsize=(12, 6))
+        plt.figure(figsize=(10, 6))
         sns.lineplot(data=df, x="n_neurons", y="pred_time", hue="library", marker="o")
         plt.yscale("log")
         plt.xscale("log")
