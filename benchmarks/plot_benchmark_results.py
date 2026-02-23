@@ -12,13 +12,14 @@ import pandas as pd
 import seaborn as sns
 
 
-def plot_results(csv_file: str) -> None:
+def plot_results(csv_file: str, plot_suffix: str = ".png") -> None:
     """Read detailed benchmark results from a CSV file, calculate statistics.
 
     And generate plots for performance and MSE.
 
     Args:
         csv_file (str): The path to the input CSV file.
+        plot_suffix (str): The suffix for the output plot files.
     """
     path = Path(csv_file)
     if not path.exists():
@@ -53,9 +54,16 @@ def plot_results(csv_file: str) -> None:
     )
     df = pd.concat([df, offline_total_df], ignore_index=True)
 
+    # Plotting parameters
+    title_fs = 18
+    label_fs = 16
+    tick_fs = 14
+    legend_fs = 14
+    figsize = (10, 6)
+
     # --- 1. Plot Performance (Time vs. Threads) in a single figure ---
     sns.set_theme(style="whitegrid")
-    plt.figure(figsize=(12, 8))
+    plt.figure(figsize=figsize)
 
     ax = sns.lineplot(
         data=df,
@@ -68,14 +76,16 @@ def plot_results(csv_file: str) -> None:
         dashes=True,
     )
 
-    ax.set_title("Performance Benchmark: Time vs. Threads", fontsize=16)
-    ax.set_xlabel("Number of OpenMP Threads")
-    ax.set_ylabel("Average Time (s)")
-    ax.legend(title="Method")
+    ax.set_title("Performance Benchmark: Time vs. Threads", fontsize=title_fs)
+    ax.set_xlabel("Number of OpenMP Threads", fontsize=label_fs)
+    ax.set_ylabel("Average Time (s)", fontsize=label_fs)
+    plt.xticks(fontsize=tick_fs)
+    plt.yticks(fontsize=tick_fs)
+    plt.legend(title="Method", fontsize=legend_fs, title_fontsize=legend_fs)
     ax.set_yscale("log")  # Use a log scale for the y-axis to better see differences
 
     # Save the performance plot
-    perf_output_path = path.with_name(f"{path.stem}_performance.png")
+    perf_output_path = path.with_name(f"{path.stem}_performance{plot_suffix}")
     plt.savefig(perf_output_path)
     print(f"Performance plot saved to '{perf_output_path}'")
 
@@ -83,17 +93,19 @@ def plot_results(csv_file: str) -> None:
         plt.show()
 
     # --- 2. Plot RLS-only Performance ---
-    plt.figure(figsize=(10, 6))
+    plt.figure(figsize=figsize)
     df_rls = df[df["method"] == "online_rls"]
 
     ax_rls = sns.lineplot(data=df_rls, x="threads", y="time_s", marker="o")  # type: ignore[reportArgumentType]
 
-    ax_rls.set_title("RLS Performance: Time vs. Threads", fontsize=16)
-    ax_rls.set_xlabel("Number of OpenMP Threads")
-    ax_rls.set_ylabel("Average Time (s)")
+    ax_rls.set_title("RLS Performance: Time vs. Threads", fontsize=title_fs)
+    ax_rls.set_xlabel("Number of OpenMP Threads", fontsize=label_fs)
+    ax_rls.set_ylabel("Average Time (s)", fontsize=label_fs)
+    plt.xticks(fontsize=tick_fs)
+    plt.yticks(fontsize=tick_fs)
 
     # Save the RLS performance plot
-    rls_output_path = path.with_name(f"{path.stem}_rls_performance.png")
+    rls_output_path = path.with_name(f"{path.stem}_rls_performance{plot_suffix}")
     plt.savefig(rls_output_path)
     print(f"RLS performance plot saved to '{rls_output_path}'")
 
@@ -108,18 +120,20 @@ def plot_results(csv_file: str) -> None:
     methods_to_exclude = ["offline_fit", "offline_predict"]
     df_mse_filtered = df_mse[~df_mse["method"].isin(methods_to_exclude)]
 
-    plt.figure(figsize=(10, 6))
+    plt.figure(figsize=figsize)
     ax_mse = sns.barplot(data=df_mse_filtered, x="method", y="mse")  # type: ignore[reportArgumentType]
-    ax_mse.set_title("Comparison of Mean Squared Error (MSE)")
-    ax_mse.set_ylabel("MSE")
-    ax_mse.set_xlabel("Method")
+    ax_mse.set_title("Comparison of Mean Squared Error (MSE)", fontsize=title_fs)
+    ax_mse.set_ylabel("MSE", fontsize=label_fs)
+    ax_mse.set_xlabel("Method", fontsize=label_fs)
+    plt.xticks(fontsize=tick_fs)
+    plt.yticks(fontsize=tick_fs)
 
     # Add MSE values on top of the bars
     for index, row in df_mse_filtered.iterrows():
-        ax_mse.text(index, row.mse, f"{row.mse:.4f}", color="black", ha="center")  # type: ignore[reportArgumentType]
+        ax_mse.text(index, row.mse, f"{row.mse:.4f}", color="black", ha="center", fontsize=tick_fs)  # type: ignore[reportArgumentType]
 
     # Save the MSE plot
-    mse_output_path = path.with_name(f"{path.stem}_mse.png")
+    mse_output_path = path.with_name(f"{path.stem}_mse{plot_suffix}")
     plt.savefig(mse_output_path)
     print(f"MSE plot saved to '{mse_output_path}'")
 
@@ -135,5 +149,11 @@ if __name__ == "__main__":
         default="benchmarks/benchmark_results.csv",
         help="Path to the CSV file containing benchmark results. Defaults to 'benchmarks/benchmark_results.csv'.",
     )
+    parser.add_argument(
+        "--plot-suffix",
+        type=str,
+        default=".png",
+        help="Suffix for plot figures (e.g., .png, .pdf). Defaults to '.png'.",
+    )
     args = parser.parse_args()
-    plot_results(args.csv_file)
+    plot_results(args.csv_file, args.plot_suffix)
