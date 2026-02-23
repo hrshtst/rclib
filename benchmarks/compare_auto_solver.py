@@ -164,13 +164,21 @@ def plot_results(df: pd.DataFrame, output_dir: Path, plot_suffix: str) -> None:
         import matplotlib.pyplot as plt
         import seaborn as sns
 
+        title_fs = 18
+        label_fs = 16
+        tick_fs = 14
+        legend_fs = 14
+
         plt.figure(figsize=(12, 6))
         sns.lineplot(data=df, x="n_neurons", y="fit_time", hue="library", marker="o")
         plt.yscale("log")
         plt.xscale("log")
-        plt.title("Training Time: rclib (auto) vs reservoirpy")
-        plt.ylabel("Time (s) - Log Scale")
-        plt.xlabel("Number of Neurons - Log Scale")
+        plt.title("Training Time: rclib (auto) vs reservoirpy", fontsize=title_fs)
+        plt.ylabel("Time (s) - Log Scale", fontsize=label_fs)
+        plt.xlabel("Number of Neurons - Log Scale", fontsize=label_fs)
+        plt.xticks(fontsize=tick_fs)
+        plt.yticks(fontsize=tick_fs)
+        plt.legend(fontsize=legend_fs)
         plt.grid(visible=True, which="both", ls="-", alpha=0.5)
         fit_plot_path = output_dir / f"comparison_auto_fit_time{plot_suffix}"
         plt.tight_layout()
@@ -180,9 +188,12 @@ def plot_results(df: pd.DataFrame, output_dir: Path, plot_suffix: str) -> None:
         sns.lineplot(data=df, x="n_neurons", y="pred_time", hue="library", marker="o")
         plt.yscale("log")
         plt.xscale("log")
-        plt.title("Prediction Time: rclib (auto) vs reservoirpy")
-        plt.ylabel("Time (s) - Log Scale")
-        plt.xlabel("Number of Neurons - Log Scale")
+        plt.title("Prediction Time: rclib (auto) vs reservoirpy", fontsize=title_fs)
+        plt.ylabel("Time (s) - Log Scale", fontsize=label_fs)
+        plt.xlabel("Number of Neurons - Log Scale", fontsize=label_fs)
+        plt.xticks(fontsize=tick_fs)
+        plt.yticks(fontsize=tick_fs)
+        plt.legend(fontsize=legend_fs)
         plt.grid(visible=True, which="both", ls="-", alpha=0.5)
         pred_plot_path = output_dir / f"comparison_auto_pred_time{plot_suffix}"
         plt.tight_layout()
