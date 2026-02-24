@@ -38,15 +38,7 @@ int main() {
   // 5. Online Training Loop
   std::cout << "Starting online training..." << std::endl;
   for (int i = 0; i < num_steps; ++i) {
-    Eigen::MatrixXd current_input = X_data.row(i);
-    Eigen::MatrixXd current_target = y_data.row(i);
-
-    // Advance reservoir state
-    res->advance(current_input);
-    Eigen::MatrixXd current_state = res->getState();
-
-    // Perform partial fit (online update)
-    readout->partialFit(current_state, current_target);
+    model.partialFit(X_data.row(i), y_data.row(i));
 
     if ((i + 1) % 100 == 0) {
       std::cout << "Step " << (i + 1) << "/" << num_steps << std::endl;

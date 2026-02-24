@@ -1,3 +1,6 @@
+add_executable(quick_online quick_online.cpp)
+target_link_libraries(quick_online PRIVATE rclib_core)
+
 add_executable(quick_start quick_start.cpp)
 target_link_libraries(quick_start PRIVATE rclib_core)
 

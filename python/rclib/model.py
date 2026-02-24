@@ -249,17 +249,15 @@ class ESN:
         # Ensure readout is correctly initialized
         self._update_readout()
 
-        # Get the C++ reservoir object (assuming the first one for now)
-        cpp_res = self._cpp_model.getReservoir(0)
-
-        # Advance reservoir state if x is provided
-        if x is not None:
-            cpp_res.advance(x)
-
-        current_state = cpp_res.getState()
-
-        # Get the C++ readout object
-        cpp_readout = self._cpp_model.getReadout()
-
-        # Perform partial fit (online update)
-        cpp_readout.partialFit(current_state, y)
+        if x is None:
+            # If x is None, we use the current state of reservoirs
+            # But the C++ partialFit expects an input to advance.
+            # So if x is None, we call readout.partialFit directly with current state.
+            cpp_readout = self._cpp_model.getReadout()
+            # For multiple reservoirs, we'd need to combine states, which Model::partialFit handles.
+            # If we want to support x=None for multiple reservoirs, we should add it to Model.cpp.
+            # For now, let's keep it simple as it was.
+            cpp_res = self._cpp_model.getReservoir(0)
+            cpp_readout.partialFit(cpp_res.getState(), y)
+        else:
+            self._cpp_model.partialFit(x, y)

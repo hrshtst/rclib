@@ -12,6 +12,7 @@ public:
   void addReservoir(std::shared_ptr<Reservoir> res, std::string connection_type = "serial");
   void setReadout(std::shared_ptr<Readout> readout);
   void fit(const Eigen::MatrixXd &inputs, const Eigen::MatrixXd &targets, int washout_len = 0);
+  void partialFit(const Eigen::MatrixXd &input, const Eigen::MatrixXd &target);
   Eigen::MatrixXd predict(const Eigen::MatrixXd &inputs, bool reset_state_before_predict = true);
   Eigen::MatrixXd predictOnline(const Eigen::MatrixXd &input);
   Eigen::MatrixXd predictGenerative(const Eigen::MatrixXd &prime_inputs, int n_steps);

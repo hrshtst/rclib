@@ -1,5 +1,6 @@
 #include "rclib/Model.h"
 #include "rclib/readouts/RidgeReadout.h"
+#include "rclib/readouts/RlsReadout.h"
 #include "rclib/reservoirs/RandomSparseReservoir.h"
 
 #include <Eigen/Dense>
@@ -103,4 +104,50 @@ TEST_CASE("Model - resetReservoirs", "[Model]") {
 
   REQUIRE(res1->getState().norm() == 0);
   REQUIRE(res2->getState().norm() == 0);
+}
+
+TEST_CASE("Model - partialFit", "[Model]") {
+  Model model;
+  auto res = std::make_shared<RandomSparseReservoir>(100, 0.9, 0.1, 0.2, 1.0);
+  model.addReservoir(res);
+
+  SECTION("Throws when readout not set") {
+    REQUIRE_THROWS(model.partialFit(Eigen::MatrixXd::Random(1, 1), Eigen::MatrixXd::Random(1, 1)));
+  }
+
+  // Use RLS for online updates
+  auto readout = std::make_shared<RlsReadout>(0.99, 1.0, true);
+  model.setReadout(readout);
+
+  SECTION("Updates weights on partialFit") {
+    Eigen::MatrixXd input = Eigen::MatrixXd::Random(1, 1);
+    Eigen::MatrixXd target = Eigen::MatrixXd::Random(1, 1);
+
+    // Initialize with a dummy fit to ensure W_out is allocated
+    model.partialFit(input, target);
+
+    // Get prediction after initial fit
+    Eigen::MatrixXd pred_before = model.predict(input, true);
+
+    // Perform another partial fit
+    model.partialFit(input, target);
+
+    // Prediction should have changed
+    Eigen::MatrixXd pred_after = model.predict(input, true);
+    REQUIRE(pred_before(0, 0) != Catch::Approx(pred_after(0, 0)));
+  }
+
+  SECTION("Parallel connection in partialFit") {
+    Model pmodel;
+    auto res1 = std::make_shared<RandomSparseReservoir>(50, 0.9, 0.1, 0.2, 1.0);
+    auto res2 = std::make_shared<RandomSparseReservoir>(50, 0.9, 0.1, 0.2, 1.0);
+    pmodel.addReservoir(res1, "parallel");
+    pmodel.addReservoir(res2, "parallel");
+    pmodel.setReadout(std::make_shared<RlsReadout>());
+
+    Eigen::MatrixXd input = Eigen::MatrixXd::Random(1, 1);
+    Eigen::MatrixXd target = Eigen::MatrixXd::Random(1, 1);
+
+    REQUIRE_NOTHROW(pmodel.partialFit(input, target));
+  }
 }

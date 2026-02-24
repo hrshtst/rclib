@@ -86,3 +86,44 @@ def test_model_reset_reservoirs() -> None:
     # Check that states are reset to zero
     assert np.linalg.norm(model.get_reservoir(0).getState()) == 0
     assert np.linalg.norm(model.get_reservoir(1).getState()) == 0
+
+
+def test_model_partial_fit() -> None:
+    """Test partial_fit for online learning."""
+    model = ESN()
+    res = reservoirs.RandomSparse(n_neurons=100, spectral_radius=0.9)
+    readout = readouts.Rls(lambda_=0.99, delta=1.0, include_bias=True)
+    model.add_reservoir(res)
+    model.set_readout(readout)
+
+    rng = np.random.default_rng(seed=42)
+    x = rng.random((1, 1))
+    y = rng.random((1, 1))
+
+    # Initial fit to allocate weights
+    model.partial_fit(x, y)
+    pred_before = model.predict(x)
+
+    # Further fit
+    model.partial_fit(x, y)
+    pred_after = model.predict(x)
+
+    assert not np.allclose(pred_before, pred_after)
+
+
+def test_parallel_model_partial_fit() -> None:
+    """Test partial_fit with parallel connection."""
+    model = ESN(connection_type="parallel")
+    res1 = reservoirs.RandomSparse(n_neurons=50, spectral_radius=0.9)
+    res2 = reservoirs.RandomSparse(n_neurons=50, spectral_radius=0.9)
+    readout = readouts.Rls(lambda_=0.99, delta=1.0, include_bias=True)
+    model.add_reservoir(res1)
+    model.add_reservoir(res2)
+    model.set_readout(readout)
+
+    rng = np.random.default_rng(seed=42)
+    x = rng.random((1, 1))
+    y = rng.random((1, 1))
+
+    # Should not raise any error
+    model.partial_fit(x, y)

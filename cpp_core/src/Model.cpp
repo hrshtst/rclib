@@ -71,6 +71,35 @@ void Model::fit(const Eigen::MatrixXd &inputs, const Eigen::MatrixXd &targets, i
   readout->fit(fit_states, fit_targets);
 }
 
+void Model::partialFit(const Eigen::MatrixXd &input, const Eigen::MatrixXd &target) {
+  if (reservoirs.empty() || !readout) {
+    throw std::runtime_error("Model is not fully configured. Add at least one reservoir and a readout.");
+  }
+
+  // Collect states from all reservoirs
+  Eigen::MatrixXd all_states;
+
+  if (connection_type == "serial") {
+    Eigen::MatrixXd current_input = input;
+    for (const auto &res : reservoirs) {
+      current_input = res->advance(current_input);
+    }
+    all_states = current_input;
+  } else if (connection_type == "parallel") {
+    for (const auto &res : reservoirs) {
+      Eigen::MatrixXd res_state = res->advance(input);
+      if (all_states.size() == 0) {
+        all_states = res_state;
+      } else {
+        all_states.conservativeResize(all_states.rows(), all_states.cols() + res_state.cols());
+        all_states.rightCols(res_state.cols()) = res_state;
+      }
+    }
+  }
+
+  readout->partialFit(all_states, target);
+}
+
 Eigen::MatrixXd Model::predict(const Eigen::MatrixXd &inputs, bool reset_state_before_predict) {
   if (reservoirs.empty() || !readout) {
     throw std::runtime_error("Model is not fully configured. Add at least one reservoir and a readout.");
