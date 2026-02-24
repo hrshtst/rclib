@@ -226,7 +226,7 @@ The `benchmarks/` directory contains scripts to evaluate performance across diff
 
 **Model Class (`Model.h`)**
 *   Manages collections of reservoirs and readouts.
-*   Supports `addReservoir` (serial/parallel) and `setReadout`.
+*   Supports `addReservoir` (serial/parallel), `setReadout`, and `partialFit` (online learning).
 
 ### Python API
 
@@ -240,15 +240,18 @@ from rclib.model import ESN
 
 # Configure
 res1 = reservoirs.RandomSparse(n_neurons=1000, spectral_radius=0.9, include_bias=True)
-readout = readouts.Ridge(alpha=1e-8, include_bias=True)
+readout = readouts.Rls(lambda_=0.99, delta=1.0, include_bias=True)
 
 # Model
 model = ESN(connection_type='serial')
 model.add_reservoir(res1)
 model.set_readout(readout)
 
-# Train & Predict
-model.fit(X_train, Y_train)
+# Online Training
+for x, y in zip(X_train, Y_train):
+    model.partial_fit(x, y)
+
+# Predict
 Y_pred = model.predict(X_test)
 ```
 

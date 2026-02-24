@@ -62,6 +62,9 @@ uv sync
 
 # Run the quick start example
 uv run python examples/python/quick_start.py
+
+# Run the online learning example
+uv run python examples/python/quick_online.py
 ```
 
 With this configuration, any changes to the C++ source code in `cpp_core` will automatically trigger a rebuild of the Python extension module upon the next import, ensuring your Python environment always uses the latest C++ logic without manual recompilation.
