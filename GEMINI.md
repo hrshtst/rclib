@@ -199,18 +199,18 @@ The `benchmarks/` directory contains scripts to evaluate performance across diff
 
 3.  **Compare with ReservoirPy:**
     ```bash
-    uv run python benchmarks/compare_auto_solver.py
+    # Run the comparison benchmark with statistical analysis (default: 10 iterations)
+    uv run python benchmarks/compare_auto_solver.py --n-iter 10
     ```
-    This script compares `rclib`'s automatic solver selection (Cholesky vs. Implicit CG) against `reservoirpy` across various reservoir sizes.
+    This script compares `rclib`'s automatic solver selection (Cholesky vs. Implicit CG) against `reservoirpy` across various reservoir sizes, producing mean and standard deviation for performance metrics.
 
 ## Architecture & API Reference
 
 ### Key Architectural Principles
 
 1.  **Modularity:** The **Reservoir** and **Readout** components are implemented as separate, swappable modules.
-2.  **Performance:** C++ implementations prioritize computational efficiency and memory management, especially for large, sparse matrices (`Eigen::SparseMatrix`).
-3.  **Scalability:** Supports large-scale reservoirs, deep ESNs (serial stacking), and parallel ESNs.
-4.  **Configurability:** Key parameters (spectral radius, sparsity, leak rate, regularization, bias, etc.) are configurable via C++ and Python APIs. **Adaptive Solver Selection** automatically chooses the most efficient solver (e.g., Cholesky vs. Implicit CG) based on reservoir size to ensure optimal performance without manual tuning.
+2.  **Performance:** C++ implementations prioritize computational efficiency and memory management. Core training routines (e.g., `RidgeReadout`) leverage OpenMP for parallelized matrix operations and highly optimized linear algebra.
+3.  **Scalability:** Supports large-scale reservoirs, deep ESNs (serial stacking), and parallel ESNs. **Adaptive Solver Selection** automatically chooses the most efficient solver (e.g., Cholesky, Dual Cholesky, or Implicit CG) based on reservoir and dataset size to ensure optimal performance.
 
 ### C++ API Design
 
