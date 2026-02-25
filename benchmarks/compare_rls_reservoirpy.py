@@ -127,6 +127,7 @@ def run_benchmarks(
     lr: float,
     input_scaling: float,
     lambda_: float,
+    n_iter: int = 3,
 ) -> pd.DataFrame:
     """Run comparison benchmarks for rclib and reservoirpy RLS."""
     results = []
@@ -135,27 +136,34 @@ def run_benchmarks(
     print("-" * 55)
 
     for n in neuron_sizes:
-        # rclib
-        try:
-            res_rc = benchmark_rclib_rls(x_train, y_train, x_test, y_test, n, sr, sparsity, lr, input_scaling, lambda_)
-            results.append(res_rc)
-            print(
-                f"{res_rc['library']:<12} | {res_rc['n_neurons']:<8} | "
-                f"{res_rc['online_fit_time']:<15.4f} | {res_rc['mse']:<10.4e}"
-            )
-        except Exception as e:  # noqa: BLE001
-            print(f"rclib failed for n={n}: {e}")
+        for i in range(n_iter):
+            # rclib
+            try:
+                res_rc = benchmark_rclib_rls(
+                    x_train, y_train, x_test, y_test, n, sr, sparsity, lr, input_scaling, lambda_
+                )
+                results.append(res_rc)
+                print(
+                    f"{res_rc['library']:<12} | {res_rc['n_neurons']:<8} | "
+                    f"{res_rc['online_fit_time']:<15.4f} | "
+                    f"{res_rc['mse']:<10.4e} (iter {i + 1}/{n_iter})"
+                )
+            except Exception as e:  # noqa: BLE001
+                print(f"rclib failed for n={n}: {e}")
 
-        # reservoirpy
-        try:
-            res_rpy = benchmark_reservoirpy_rls(x_train, y_train, x_test, y_test, n, sr, sparsity, lr, input_scaling)
-            results.append(res_rpy)
-            print(
-                f"{res_rpy['library']:<12} | {res_rpy['n_neurons']:<8} | "
-                f"{res_rpy['online_fit_time']:<15.4f} | {res_rpy['mse']:<10.4e}"
-            )
-        except Exception as e:  # noqa: BLE001
-            print(f"reservoirpy failed for n={n}: {e}")
+            # reservoirpy
+            try:
+                res_rpy = benchmark_reservoirpy_rls(
+                    x_train, y_train, x_test, y_test, n, sr, sparsity, lr, input_scaling
+                )
+                results.append(res_rpy)
+                print(
+                    f"{res_rpy['library']:<12} | {res_rpy['n_neurons']:<8} | "
+                    f"{res_rpy['online_fit_time']:<15.4f} | "
+                    f"{res_rpy['mse']:<10.4e} (iter {i + 1}/{n_iter})"
+                )
+            except Exception as e:  # noqa: BLE001
+                print(f"reservoirpy failed for n={n}: {e}")
 
     return pd.DataFrame(results)
 
@@ -172,10 +180,10 @@ def plot_results(df: pd.DataFrame, output_dir: Path, plot_suffix: str) -> None:
         legend_fs = 14
 
         plt.figure(figsize=(10, 6))
-        sns.lineplot(data=df, x="n_neurons", y="online_fit_time", hue="library", marker="o")
+        sns.lineplot(data=df, x="n_neurons", y="online_fit_time", hue="library", marker="o", errorbar="sd")
         plt.yscale("log")
         plt.title("RLS Online Learning Time: rclib vs reservoirpy", fontsize=title_fs)
-        plt.ylabel("Time (s) - Log Scale", fontsize=label_fs)
+        plt.ylabel("Time (s) - Log Scale (Mean ± SD)", fontsize=label_fs)
         plt.xlabel("Number of Neurons", fontsize=label_fs)
         plt.xticks(fontsize=tick_fs)
         plt.yticks(fontsize=tick_fs)
@@ -195,6 +203,7 @@ def main() -> None:
     parser.add_argument("--output-dir", type=str, help="Directory to save output files.")
     parser.add_argument("--plot-suffix", type=str, default=".png", help="Suffix for plot figures (e.g., .png, .pdf).")
     parser.add_argument("--csv-data", type=str, help="Path to existing CSV data to skip benchmarks and only plot.")
+    parser.add_argument("--n-iter", type=int, default=10, help="Number of iterations for each configuration.")
     args = parser.parse_args()
 
     if args.output_dir:
@@ -234,6 +243,7 @@ def main() -> None:
             lr=0.1,
             input_scaling=0.1,
             lambda_=0.99,
+            n_iter=args.n_iter,
         )
 
         csv_path = output_dir / "rls_comparison_results.csv"

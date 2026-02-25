@@ -134,6 +134,7 @@ def run_benchmarks(
     input_scaling: float,
     alpha: float,
     washout: int,
+    n_iter: int = 3,
 ) -> pd.DataFrame:
     """Run comparison benchmarks for rclib and reservoirpy."""
     results = []
@@ -143,29 +144,32 @@ def run_benchmarks(
     print("-" * 80)
 
     for n in neuron_sizes:
-        # rclib
-        for solver in rclib_solvers:
-            res_rc = benchmark_rclib(
-                x_train, y_train, x_test, n, sr, sparsity, lr, input_scaling, alpha, washout, solver
-            )
-            results.append(res_rc)
-            print(
-                f"{res_rc['library']:<30} | {res_rc['n_neurons']:<8} | "
-                f"{res_rc['fit_time']:<10.4f} | {res_rc['pred_time']:<10.4f} | {res_rc['mse']:<10.4e}"
-            )
+        for i in range(n_iter):
+            # rclib
+            for solver in rclib_solvers:
+                res_rc = benchmark_rclib(
+                    x_train, y_train, x_test, n, sr, sparsity, lr, input_scaling, alpha, washout, solver
+                )
+                results.append(res_rc)
+                print(
+                    f"{res_rc['library']:<30} | {res_rc['n_neurons']:<8} | "
+                    f"{res_rc['fit_time']:<10.4f} | {res_rc['pred_time']:<10.4f} | "
+                    f"{res_rc['mse']:<10.4e} (iter {i + 1}/{n_iter})"
+                )
 
-        # reservoirpy
-        try:
-            res_rpy = benchmark_reservoirpy(
-                x_train, y_train, x_test, n, sr, sparsity, lr, input_scaling, alpha, washout
-            )
-            results.append(res_rpy)
-            print(
-                f"{res_rpy['library']:<30} | {res_rpy['n_neurons']:<8} | "
-                f"{res_rpy['fit_time']:<10.4f} | {res_rpy['pred_time']:<10.4f} | {res_rpy['mse']:<10.4e}"
-            )
-        except Exception as e:  # noqa: BLE001
-            print(f"reservoirpy failed for n={n}: {e}")
+            # reservoirpy
+            try:
+                res_rpy = benchmark_reservoirpy(
+                    x_train, y_train, x_test, n, sr, sparsity, lr, input_scaling, alpha, washout
+                )
+                results.append(res_rpy)
+                print(
+                    f"{res_rpy['library']:<30} | {res_rpy['n_neurons']:<8} | "
+                    f"{res_rpy['fit_time']:<10.4f} | {res_rpy['pred_time']:<10.4f} | "
+                    f"{res_rpy['mse']:<10.4e} (iter {i + 1}/{n_iter})"
+                )
+            except Exception as e:  # noqa: BLE001
+                print(f"reservoirpy failed for n={n}: {e}")
 
     return pd.DataFrame(results)
 
@@ -182,11 +186,11 @@ def plot_results(df: pd.DataFrame, output_dir: Path, plot_suffix: str) -> None:
         legend_fs = 14
 
         plt.figure(figsize=(10, 6))
-        sns.lineplot(data=df, x="n_neurons", y="fit_time", hue="library", marker="o")
+        sns.lineplot(data=df, x="n_neurons", y="fit_time", hue="library", marker="o", errorbar="sd")
         plt.yscale("log")
         plt.xscale("log")
         plt.title("Training Time: rclib vs reservoirpy", fontsize=title_fs)
-        plt.ylabel("Time (s) - Log Scale", fontsize=label_fs)
+        plt.ylabel("Time (s) - Log Scale (Mean ± SD)", fontsize=label_fs)
         plt.xlabel("Number of Neurons - Log Scale", fontsize=label_fs)
         plt.xticks(fontsize=tick_fs)
         plt.yticks(fontsize=tick_fs)
@@ -197,11 +201,11 @@ def plot_results(df: pd.DataFrame, output_dir: Path, plot_suffix: str) -> None:
         plt.savefig(fit_plot_path)
 
         plt.figure(figsize=(10, 6))
-        sns.lineplot(data=df, x="n_neurons", y="pred_time", hue="library", marker="o")
+        sns.lineplot(data=df, x="n_neurons", y="pred_time", hue="library", marker="o", errorbar="sd")
         plt.yscale("log")
         plt.xscale("log")
         plt.title("Prediction Time: rclib vs reservoirpy", fontsize=title_fs)
-        plt.ylabel("Time (s) - Log Scale", fontsize=label_fs)
+        plt.ylabel("Time (s) - Log Scale (Mean ± SD)", fontsize=label_fs)
         plt.xlabel("Number of Neurons - Log Scale", fontsize=label_fs)
         plt.xticks(fontsize=tick_fs)
         plt.yticks(fontsize=tick_fs)
@@ -221,6 +225,7 @@ def main() -> None:
     parser.add_argument("--output-dir", type=str, help="Directory to save output files.")
     parser.add_argument("--plot-suffix", type=str, default=".png", help="Suffix for plot figures (e.g., .png, .pdf).")
     parser.add_argument("--csv-data", type=str, help="Path to existing CSV data to skip benchmarks and only plot.")
+    parser.add_argument("--n-iter", type=int, default=10, help="Number of iterations for each configuration.")
     args = parser.parse_args()
 
     if args.output_dir:
@@ -256,6 +261,7 @@ def main() -> None:
             input_scaling=0.1,
             alpha=1e-8,
             washout=washout,
+            n_iter=args.n_iter,
         )
 
         csv_path = output_dir / "comparison_results.csv"
