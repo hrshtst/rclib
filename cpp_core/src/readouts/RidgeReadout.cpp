@@ -16,9 +16,9 @@ void RidgeReadout::fit(const Eigen::MatrixXd &states, const Eigen::MatrixXd &tar
   Eigen::Index dim = n_features + (include_bias ? 1 : 0);
 
   if (solver == AUTO) {
-    if (n_features >= 8000) {
+    if (n_features >= 4000) {
       effective_solver = CONJUGATE_GRADIENT_IMPLICIT;
-    } else if (n_features > n_samples) {
+    } else if (n_features > n_samples && n_features > 100) {
       effective_solver = DUAL_CHOLESKY;
     } else {
       effective_solver = CHOLESKY;
@@ -32,13 +32,26 @@ void RidgeReadout::fit(const Eigen::MatrixXd &states, const Eigen::MatrixXd &tar
     // 1. Construct XtY directly
     Eigen::MatrixXd XtY(dim, n_outputs);
 
-    // Top part: states^T * targets
+#ifdef RCLIB_USE_OPENMP
+#  pragma omp parallel sections
+    {
+#  pragma omp section
+      {
+        XtY.topRows(n_features).noalias() = states.transpose() * targets;
+      }
+#  pragma omp section
+      {
+        if (include_bias) {
+          XtY.bottomRows(1) = targets.colwise().sum();
+        }
+      }
+    }
+#else
     XtY.topRows(n_features).noalias() = states.transpose() * targets;
-
-    // Bottom part (bias): sum(targets)
     if (include_bias) {
       XtY.bottomRows(1) = targets.colwise().sum();
     }
+#endif
 
     // 2. Solve using RidgeLinearOperator with virtual bias
     W_out.resize(dim, n_outputs);
@@ -82,6 +95,7 @@ void RidgeReadout::fit(const Eigen::MatrixXd &states, const Eigen::MatrixXd &tar
     Eigen::MatrixXd XtY(dim, n_outputs);
 
     // 1. Fill XtX using rankUpdate (BLAS SYRK)
+    // When T > N, states^T * states is more efficient.
     XtX.setZero();
     XtX.topLeftCorner(n_features, n_features).selfadjointView<Eigen::Lower>().rankUpdate(states.transpose());
 
@@ -99,17 +113,33 @@ void RidgeReadout::fit(const Eigen::MatrixXd &states, const Eigen::MatrixXd &tar
       XtX(n_features, n_features) = static_cast<double>(n_samples);
     }
 
-    // Symmetry
+    // Symmetry - rankUpdate only fills one triangle
     XtX.triangularView<Eigen::Upper>() = XtX.transpose();
 
     // 2. Add Regularization
     XtX.diagonal().array() += alpha;
 
     // 3. Fill XtY block-wise
+#ifdef RCLIB_USE_OPENMP
+#  pragma omp parallel sections
+    {
+#  pragma omp section
+      {
+        XtY.topRows(n_features).noalias() = states.transpose() * targets;
+      }
+#  pragma omp section
+      {
+        if (include_bias) {
+          XtY.bottomRows(1) = targets.colwise().sum();
+        }
+      }
+    }
+#else
     XtY.topRows(n_features).noalias() = states.transpose() * targets;
     if (include_bias) {
       XtY.bottomRows(1) = targets.colwise().sum();
     }
+#endif
 
     // 4. Solve
     if (effective_solver == CONJUGATE_GRADIENT) {
