@@ -11,17 +11,29 @@ This report details the optimizations applied to the **Ridge Readout** (Ridge Re
 
 ## Analysis of the Bottleneck
 
-In Reservoir Computing, we often deal with state matrices $X$ of size $T 	imes N$, where $T$ is the number of time steps and $N$ is the number of neurons.
+In Reservoir Computing, we often deal with state matrices $X$ of size $T \times N$, where $T$ is the number of time steps and $N$ is the number of neurons.
 
 The standard **Primal** solution to Ridge Regression involves solving the normal equations:
 $$(X^T X + \alpha I) W_{out} = X^T Y$$
-This has a computational complexity of **$O(N^3)$** due to the $N 	imes N$ matrix inversion/decomposition. When $N$ is large (e.g., 20,000 neurons), this becomes the primary bottleneck of the ESN training phase.
+This has a computational complexity of **$O(N^3)$** due to the $N \times N$ matrix inversion/decomposition. When $N$ is large (e.g., 20,000 neurons), this becomes the primary bottleneck of the ESN training phase.
 
 ## Optimization Details
 
-### 1. Dual Ridge Formulation ($N > T$)
+### 1. Matrix-Free Implicit CG ($N \ge 8,000$)
 
-When $N > T$, it is mathematically superior to solve the **Dual problem**, which operates in the sample space ($T 	imes T$) rather than the feature space.
+For extremely large reservoirs, even the $O(N^2)$ memory requirement for storing the covariance matrix $X^T X$ becomes a bottleneck. We implemented a **Matrix-Free Conjugate Gradient** solver.
+
+**Mechanism:**
+Instead of computing $A = X^T X + \alpha I$, we define a linear operator that computes the product $Av$ without ever materializing $A$:
+$$Av = X^T(Xv) + \alpha v$$
+
+*   **Memory Efficiency:** Reduces memory footprint from $O(N^2)$ to $O(NT)$.
+*   **Zero-Copy Design:** The `RidgeLinearOperator` uses Eigen's expression templates to perform these operations directly on the state matrix $X$, avoiding any intermediate large allocations.
+*   **Parallelism:** Each output dimension (target) is solved in parallel using OpenMP, sharing the same matrix-free operator.
+
+### 2. Dual Ridge Formulation ($N > T$)
+
+When $N > T$, it is mathematically superior to solve the **Dual problem**, which operates in the sample space ($T \times T$) rather than the feature space.
 
 **Mathematical Formulation:**
 Instead of the primal weights, we solve for dual variables $\beta$:
@@ -32,17 +44,19 @@ $$W_{out} = X^T \beta$$
 **Computational Gain:**
 The complexity drops from **$O(N^3)$** to **$O(T^3)$**. For a typical case of $N=20,000$ and $T=8,000$, this provides a theoretical speedup of over **15x**.
 
-### 2. Automated Solver Selection (`AUTO`)
+### 3. Solver Comparison & Selection Strategy
 
-To ensure optimal performance without manual tuning, a heuristic-based "Auto" mode was implemented as the default behavior. The library now automatically inspects the problem dimensions and selects the best strategy:
+To ensure optimal performance across all scales, `rclib` implements an adaptive selection strategy (`AUTO` mode).
 
-| Scenario | Criteria | Selected Solver |
-| :--- | :--- | :--- |
-| **High Dimension (Implicit)** | $N \ge 8,000$ | `CONJUGATE_GRADIENT_IMPLICIT` |
-| **Underdetermined (Dual)** | $N > T$ | `DUAL_CHOLESKY` |
-| **Standard (Primal)** | $N \le T$ | `CHOLESKY` |
+| Solver | Strategy | Matrix Formed | Complexity | Ideal For |
+| :--- | :--- | :--- | :--- | :--- |
+| **`CHOLESKY`** | Primal (Explicit) | $N \times N$ ($X^T X$) | $O(N^3)$ | Small $N$ ($N \le T$) |
+| **`DUAL_CHOLESKY`** | Dual (Explicit) | $T \times T$ ($X X^T$) | $O(T^3)$ | Underdetermined ($N > T$) |
+| **`CONJUGATE_GRADIENT_IMPLICIT`** | Iterative (Matrix-Free) | **None** | $O(kNT)$ | Large $N$ ($N \ge 8,000$) |
 
-### 3. BLAS-Optimized Matrix Formation
+*Where $N$ is neurons, $T$ is samples, and $k$ is the number of CG iterations.*
+
+### 4. BLAS-Optimized Matrix Formation
 
 Both the Primal ($X^T X$) and Dual ($X X^T$) solvers require forming a symmetric positive semi-definite matrix. We refactored these operations to use Eigen's `rankUpdate` (mapping to BLAS `SYRK`).
 
