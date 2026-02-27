@@ -58,6 +58,7 @@ To enable fast incremental builds and automatic rebuilding when C++ source files
 uv sync --no-install-project --only-group build
 
 # 2. Install the project and remaining dependencies
+# (Optional: Pass CMAKE_ARGS to customize the build, e.g., for OpenMP)
 uv sync
 
 # Run the quick start example
@@ -67,7 +68,10 @@ uv run python examples/python/quick_start.py
 uv run python examples/python/quick_online.py
 ```
 
-With this configuration, any changes to the C++ source code in `cpp_core` will automatically trigger a rebuild of the Python extension module upon the next import, ensuring your Python environment always uses the latest C++ logic without manual recompilation.
+> **Tip:** If you need to customize the build (e.g., to disable OpenMP or Eigen parallelization), pass `CMAKE_ARGS` to `uv sync`:
+> `CMAKE_ARGS="-DRCLIB_USE_OPENMP=OFF" uv sync`
+
+With this configuration, any changes to the C++ source code in `cpp_core` will automatically trigger a rebuild of the Python extension module upon the next import.
 
 ### Integrating `rclib_core` into Your C++ Project (CMake)
 
@@ -203,7 +207,10 @@ The documentation is automatically deployed to [https://hrshtst.github.io/rclib/
 
 *   **Configuration:**
     ```bash
+    # C++ Core
     cmake -S . -B build -DRCLIB_USE_OPENMP=ON -DRCLIB_ENABLE_EIGEN_PARALLELIZATION=ON
+    # Python (uv)
+    CMAKE_ARGS="-DRCLIB_USE_OPENMP=ON -DRCLIB_ENABLE_EIGEN_PARALLELIZATION=ON" uv sync
     ```
 
 #### 2. User-Level Parallelism Only (Hybrid)
@@ -211,7 +218,10 @@ The documentation is automatically deployed to [https://hrshtst.github.io/rclib/
 
 *   **Configuration:**
     ```bash
+    # C++ Core
     cmake -S . -B build -DRCLIB_USE_OPENMP=ON -DRCLIB_ENABLE_EIGEN_PARALLELIZATION=OFF
+    # Python (uv)
+    CMAKE_ARGS="-DRCLIB_USE_OPENMP=ON -DRCLIB_ENABLE_EIGEN_PARALLELIZATION=OFF" uv sync
     ```
 
 #### 3. Serial (Single-Threaded)
@@ -219,7 +229,10 @@ The documentation is automatically deployed to [https://hrshtst.github.io/rclib/
 
 *   **Configuration:**
     ```bash
+    # C++ Core
     cmake -S . -B build -DRCLIB_USE_OPENMP=OFF
+    # Python (uv)
+    CMAKE_ARGS="-DRCLIB_USE_OPENMP=OFF" uv sync
     ```
 
 ## Performance Benchmarking
