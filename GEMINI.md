@@ -126,7 +126,9 @@ cmake --build build --config Release -j $(nproc)
 ctest --test-dir build --output-on-failure
 
 # 3. Run all tests including slow tests
+# Slow tests are tagged with [.slow] and can be run by passing the tag to any test executable.
 ./build/tests/cpp/test_readout "[.slow]"
+./build/tests/cpp/test_ridge_dual "[.slow]"
 ```
 
 #### Python Tests
@@ -154,25 +156,26 @@ uv run pytest -m "slow or not slow"
 | :--- | :--- | :--- |
 | `RCLIB_USE_OPENMP` | `ON` | Enables OpenMP support. Required for any multi-threading. |
 | `RCLIB_ENABLE_EIGEN_PARALLELIZATION` | `ON` | Enables Eigen's internal parallelization (using OpenMP). |
+| `RCLIB_ADAPTIVE_PARALLELIZATION` | `ON` | Enables threshold-based (N > 1000) switching between serial and parallel modes. |
 
 ### Recommended Configurations
 
-#### 1. Default (Balanced Performance)
-**Best for:** Most workloads, from small to large reservoirs.
+#### 1. Default (Adaptive Performance)
+**Best for:** Most workloads. Automatically switches to parallel mode for reservoirs larger than 1000 neurons to avoid overhead in small models.
 *   `rclib` automatically parallelizes large reservoir updates (N > 1000).
-*   Eigen parallelizes dense matrix operations (beneficial for Ridge regression training).
+*   Eigen parallelizes dense matrix operations (highly optimized for Ridge training via GEMM).
 
 *   **Configuration:**
     ```bash
-    cmake -S . -B build -DRCLIB_USE_OPENMP=ON -DRCLIB_ENABLE_EIGEN_PARALLELIZATION=ON
+    cmake -S . -B build -DRCLIB_ADAPTIVE_PARALLELIZATION=ON
     ```
 
-#### 2. User-Level Parallelism Only (Hybrid)
-**Best for:** Specific cases with many small reservoirs where Eigen's threading overhead might be excessive.
+#### 2. Forced Parallelism
+**Best for:** Small reservoirs where thread overhead is acceptable or when benchmarked to be faster.
 
 *   **Configuration:**
     ```bash
-    cmake -S . -B build -DRCLIB_USE_OPENMP=ON -DRCLIB_ENABLE_EIGEN_PARALLELIZATION=OFF
+    cmake -S . -B build -DRCLIB_ADAPTIVE_PARALLELIZATION=OFF
     ```
 
 #### 3. Serial (Single-Threaded)
@@ -210,7 +213,7 @@ The `benchmarks/` directory contains scripts to evaluate performance across diff
 
 1.  **Modularity:** The **Reservoir** and **Readout** components are implemented as separate, swappable modules.
 2.  **Performance:** C++ implementations prioritize computational efficiency and memory management. Core training routines (e.g., `RidgeReadout`) leverage OpenMP for parallelized matrix operations and highly optimized linear algebra.
-3.  **Scalability:** Supports large-scale reservoirs, deep ESNs (serial stacking), and parallel ESNs. **Adaptive Solver Selection** automatically chooses the most efficient solver (e.g., Cholesky, Dual Cholesky, or Implicit CG) based on reservoir and dataset size to ensure optimal performance.
+3.  **Scalability:** Supports large-scale reservoirs, deep ESNs (serial stacking), and parallel ESNs. **Adaptive Solver Selection** automatically chooses the most efficient solver (e.g., Cholesky, Dual Cholesky, or Implicit CG) based on reservoir and dataset size. **Adaptive Parallelization** automatically switches between serial and parallel modes (threshold $N=1000$) to minimize threading overhead for small models.
 
 ### C++ API Design
 
