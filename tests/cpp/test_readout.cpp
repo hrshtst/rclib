@@ -65,7 +65,7 @@ TEST_CASE("RidgeReadout Solver Consistency", "[RidgeReadout]") {
   dual.fit(states, targets);
   Eigen::MatrixXd pred_dual = dual.predict(states);
 
-  RidgeReadout implicit(0.1, true, RidgeReadout::CONJUGATE_GRADIENT_IMPLICIT);
+  RidgeReadout implicit(0.1, true, RidgeReadout::CONJUGATE_GRADIENT_IMPLICIT, 1e-12);
   implicit.fit(states, targets);
   Eigen::MatrixXd pred_implicit = implicit.predict(states);
 
