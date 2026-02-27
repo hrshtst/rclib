@@ -13,6 +13,10 @@ add_executable(test_readout test_readout.cpp)
 target_link_libraries(test_readout PRIVATE rclib_core Catch2::Catch2WithMain)
 catch_discover_tests(test_readout)
 
+add_executable(test_ridge_dual test_ridge_dual.cpp)
+target_link_libraries(test_ridge_dual PRIVATE rclib_core Catch2::Catch2WithMain)
+catch_discover_tests(test_ridge_dual)
+
 add_executable(test_rls_readout test_rls_readout.cpp)
 target_link_libraries(test_rls_readout PRIVATE rclib_core Catch2::Catch2WithMain)
 catch_discover_tests(test_rls_readout)
