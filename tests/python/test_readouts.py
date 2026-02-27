@@ -183,6 +183,46 @@ def test_rls_readout_partial_fit() -> None:
     assert predictions2.shape == (1, n_targets)
 
 
+def test_rls_readout_solvers() -> None:
+    """Test RLS Readout with different solver options."""
+    n_features = 10
+    n_targets = 1
+    rng = np.random.default_rng(seed=42)
+    states = rng.random((32, n_features))
+    targets = rng.random((32, n_targets))
+
+    # rank1_update
+    rls1 = _rclib.RlsReadout(lambda_=1.0, delta=1.0, include_bias=True, solver=_rclib.RlsReadout.Solver.RANK1_UPDATE)
+    rls1.partialFit(states, targets)
+    pred1 = rls1.predict(states)
+
+    # rank_k_update
+    rlsk = _rclib.RlsReadout(lambda_=1.0, delta=1.0, include_bias=True, solver=_rclib.RlsReadout.Solver.RANK_K_UPDATE)
+    rlsk.partialFit(states, targets)
+    predk = rlsk.predict(states)
+
+    assert np.allclose(pred1, predk, atol=1e-10)
+
+
+def test_mini_batch_fit() -> None:
+    """Test that partialFit handles mini-batches correctly."""
+    n_features = 10
+    n_targets = 1
+    rng = np.random.default_rng(seed=42)
+    states = rng.random((10, n_features))
+    targets = rng.random((10, n_targets))
+
+    # LMS
+    lms = _rclib.LmsReadout(learning_rate=0.01, include_bias=True)
+    lms.partialFit(states, targets)
+    assert lms.predict(states).shape == (10, n_targets)
+
+    # RLS
+    rls = _rclib.RlsReadout(lambda_=0.99, delta=1.0, include_bias=True)
+    rls.partialFit(states, targets)
+    assert rls.predict(states).shape == (10, n_targets)
+
+
 @pytest.mark.slow
 def test_adaptive_solver_primal() -> None:
     """Test that a problem with N <= T uses the CHOLESKY solver."""
