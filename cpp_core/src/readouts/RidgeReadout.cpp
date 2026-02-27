@@ -72,10 +72,10 @@ void RidgeReadout::fit(const Eigen::MatrixXd &states, const Eigen::MatrixXd &tar
   } else if (effective_solver == DUAL_CHOLESKY) {
     // Dual Ridge Regression (N > T)
     // 1. Form Kernel matrix K = X_aug * X_aug^T + alpha*I (T x T)
-    Eigen::MatrixXd K = Eigen::MatrixXd::Zero(n_samples, n_samples);
-    K.selfadjointView<Eigen::Lower>().rankUpdate(states);
+    // Use GEMM instead of rankUpdate for better parallelization
+    Eigen::MatrixXd K = states * states.transpose();
     if (include_bias) {
-      K.selfadjointView<Eigen::Lower>().rankUpdate(Eigen::VectorXd::Ones(n_samples));
+      K.array() += 1.0;
     }
     K.diagonal().array() += alpha;
 
@@ -94,10 +94,10 @@ void RidgeReadout::fit(const Eigen::MatrixXd &states, const Eigen::MatrixXd &tar
     Eigen::MatrixXd XtX(dim, dim);
     Eigen::MatrixXd XtY(dim, n_outputs);
 
-    // 1. Fill XtX using rankUpdate (BLAS SYRK)
-    // When T > N, states^T * states is more efficient.
-    XtX.setZero();
-    XtX.topLeftCorner(n_features, n_features).selfadjointView<Eigen::Lower>().rankUpdate(states.transpose());
+    // 1. Fill XtX using GEMM
+    // Although rankUpdate is theoretically more efficient (only computes half),
+    // Eigen's GEMM is much better parallelized in the absence of an external BLAS.
+    XtX.topLeftCorner(n_features, n_features).noalias() = states.transpose() * states;
 
     if (include_bias) {
       // Calculate column sums once
@@ -112,9 +112,6 @@ void RidgeReadout::fit(const Eigen::MatrixXd &states, const Eigen::MatrixXd &tar
       // Bottom-Right: n_samples
       XtX(n_features, n_features) = static_cast<double>(n_samples);
     }
-
-    // Symmetry - rankUpdate only fills one triangle
-    XtX.triangularView<Eigen::Upper>() = XtX.transpose();
 
     // 2. Add Regularization
     XtX.diagonal().array() += alpha;

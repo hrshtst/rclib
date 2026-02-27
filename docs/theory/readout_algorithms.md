@@ -14,7 +14,7 @@ When the number of neurons ($N$) is less than or equal to the number of samples 
 
 $$ \mathbf{W}_{out} = (\mathbf{X}^T \mathbf{X} + \alpha \mathbf{I})^{-1} \mathbf{X}^T \mathbf{Y} $$
 
-Where $\mathbf{X}$ is the $T \times N$ state matrix, $\mathbf{Y}$ is the $T \times O$ target matrix, and $\alpha$ is the regularization parameter. `rclib` uses optimized BLAS routines (symmetric rank-1 updates) to form the $N \times N$ covariance matrix $\mathbf{X}^T \mathbf{X}$ efficiently.
+Where $\mathbf{X}$ is the $T \times N$ state matrix, $\mathbf{Y}$ is the $T \times O$ target matrix, and $\alpha$ is the regularization parameter. `rclib` uses optimized matrix-matrix multiplication (GEMM) to form the $N \times N$ covariance matrix $\mathbf{X}^T \mathbf{X}$ efficiently, leveraging multi-core parallelization.
 
 ### Dual Formulation ($N > T$)
 

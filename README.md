@@ -199,7 +199,7 @@ The documentation is automatically deployed to [https://hrshtst.github.io/rclib/
 #### 1. Default (Balanced Performance)
 **Best for:** Most workloads, from small to large reservoirs.
 *   `rclib` automatically parallelizes large reservoir updates (N > 1000).
-*   Eigen parallelizes dense matrix operations (beneficial for Ridge regression training).
+*   Eigen parallelizes dense matrix operations (highly optimized for Ridge regression training via GEMM).
 
 *   **Configuration:**
     ```bash

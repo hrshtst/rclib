@@ -56,29 +56,22 @@ To ensure optimal performance across all scales, `rclib` implements an adaptive 
 
 *Where $N$ is neurons, $T$ is samples, and $k$ is the number of CG iterations.*
 
-### 4. BLAS-Optimized Matrix Formation
+### 4. Optimized Matrix Formation (GEMM)
 
-Both the Primal ($X^T X$) and Dual ($X X^T$) solvers require forming a symmetric positive semi-definite matrix. We refactored these operations to use Eigen's `rankUpdate` (mapping to BLAS `SYRK`).
+Both the Primal ($X^T X$) and Dual ($X X^T$) solvers require forming a symmetric positive semi-definite matrix. While Eigen provides a specialized `rankUpdate` (SYRK) for this, our investigation revealed that its general matrix-matrix multiplication (`GEMM`) is significantly better parallelized in multi-core environments when no external BLAS library is present.
 
-*   **Efficiency:** Only one triangle (lower/upper) is computed, reducing FLOPs by 50%.
-*   **Performance:** Utilizes highly optimized Level-3 BLAS routines, maximizing CPU cache utilization.
+*   **Parallelization Efficiency:** Switching to `.noalias() = A * B` (GEMM) allowed the operation to scale across all CPU cores, delivering a ~2x speedup over `rankUpdate` for large matrices.
+*   **Scale Performance:** This optimization ensures that `rclib` remains significantly faster than competitive libraries like `reservoirpy` even in the medium-to-large reservoir range (800 - 4,000+ neurons).
 
-### 4. Parallelization via OpenMP
+## Performance Benchmark (Mackey-Glass, T=8,000)
 
-The training process was further accelerated using OpenMP:
-*   **Implicit CG:** Multiple output dimensions (targets) are solved in parallel.
-*   **Explicit Solvers:** Parallelization is applied to the formation of the covariance/kernel matrices and the final weight recovery in the dual case.
+Benchmarks comparing the latest `rclib` Ridge implementation against `reservoirpy`.
 
-## Performance Benchmark (Estimated Comparison)
-
-Benchmarks comparing the new `rclib` Ridge implementation against `reservoirpy` (which uses Scipy's optimized solvers).
-
-| Library | Neurons ($N$) | Samples ($T$) | Method | Time (s) |
+| Library | Neurons ($N$) | Method | Fit Time (s) | Pred Time (s) |
 | :--- | :--- | :--- | :--- | :--- |
-| `rclib` (Original) | 20,000 | 8,000 | Cholesky Primal | 448.9 |
-| `reservoirpy` | 20,000 | 8,000 | Scipy (Auto) | 426.1 |
-| **`rclib` (Optimized)** | **20,000** | **8,000** | **Dual Cholesky** | **~28.0 (est.)** |
+| `reservoirpy` | 4,000 | Scipy (Auto) | ~7.6 | ~0.61 |
+| **`rclib`** | **4,000** | **Cholesky (GEMM)** | **~5.6** | **~0.34** |
 
 ## Conclusion
 
-By introducing the Dual formulation and an intelligent adaptive solver, `rclib` now provides state-of-the-art performance for Ridge Regression in Reservoir Computing. It effectively eliminates the "dimensionality curse" for large reservoirs, allowing for extremely fast training even with tens of thousands of neurons.
+By introducing the Dual formulation, an intelligent adaptive solver selection, and optimizing matrix formation for multi-core parallelization, `rclib` now provides state-of-the-art performance for Ridge Regression in Reservoir Computing. It effectively eliminates the "dimensionality curse" and outperforms existing Python-based alternatives.
