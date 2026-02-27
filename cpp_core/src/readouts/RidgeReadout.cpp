@@ -33,7 +33,11 @@ void RidgeReadout::fit(const Eigen::MatrixXd &states, const Eigen::MatrixXd &tar
     Eigen::MatrixXd XtY(dim, n_outputs);
 
 #ifdef RCLIB_USE_OPENMP
-#  pragma omp parallel sections
+#  ifdef RCLIB_ADAPTIVE_PARALLELIZATION
+#    pragma omp parallel sections if (dim > 1000)
+#  else
+#    pragma omp parallel sections
+#  endif
     {
 #  pragma omp section
       {
@@ -63,7 +67,11 @@ void RidgeReadout::fit(const Eigen::MatrixXd &states, const Eigen::MatrixXd &tar
     cg.setTolerance(tolerance);
 
 #ifdef RCLIB_USE_OPENMP
-#  pragma omp parallel for
+#  ifdef RCLIB_ADAPTIVE_PARALLELIZATION
+#    pragma omp parallel for if (dim > 1000)
+#  else
+#    pragma omp parallel for
+#  endif
 #endif
     for (int i = 0; i < n_outputs; ++i) {
       W_out.col(i) = cg.solve(XtY.col(i));
@@ -73,7 +81,20 @@ void RidgeReadout::fit(const Eigen::MatrixXd &states, const Eigen::MatrixXd &tar
     // Dual Ridge Regression (N > T)
     // 1. Form Kernel matrix K = X_aug * X_aug^T + alpha*I (T x T)
     // Use GEMM instead of rankUpdate for better parallelization
+#ifdef RCLIB_USE_OPENMP
+    int old_threads = Eigen::nbThreads();
+#  ifdef RCLIB_ADAPTIVE_PARALLELIZATION
+    if (n_samples <= 1000) {
+      Eigen::setNbThreads(1);
+    }
+#  endif
+#endif
     Eigen::MatrixXd K = states * states.transpose();
+#ifdef RCLIB_USE_OPENMP
+#  ifdef RCLIB_ADAPTIVE_PARALLELIZATION
+    Eigen::setNbThreads(old_threads);
+#  endif
+#endif
     if (include_bias) {
       K.array() += 1.0;
     }
@@ -97,7 +118,20 @@ void RidgeReadout::fit(const Eigen::MatrixXd &states, const Eigen::MatrixXd &tar
     // 1. Fill XtX using GEMM
     // Although rankUpdate is theoretically more efficient (only computes half),
     // Eigen's GEMM is much better parallelized in the absence of an external BLAS.
+#ifdef RCLIB_USE_OPENMP
+    int old_threads = Eigen::nbThreads();
+#  ifdef RCLIB_ADAPTIVE_PARALLELIZATION
+    if (dim <= 1000) {
+      Eigen::setNbThreads(1);
+    }
+#  endif
+#endif
     XtX.topLeftCorner(n_features, n_features).noalias() = states.transpose() * states;
+#ifdef RCLIB_USE_OPENMP
+#  ifdef RCLIB_ADAPTIVE_PARALLELIZATION
+    Eigen::setNbThreads(old_threads);
+#  endif
+#endif
 
     if (include_bias) {
       // Calculate column sums once
@@ -118,7 +152,11 @@ void RidgeReadout::fit(const Eigen::MatrixXd &states, const Eigen::MatrixXd &tar
 
     // 3. Fill XtY block-wise
 #ifdef RCLIB_USE_OPENMP
-#  pragma omp parallel sections
+#  ifdef RCLIB_ADAPTIVE_PARALLELIZATION
+#    pragma omp parallel sections if (dim > 1000)
+#  else
+#    pragma omp parallel sections
+#  endif
     {
 #  pragma omp section
       {

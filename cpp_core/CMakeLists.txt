@@ -1,6 +1,7 @@
 # Options
 option(RCLIB_USE_OPENMP "Enable OpenMP support" ON)
 option(RCLIB_ENABLE_EIGEN_PARALLELIZATION "Enable Eigen's internal parallelization" ON)
+option(RCLIB_ADAPTIVE_PARALLELIZATION "Enable adaptive parallelization based on problem size" ON)
 
 # Find OpenMP
 if(RCLIB_USE_OPENMP)
@@ -28,6 +29,9 @@ if(RCLIB_USE_OPENMP)
   if(OpenMP_FOUND)
     target_link_libraries(rclib_core PUBLIC OpenMP::OpenMP_CXX)
     target_compile_definitions(rclib_core PUBLIC RCLIB_USE_OPENMP)
+    if(RCLIB_ADAPTIVE_PARALLELIZATION)
+      target_compile_definitions(rclib_core PUBLIC RCLIB_ADAPTIVE_PARALLELIZATION)
+    endif()
   else()
     message(WARNING "OpenMP not found. The project will be built without parallelization.")
   endif()

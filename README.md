@@ -197,36 +197,32 @@ The documentation is automatically deployed to [https://hrshtst.github.io/rclib/
 | :--- | :--- | :--- |
 | `RCLIB_USE_OPENMP` | `ON` | Enables OpenMP support. Required for any multi-threading. |
 | `RCLIB_ENABLE_EIGEN_PARALLELIZATION` | `ON` | Enables Eigen's internal parallelization (using OpenMP). |
+| `RCLIB_ADAPTIVE_PARALLELIZATION` | `ON` | Enables threshold-based (N > 1000) switching between serial and parallel modes. |
 
 ### Recommended Configurations
 
-#### 1. Default (Balanced Performance)
-**Best for:** Most workloads, from small to large reservoirs.
-*   `rclib` automatically parallelizes large reservoir updates (N > 1000).
-*   Eigen parallelizes dense matrix operations (highly optimized for Ridge regression training via GEMM).
-
+#### 1. Default (Adaptive Performance)
+**Best for:** Most workloads. Automatically switches to parallel mode for reservoirs larger than 1000 neurons to avoid overhead in small models.
 *   **Configuration:**
     ```bash
     # C++ Core
-    cmake -S . -B build -DRCLIB_USE_OPENMP=ON -DRCLIB_ENABLE_EIGEN_PARALLELIZATION=ON
+    cmake -S . -B build -DRCLIB_ADAPTIVE_PARALLELIZATION=ON
     # Python (uv)
-    CMAKE_ARGS="-DRCLIB_USE_OPENMP=ON -DRCLIB_ENABLE_EIGEN_PARALLELIZATION=ON" uv sync
+    CMAKE_ARGS="-DRCLIB_ADAPTIVE_PARALLELIZATION=ON" uv sync
     ```
 
-#### 2. User-Level Parallelism Only (Hybrid)
-**Best for:** Specific cases with many small reservoirs where Eigen's threading overhead might be excessive.
-
+#### 2. Forced Parallelism
+**Best for:** Small reservoirs where thread overhead is acceptable or when benchmarked to be faster.
 *   **Configuration:**
     ```bash
     # C++ Core
-    cmake -S . -B build -DRCLIB_USE_OPENMP=ON -DRCLIB_ENABLE_EIGEN_PARALLELIZATION=OFF
+    cmake -S . -B build -DRCLIB_ADAPTIVE_PARALLELIZATION=OFF
     # Python (uv)
-    CMAKE_ARGS="-DRCLIB_USE_OPENMP=ON -DRCLIB_ENABLE_EIGEN_PARALLELIZATION=OFF" uv sync
+    CMAKE_ARGS="-DRCLIB_ADAPTIVE_PARALLELIZATION=OFF" uv sync
     ```
 
 #### 3. Serial (Single-Threaded)
 **Best for:** Debugging or systems without OpenMP.
-
 *   **Configuration:**
     ```bash
     # C++ Core
