@@ -61,6 +61,7 @@ To ensure optimal performance across all scales, `rclib` implements an adaptive 
 Both the Primal ($X^T X$) and Dual ($X X^T$) solvers require forming a symmetric positive semi-definite matrix. While Eigen provides a specialized `rankUpdate` (SYRK) for this, our investigation revealed that its general matrix-matrix multiplication (`GEMM`) is significantly better parallelized in multi-core environments when no external BLAS library is present.
 
 *   **Parallelization Efficiency:** Switching to `.noalias() = A * B` (GEMM) allowed the operation to scale across all CPU cores, delivering a ~2x speedup over `rankUpdate` for large matrices.
+*   **Adaptive Thresholding:** To avoid the overhead of thread management for very small reservoirs ($N \le 1000$), `rclib` implements an adaptive strategy that reverts to serial execution for small problems. This behavior can be controlled via the `RCLIB_ADAPTIVE_PARALLELIZATION` CMake option.
 *   **Scale Performance:** This optimization ensures that `rclib` remains significantly faster than competitive libraries like `reservoirpy` even in the medium-to-large reservoir range (800 - 4,000+ neurons).
 
 ## Performance Benchmark (Mackey-Glass, T=8,000)

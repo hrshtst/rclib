@@ -62,9 +62,24 @@ You can optimize performance for your hardware by configuring CMake options duri
 | :--- | :--- | :--- |
 | `RCLIB_USE_OPENMP` | `ON` | Multi-core CPUs |
 | `RCLIB_ENABLE_EIGEN_PARALLELIZATION` | `ON` | Balanced performance (Default) |
+| `RCLIB_ADAPTIVE_PARALLELIZATION` | `ON` | Automatic switching based on problem size (N > 1000) |
 
-To change these, reinstall with:
+### Common Scenarios
+
+**1. Default (Adaptive)**
+Automatically uses serial mode for small reservoirs to avoid overhead and parallel mode for large ones.
 ```bash
-CMAKE_ARGS="-DRCLIB_ENABLE_EIGEN_PARALLELIZATION=OFF" pip install .
+CMAKE_ARGS="-DRCLIB_ADAPTIVE_PARALLELIZATION=ON" uv sync
 ```
-or via direct CMake configuration if building manually.
+
+**2. Forced Parallelism**
+Force parallel execution even for small reservoirs.
+```bash
+CMAKE_ARGS="-DRCLIB_ADAPTIVE_PARALLELIZATION=OFF" uv sync
+```
+
+**3. Completely Serial**
+Disable all multi-threading (best for debugging).
+```bash
+CMAKE_ARGS="-DRCLIB_USE_OPENMP=OFF" uv sync
+```
