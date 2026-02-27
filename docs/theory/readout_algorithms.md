@@ -43,9 +43,14 @@ RLS updates the weights recursively for each new data point. It maintains an inv
 3.  **Covariance Matrix Update:**
     $$ \mathbf{P} \leftarrow \lambda^{-1} (\mathbf{P} - \mathbf{k} \mathbf{x}^T \mathbf{P}) $$
 
-`rclib` implements an optimized version of the covariance update using symmetric rank-1 updates to significantly reduce computational cost:
+`rclib` implements two strategies for the covariance update:
 
-$$ \mathbf{P} \leftarrow \lambda^{-1} \left( \mathbf{P} - \frac{(\mathbf{P}\mathbf{x})(\mathbf{P}\mathbf{x})^T}{\lambda + \mathbf{x}^T \mathbf{P} \mathbf{x}} \right) $$
+1. **Sequential Rank-1 Update:** For single samples or small batches, it uses symmetric rank-1 updates to reduce computational cost:
+   $$ \mathbf{P} \leftarrow \lambda^{-1} \left( \mathbf{P} - \frac{(\mathbf{P}\mathbf{x})(\mathbf{P}\mathbf{x})^T}{\lambda + \mathbf{x}^T \mathbf{P} \mathbf{x}} \right) $$
+
+2. **Woodbury Rank-K Update (Mini-batch):** For larger mini-batches ($\lambda = 1.0$), it leverages the Woodbury Matrix Identity to update the covariance matrix using matrix-matrix products (GEMM):
+   $$ \mathbf{P}_{new} = \mathbf{P} - \mathbf{P} \mathbf{X}^T (\mathbf{I} + \mathbf{X} \mathbf{P} \mathbf{X}^T)^{-1} \mathbf{X} \mathbf{P} $$
+   This turns sequential $O(B \cdot N^2)$ operations into high-density GEMM calls, significantly improving throughput on multi-core systems when the batch size $B$ is sufficiently large.
 
 ## Least Mean Squares (LMS) (Online)
 
