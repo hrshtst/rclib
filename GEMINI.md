@@ -224,7 +224,7 @@ The `benchmarks/` directory contains scripts to evaluate performance across diff
 
 **Readout Interface (`Readout.h`)**
 *   `virtual void fit(const Eigen::MatrixXd& states, const Eigen::MatrixXd& targets) = 0;`
-*   `virtual void partialFit(const Eigen::MatrixXd& state, const Eigen::MatrixXd& target) = 0;`
+*   `virtual void partialFit(const Eigen::MatrixXd& states, const Eigen::MatrixXd& targets) = 0;`
 *   `virtual Eigen::MatrixXd predict(const Eigen::MatrixXd& states) = 0;`
 
 **Model Class (`Model.h`)**

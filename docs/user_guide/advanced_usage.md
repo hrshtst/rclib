@@ -2,15 +2,35 @@
 
 ## Online Learning
 
-For real-time applications where data arrives sequentially, use `partial_fit` with an RLS or LMS readout.
+For real-time applications where data arrives sequentially, use `partial_fit` with an RLS or LMS readout. `rclib` supports **mini-batch** updates for both, providing significant speedups when processing multiple samples at once.
+
+### Mini-batch LMS
+The `Lms` readout automatically uses GEMM-based batch updates when `partial_fit` is called with multiple samples.
+
+### Mini-batch RLS
+The `Rls` readout provides two strategies for handling mini-batches:
+
+| Solver | Strategy | Best For |
+| :--- | :--- | :--- |
+| `rank1_update` (Default) | Sequential Rank-1 updates | Single samples or small batches with $\lambda < 1.0$. |
+| `rank_k_update` | Woodbury Rank-K update (GEMM) | Mini-batches (32+) with $\lambda = 1.0$. |
 
 ```python
-readout = readouts.Rls(lambda_=0.99, delta=1.0, include_bias=True)
+# Create an RLS readout optimized for mini-batches
+readout = readouts.Rls(
+    lambda_=1.0,
+    delta=1.0,
+    include_bias=True,
+    solver="rank_k_update"
+)
 model.set_readout(readout)
 
-# In a loop:
-model.partial_fit(x_step, y_step)
+# In a loop (processing 64 samples at once):
+for i in range(0, len(X), 64):
+    model.partial_fit(X[i:i+64], Y[i:i+64])
 ```
+
+> **Note:** `rank_k_update` is mathematically equivalent to sequential RLS only when the forgetting factor `lambda` is 1.0. For `lambda < 1.0`, `rclib` automatically falls back to sequential `rank1_update` to ensure mathematical correctness.
 
 ## Generative Prediction
 
