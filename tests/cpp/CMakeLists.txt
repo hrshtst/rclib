@@ -21,6 +21,10 @@ add_executable(test_rls_readout test_rls_readout.cpp)
 target_link_libraries(test_rls_readout PRIVATE rclib_core Catch2::Catch2WithMain)
 catch_discover_tests(test_rls_readout)
 
+add_executable(test_rls_minibatch test_rls_minibatch.cpp)
+target_link_libraries(test_rls_minibatch PRIVATE rclib_core Catch2::Catch2WithMain)
+catch_discover_tests(test_rls_minibatch)
+
 add_executable(test_lms_readout test_lms_readout.cpp)
 target_link_libraries(test_lms_readout PRIVATE rclib_core Catch2::Catch2WithMain)
 catch_discover_tests(test_lms_readout)

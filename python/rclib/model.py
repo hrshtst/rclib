@@ -121,7 +121,17 @@ class ESN:
             )
             self._cpp_model.setReadout(cpp_readout)
         elif isinstance(readout, readouts.Rls):
-            cpp_readout = _rclib.RlsReadout(readout.lambda_, readout.delta, readout.include_bias)
+            solver_map = {
+                "rank1_update": _rclib.RlsReadout.Solver.RANK1_UPDATE,
+                "rank_k_update": _rclib.RlsReadout.Solver.RANK_K_UPDATE,
+            }
+            if readout.solver not in solver_map:
+                msg = f"Unsupported RLS solver: {readout.solver}"
+                raise ValueError(msg)
+
+            cpp_readout = _rclib.RlsReadout(
+                readout.lambda_, readout.delta, readout.include_bias, solver_map[readout.solver]
+            )
             self._cpp_model.setReadout(cpp_readout)
         elif isinstance(readout, readouts.Lms):
             cpp_readout = _rclib.LmsReadout(readout.learning_rate, readout.include_bias)

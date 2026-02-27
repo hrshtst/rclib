@@ -16,26 +16,32 @@ void LmsReadout::fit(const Eigen::MatrixXd &states, const Eigen::MatrixXd &targe
 }
 
 void LmsReadout::partialFit(const Eigen::MatrixXd &state, const Eigen::MatrixXd &target) {
-  Eigen::MatrixXd x = state;
-  if (include_bias) {
-    x.conservativeResize(1, x.cols() + 1);
-    x(0, x.cols() - 1) = 1.0;
-  }
+  int n_samples = state.rows();
+  int n_in = state.cols();
+  int n_features = n_in + (include_bias ? 1 : 0);
 
   if (!initialized) {
     // Initialize W_out
-    int n_features = x.cols();
     int n_targets = target.cols();
-
     W_out = Eigen::MatrixXd::Zero(n_features, n_targets);
     initialized = true;
   }
 
-  // LMS update equations
+  Eigen::MatrixXd x;
+  if (include_bias) {
+    x.resize(n_samples, n_features);
+    x.leftCols(n_in) = state;
+    x.rightCols(1).setOnes();
+  } else {
+    x = state; // Shallow copy if possible, but scikit-build/eigen handles this
+  }
+
+  // LMS update equations (GEMM)
   Eigen::MatrixXd y_hat = x * W_out;
   Eigen::MatrixXd error = target - y_hat;
 
-  W_out = W_out + learning_rate * x.transpose() * error;
+  // Batch update: W = W + eta * X^T * E / n_samples
+  W_out.noalias() += (learning_rate / n_samples) * x.transpose() * error;
 }
 
 Eigen::MatrixXd LmsReadout::predict(const Eigen::MatrixXd &states) {

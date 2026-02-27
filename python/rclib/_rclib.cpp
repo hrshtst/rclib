@@ -55,8 +55,16 @@ PYBIND11_MODULE(_rclib, m) {
       .def("getEffectiveSolver", &RidgeReadout::getEffectiveSolver);
 
   // Bind RlsReadout
-  py::class_<RlsReadout, Readout, std::shared_ptr<RlsReadout>>(m, "RlsReadout")
-      .def(py::init<double, double, bool>(), py::arg("lambda_"), py::arg("delta"), py::arg("include_bias"));
+  py::class_<RlsReadout, Readout, std::shared_ptr<RlsReadout>> rls(m, "RlsReadout");
+
+  py::enum_<RlsReadout::Solver>(rls, "Solver")
+      .value("RANK1_UPDATE", RlsReadout::Solver::RANK1_UPDATE)
+      .value("RANK_K_UPDATE", RlsReadout::Solver::RANK_K_UPDATE)
+      .export_values();
+
+  rls.def(py::init<double, double, bool, RlsReadout::Solver>(), py::arg("lambda_"), py::arg("delta"),
+          py::arg("include_bias"), py::arg("solver") = RlsReadout::Solver::RANK1_UPDATE)
+      .def("getSolver", &RlsReadout::getSolver);
 
   // Bind LmsReadout
   py::class_<LmsReadout, Readout, std::shared_ptr<LmsReadout>>(m, "LmsReadout")

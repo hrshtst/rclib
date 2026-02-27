@@ -32,17 +32,28 @@ class Ridge:
 class Rls:
     """Recursive Least Squares (RLS) Readout configuration."""
 
-    def __init__(self, lambda_: float, delta: float, *, include_bias: bool) -> None:
+    def __init__(
+        self,
+        lambda_: float,
+        delta: float,
+        *,
+        include_bias: bool,
+        solver: str = "rank1_update",
+    ) -> None:
         """Initialize the RLS Readout.
 
         Args:
             lambda_: Forgetting factor (0.0 to 1.0).
             delta: Initial value for the covariance matrix diagonal.
             include_bias: Whether to include a bias term.
+            solver: Solver type ("rank1_update" or "rank_k_update").
+                "rank1_update" is traditional sequential RLS.
+                "rank_k_update" is optimized for mini-batches using Woodbury identity.
         """
         self.lambda_ = lambda_
         self.delta = delta
         self.include_bias = include_bias
+        self.solver = solver
 
 
 class Lms:
