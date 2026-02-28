@@ -64,7 +64,8 @@ def benchmark_rclib_auto(
     mse = np.mean((y_pred[:-1] - x_test[1:]) ** 2)
 
     return {
-        "library": f"rclib (auto:{effective_solver.lower()})",
+        "library": "rclib (auto)",
+        "effective_solver": effective_solver.lower(),
         "n_neurons": n_neurons,
         "fit_time": end_fit - start_fit,
         "pred_time": end_pred - start_pred,
@@ -110,6 +111,7 @@ def benchmark_reservoirpy(
 
     return {
         "library": "reservoirpy",
+        "effective_solver": "ridge",
         "n_neurons": n_neurons,
         "fit_time": end_fit - start_fit,
         "pred_time": end_pred - start_pred,
@@ -133,15 +135,16 @@ def run_benchmarks(
     """Run comparison benchmarks for rclib (auto) and reservoirpy."""
     results = []
 
-    print(f"{'Library':<40} | {'Neurons':<8} | {'Fit (s)':<10} | {'Pred (s)':<10} | {'MSE':<10}")
+    print(f"{'Library (Solver)':<40} | {'Neurons':<8} | {'Fit (s)':<10} | {'Pred (s)':<10} | {'MSE':<10}")
     print("-" * 90)
 
     for n in neuron_sizes:
         for i in range(n_iter):
             res_rc = benchmark_rclib_auto(x_train, y_train, x_test, n, sr, sparsity, lr, input_scaling, alpha, washout)
             results.append(res_rc)
+            lib_solver = f"{res_rc['library']} ({res_rc['effective_solver']})"
             print(
-                f"{res_rc['library']:<40} | {res_rc['n_neurons']:<8} | "
+                f"{lib_solver:<40} | {res_rc['n_neurons']:<8} | "
                 f"{res_rc['fit_time']:<10.4f} | {res_rc['pred_time']:<10.4f} | "
                 f"{res_rc['mse']:<10.4e} (iter {i + 1}/{n_iter})"
             )
@@ -151,8 +154,9 @@ def run_benchmarks(
                     x_train, y_train, x_test, n, sr, sparsity, lr, input_scaling, alpha, washout
                 )
                 results.append(res_rpy)
+                lib_solver_rpy = f"{res_rpy['library']} ({res_rpy['effective_solver']})"
                 print(
-                    f"{res_rpy['library']:<40} | {res_rpy['n_neurons']:<8} | "
+                    f"{lib_solver_rpy:<40} | {res_rpy['n_neurons']:<8} | "
                     f"{res_rpy['fit_time']:<10.4f} | {res_rpy['pred_time']:<10.4f} | "
                     f"{res_rpy['mse']:<10.4e} (iter {i + 1}/{n_iter})"
                 )
@@ -245,7 +249,7 @@ def main() -> None:
             x_train=x_train,
             y_train=y_train,
             x_test=x_test,
-            neuron_sizes=[500, 1000, 2000, 4000, 8000, 10000, 15000, 20000],
+            neuron_sizes=[100, 200, 400, 800, 1000, 1500, 2000, 3000, 4000, 8000, 10000, 16000, 24000],
             sr=0.9,
             sparsity=0.05,
             lr=0.1,
