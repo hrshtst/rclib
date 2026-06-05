@@ -38,4 +38,5 @@ Testing the library's resilience to extreme parameters.
 ## 6. Performance Benchmarking Regression
 *   **Target:** Computational efficiency.
 *   **Test Scenario:** Measure execution time for fitting a large-scale reservoir.
-*   **Verification:** Establish a baseline and assert that new commits do not deviate by more than 10% from the baseline time on identical CI hardware.
+*   **Verification:** Establish a baseline and compare new commits against it.
+*   **Status:** Implemented as a **manual, non-gating** workflow (`.github/workflows/benchmark.yml`, `workflow_dispatch`) that runs `benchmark_ridge_all_solvers` and uploads the results as an artifact. It is intentionally *not* a blocking PR check: timing on shared GitHub runners varies too much run-to-run for a hard "<10% deviation" assertion to be anything but flaky. Run it before and after a perf-sensitive change and compare the artifacts; for rigorous numbers, run the local `benchmarks/` scripts on fixed hardware.
