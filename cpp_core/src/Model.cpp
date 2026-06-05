@@ -132,7 +132,7 @@ Eigen::MatrixXd Model::predictGenerative(const Eigen::MatrixXd &prime_inputs, in
     Eigen::MatrixXd states = collectStates(prime_inputs);
     last_state = states.row(states.rows() - 1);
   } else {
-    last_state = collectCurrentStates(0);
+    last_state = collectCurrentStates();
   }
 
   // First prediction is based on the last state of the priming phase
@@ -202,7 +202,7 @@ Eigen::MatrixXd Model::collectStates(const Eigen::MatrixXd &inputs) {
   return all_states;
 }
 
-Eigen::MatrixXd Model::collectCurrentStates(int input_dim) const {
+Eigen::MatrixXd Model::collectCurrentStates() const {
   if (connection_type == "serial") {
     const Eigen::MatrixXd &state = reservoirs.back()->getState();
     if (state.cols() == 0) {
@@ -213,14 +213,10 @@ Eigen::MatrixXd Model::collectCurrentStates(int input_dim) const {
 
   int total_cols = 0;
   for (const auto &res : reservoirs) {
-    int cols = static_cast<int>(res->getState().cols());
-    if (cols == 0) {
-      if (input_dim <= 0) {
-        throw std::runtime_error("Cannot generate without priming an uninitialized reservoir.");
-      }
-      cols = res->getOutputDim(input_dim);
+    if (res->getState().cols() == 0) {
+      throw std::runtime_error("Cannot generate without priming an uninitialized reservoir.");
     }
-    total_cols += cols;
+    total_cols += static_cast<int>(res->getState().cols());
   }
 
   Eigen::MatrixXd all_states(1, total_cols);

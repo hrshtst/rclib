@@ -23,7 +23,7 @@ public:
 
 private:
   Eigen::MatrixXd collectStates(const Eigen::MatrixXd &inputs);
-  Eigen::MatrixXd collectCurrentStates(int input_dim) const;
+  Eigen::MatrixXd collectCurrentStates() const;
 
   std::vector<std::shared_ptr<Reservoir>> reservoirs;
   std::shared_ptr<Readout> readout;

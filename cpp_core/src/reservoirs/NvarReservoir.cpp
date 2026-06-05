@@ -72,12 +72,18 @@ int NvarReservoir::getOutputDim(int input_dim) const {
   if (input_dim <= 0) {
     throw std::invalid_argument("input_dim must be positive.");
   }
-  int n_variables = num_lags * input_dim;
-  int total = 0;
-  for (int degree = 1; degree <= polynomial_order; ++degree) {
-    total += countMonomials(n_variables, degree);
+  const long long n_variables = static_cast<long long>(num_lags) * input_dim;
+  if (n_variables > std::numeric_limits<int>::max()) {
+    throw std::overflow_error("NVAR variable count exceeds int range.");
   }
-  return total;
+  long long total = 0;
+  for (int degree = 1; degree <= polynomial_order; ++degree) {
+    total += countMonomials(static_cast<int>(n_variables), degree);
+    if (total > std::numeric_limits<int>::max()) {
+      throw std::overflow_error("NVAR feature count exceeds int range.");
+    }
+  }
+  return static_cast<int>(total);
 }
 
 void NvarReservoir::appendMonomials(const Eigen::RowVectorXd &delayed, int start_index, int remaining_degree,
