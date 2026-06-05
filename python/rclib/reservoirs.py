@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+# Upper bound on the NVAR polynomial order, mirroring NvarReservoir::max_polynomial_order
+# in the C++ core. Bounds monomial-generation recursion depth.
+MAX_POLYNOMIAL_ORDER = 32
+
 
 class RandomSparse:
     """Random Sparse Reservoir configuration."""
@@ -69,6 +73,9 @@ class Nvar:
             raise ValueError(msg)
         if polynomial_order <= 0:
             msg = "polynomial_order must be positive."
+            raise ValueError(msg)
+        if polynomial_order > MAX_POLYNOMIAL_ORDER:
+            msg = f"polynomial_order exceeds the supported maximum ({MAX_POLYNOMIAL_ORDER})."
             raise ValueError(msg)
 
         self.num_lags = num_lags

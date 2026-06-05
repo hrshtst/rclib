@@ -35,6 +35,13 @@ TEST_CASE("RandomSparseReservoir - Constructor and Initialization", "[RandomSpar
   }
 }
 
+TEST_CASE("RandomSparseReservoir - large n_neurons does not overflow entry count", "[RandomSparseReservoir]") {
+  // n_neurons^2 exceeds INT_MAX here (46341^2 > 2^31); the non-zero entry count
+  // must be computed in 64-bit, otherwise it wraps negative and construction fails.
+  // spectral_radius = 0 skips power iteration so the test stays fast.
+  REQUIRE_NOTHROW(RandomSparseReservoir(46341, 0.0, 0.0001, 0.5, 1.0, false, 42));
+}
+
 TEST_CASE("RandomSparseReservoir - State Advancement", "[RandomSparseReservoir]") {
   int n_neurons = 10;
   double spectral_radius = 0.9;

@@ -162,3 +162,5 @@ def test_reservoir_validation() -> None:
         reservoirs.Nvar(num_lags=0)
     with np.testing.assert_raises(ValueError):
         reservoirs.Nvar(num_lags=1, polynomial_order=0)
+    with np.testing.assert_raises(ValueError):
+        reservoirs.Nvar(num_lags=1, polynomial_order=33)

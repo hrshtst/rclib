@@ -16,10 +16,13 @@ Eigen::SparseMatrix<double> generate_sparse_random_matrix(int size, double spars
   std::uniform_real_distribution<> dis(-1.0, 1.0);
   std::uniform_int_distribution<> pos_dis(0, size - 1);
 
-  int num_non_zero = static_cast<int>(size * size * sparsity);
-  triplets.reserve(num_non_zero);
+  // size * size can exceed INT_MAX for large reservoirs (n_neurons > ~46340),
+  // so compute the entry count in 64-bit to avoid wrapping to a negative value.
+  const long long total_cells = static_cast<long long>(size) * size;
+  const long long num_non_zero = static_cast<long long>(static_cast<double>(total_cells) * sparsity);
+  triplets.reserve(static_cast<size_t>(num_non_zero));
 
-  for (int k = 0; k < num_non_zero; ++k) {
+  for (long long k = 0; k < num_non_zero; ++k) {
     triplets.push_back(Eigen::Triplet<double>(pos_dis(gen), pos_dis(gen), dis(gen)));
   }
 

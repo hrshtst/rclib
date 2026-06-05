@@ -11,6 +11,9 @@ NvarReservoir::NvarReservoir(int num_lags, int polynomial_order)
   if (polynomial_order <= 0) {
     throw std::invalid_argument("polynomial_order must be positive.");
   }
+  if (polynomial_order > max_polynomial_order) {
+    throw std::invalid_argument("polynomial_order exceeds the supported maximum (32).");
+  }
 }
 
 void NvarReservoir::initialize(int input_dim) {

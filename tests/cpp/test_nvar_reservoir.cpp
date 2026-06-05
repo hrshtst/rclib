@@ -60,6 +60,7 @@ TEST_CASE("NvarReservoir - Polynomial Features", "[NvarReservoir]") {
 TEST_CASE("NvarReservoir - Validation", "[NvarReservoir]") {
   REQUIRE_THROWS_AS(NvarReservoir(0), std::invalid_argument);
   REQUIRE_THROWS_AS(NvarReservoir(1, 0), std::invalid_argument);
+  REQUIRE_THROWS_AS(NvarReservoir(1, 33), std::invalid_argument);
 
   NvarReservoir res(1);
   Eigen::MatrixXd batch = Eigen::MatrixXd::Zero(2, 1);

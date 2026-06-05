@@ -20,6 +20,10 @@ private:
                        std::vector<double> &features) const;
   static int countMonomials(int n_variables, int degree);
   static constexpr int max_feature_count = 1000000;
+  // Monomial generation recurses to a depth of polynomial_order; bound it so a
+  // pathological value cannot overflow the stack. NVAR orders are small (~2-3)
+  // in practice, so this ceiling is generous.
+  static constexpr int max_polynomial_order = 32;
 
   int num_lags;
   int polynomial_order;
