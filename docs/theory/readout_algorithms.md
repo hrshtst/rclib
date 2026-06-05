@@ -26,10 +26,15 @@ This approach significantly reduces computational complexity from $O(N^3)$ to $O
 
 ### Adaptive Solver Selection
 
-`rclib` automatically selects the optimal solver based on the problem dimensions:
+`rclib` automatically selects a solver based on the problem dimensions:
 - **Primal Cholesky**: Standard case ($N \le T$).
 - **Dual Cholesky**: High-dimensional case ($N > T$).
-- **Implicit Conjugate Gradient**: Very high-dimensional case ($N \ge 8,000$) where explicit matrix formation is avoided.
+- **Implicit Conjugate Gradient**: Very high-dimensional case
+  (`n_features >= 4,000`) where explicit matrix formation is avoided.
+
+When `include_bias=True`, `rclib` appends a constant feature to the state matrix.
+The current ridge implementation regularizes this appended bias weight in the
+same way as the other weights.
 
 ## Recursive Least Squares (RLS) (Online)
 
@@ -52,6 +57,9 @@ RLS updates the weights recursively for each new data point. It maintains an inv
    $$ \mathbf{P}_{new} = \mathbf{P} - \mathbf{P} \mathbf{X}^T (\mathbf{I} + \mathbf{X} \mathbf{P} \mathbf{X}^T)^{-1} \mathbf{X} \mathbf{P} $$
    This turns sequential $O(B \cdot N^2)$ operations into high-density GEMM calls, significantly improving throughput on multi-core systems when the batch size $B$ is sufficiently large.
 
+For `lambda < 1.0`, `rank_k_update` falls back to sequential rank-1 updates so
+the result remains mathematically equivalent to ordinary RLS.
+
 ## Least Mean Squares (LMS) (Online)
 
 LMS is a stochastic gradient descent method.
@@ -59,3 +67,10 @@ LMS is a stochastic gradient descent method.
 $$ \mathbf{W} \leftarrow \mathbf{W} + \eta \mathbf{e} \mathbf{x}^T $$
 
 Where $\eta$ is the learning rate. It is computationally cheaper ($O(N)$) than RLS ($O(N^2)$) but typically converges slower.
+
+When `partial_fit` receives more than one sample, `rclib` performs an averaged
+batch-gradient LMS update:
+
+$$ \mathbf{W} \leftarrow \mathbf{W} + \frac{\eta}{B}\mathbf{X}^T(\mathbf{Y} - \mathbf{X}\mathbf{W}) $$
+
+where $B$ is the mini-batch size.

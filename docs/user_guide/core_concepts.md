@@ -24,6 +24,9 @@ The readout maps the high-dimensional reservoir state to the target output.
 *   **Recursive Least Squares (`readouts.Rls`)**: For online, adaptive learning.
 *   **Least Mean Squares (`readouts.Lms`)**: A simpler gradient-based online method.
 
+Ridge readouts regularize all fitted weights, including the appended constant
+feature when `include_bias=True`.
+
 ## Building the Model
 
 The `ESN` class acts as a container.

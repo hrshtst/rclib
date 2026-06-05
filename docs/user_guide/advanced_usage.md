@@ -5,7 +5,8 @@
 For real-time applications where data arrives sequentially, use `partial_fit` with an RLS or LMS readout. `rclib` supports **mini-batch** updates for both, providing significant speedups when processing multiple samples at once.
 
 ### Mini-batch LMS
-The `Lms` readout automatically uses GEMM-based batch updates when `partial_fit` is called with multiple samples.
+The `Lms` readout automatically uses GEMM-based averaged batch-gradient updates
+when `partial_fit` is called with multiple samples.
 
 ### Mini-batch RLS
 The `Rls` readout provides two strategies for handling mini-batches:
@@ -62,15 +63,17 @@ readout = readouts.Ridge(
 | :--- | :--- |
 | `cholesky` | Small reservoirs or when $N \le T$. |
 | `dual_cholesky` | Large reservoirs with fewer samples ($N > T$). |
-| `conjugate_gradient_implicit` | Extremely large reservoirs ($N \ge 8,000$). |
+| `conjugate_gradient_implicit` | Extremely large reservoirs (`n_features >= 4,000`). |
 | `auto` (Default) | Automatically chooses the most efficient strategy. |
 
 ## Next-Generation RC (NVAR)
 
-`rclib` supports NVAR, which uses time-delayed features instead of a random network.
+`rclib` supports NVAR, which uses time-delayed polynomial features instead of a
+random network. `polynomial_order=1` is a linear delay embedding; higher orders
+append all monomials with replacement up to that degree.
 
 ```python
-res = reservoirs.Nvar(num_lags=5)
+res = reservoirs.Nvar(num_lags=5, polynomial_order=2)
 # ... use as a normal reservoir
 ```
 
