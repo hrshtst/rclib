@@ -1,9 +1,17 @@
 #include "rclib/readouts/RlsReadout.h"
 
+#include <cmath>
 #include <stdexcept>
 
 RlsReadout::RlsReadout(double lambda, double delta, bool include_bias, Solver solver)
-    : lambda(lambda), delta(delta), include_bias(include_bias), solver(solver), initialized(false) {}
+    : lambda(lambda), delta(delta), include_bias(include_bias), solver(solver), initialized(false) {
+  if (lambda <= 0.0 || lambda > 1.0) {
+    throw std::invalid_argument("lambda must be in (0, 1].");
+  }
+  if (delta <= 0.0) {
+    throw std::invalid_argument("delta must be positive.");
+  }
+}
 
 void RlsReadout::fit(const Eigen::MatrixXd &states, const Eigen::MatrixXd &targets) {
   // RLS is an online algorithm, so fit will call partialFit.
@@ -14,6 +22,16 @@ void RlsReadout::fit(const Eigen::MatrixXd &states, const Eigen::MatrixXd &targe
 }
 
 void RlsReadout::partialFit(const Eigen::MatrixXd &state, const Eigen::MatrixXd &target) {
+  if (state.rows() == 0 || state.cols() == 0) {
+    throw std::invalid_argument("state must be a non-empty 2D matrix.");
+  }
+  if (target.rows() != state.rows()) {
+    throw std::invalid_argument("target must have the same number of rows as state.");
+  }
+  if (target.cols() == 0) {
+    throw std::invalid_argument("target must have at least one column.");
+  }
+
   int n_samples = state.rows();
   int n_in = state.cols();
   int n_features = n_in + (include_bias ? 1 : 0);
@@ -30,6 +48,8 @@ void RlsReadout::partialFit(const Eigen::MatrixXd &state, const Eigen::MatrixXd 
     Px.resize(n_features);
 
     initialized = true;
+  } else if (W_out.rows() != n_features || W_out.cols() != n_targets) {
+    throw std::invalid_argument("state or target dimensions changed after RlsReadout initialization.");
   }
 
   if (solver == RANK_K_UPDATE && n_samples > 1 && lambda >= 1.0) {
@@ -99,6 +119,16 @@ void RlsReadout::partialFit(const Eigen::MatrixXd &state, const Eigen::MatrixXd 
 }
 
 Eigen::MatrixXd RlsReadout::predict(const Eigen::MatrixXd &states) {
+  if (!initialized) {
+    throw std::runtime_error("RlsReadout must be fit before predict.");
+  }
+  if (states.rows() == 0 || states.cols() == 0) {
+    throw std::invalid_argument("states must be a non-empty 2D matrix.");
+  }
+  if (states.cols() != W_out.rows() - (include_bias ? 1 : 0)) {
+    throw std::invalid_argument("states column count does not match initialized RlsReadout.");
+  }
+
   Eigen::MatrixXd X = states;
   if (include_bias) {
     X.conservativeResize(X.rows(), X.cols() + 1);

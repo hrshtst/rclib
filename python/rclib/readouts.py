@@ -23,6 +23,13 @@ class Ridge:
                 "conjugate_gradient", "conjugate_gradient_implicit").
             tolerance: Convergence tolerance for iterative solvers (CG).
         """
+        if alpha < 0:
+            msg = "alpha must be non-negative."
+            raise ValueError(msg)
+        if tolerance <= 0:
+            msg = "tolerance must be positive."
+            raise ValueError(msg)
+
         self.alpha = alpha
         self.include_bias = include_bias
         self.solver = solver
@@ -50,6 +57,13 @@ class Rls:
                 "rank1_update" is traditional sequential RLS.
                 "rank_k_update" is optimized for mini-batches using Woodbury identity.
         """
+        if not 0 < lambda_ <= 1:
+            msg = "lambda_ must be in (0, 1]."
+            raise ValueError(msg)
+        if delta <= 0:
+            msg = "delta must be positive."
+            raise ValueError(msg)
+
         self.lambda_ = lambda_
         self.delta = delta
         self.include_bias = include_bias
@@ -66,5 +80,9 @@ class Lms:
             learning_rate: Learning rate for the LMS algorithm.
             include_bias: Whether to include a bias term.
         """
+        if learning_rate <= 0:
+            msg = "learning_rate must be positive."
+            raise ValueError(msg)
+
         self.learning_rate = learning_rate
         self.include_bias = include_bias

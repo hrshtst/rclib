@@ -22,6 +22,9 @@ public:
   std::shared_ptr<Readout> getReadout() const;
 
 private:
+  Eigen::MatrixXd collectStates(const Eigen::MatrixXd &inputs);
+  Eigen::MatrixXd collectCurrentStates(int input_dim) const;
+
   std::vector<std::shared_ptr<Reservoir>> reservoirs;
   std::shared_ptr<Readout> readout;
   std::string connection_type = "serial";

@@ -12,6 +12,7 @@ public:
   const Eigen::MatrixXd &advance(const Eigen::MatrixXd &input) override;
   void resetState() override;
   const Eigen::MatrixXd &getState() const override;
+  int getOutputDim(int input_dim) const override;
 
 private:
   void initialize_W_in(int input_dim);

@@ -7,9 +7,26 @@
 #include <stdexcept>
 
 RidgeReadout::RidgeReadout(double alpha, bool include_bias, Solver solver, double tolerance)
-    : alpha(alpha), include_bias(include_bias), solver(solver), effective_solver(solver), tolerance(tolerance) {}
+    : alpha(alpha), include_bias(include_bias), solver(solver), effective_solver(solver), tolerance(tolerance) {
+  if (alpha < 0.0) {
+    throw std::invalid_argument("alpha must be non-negative.");
+  }
+  if (tolerance <= 0.0) {
+    throw std::invalid_argument("tolerance must be positive.");
+  }
+}
 
 void RidgeReadout::fit(const Eigen::MatrixXd &states, const Eigen::MatrixXd &targets) {
+  if (states.rows() == 0 || states.cols() == 0) {
+    throw std::invalid_argument("states must be a non-empty 2D matrix.");
+  }
+  if (targets.rows() != states.rows()) {
+    throw std::invalid_argument("targets must have the same number of rows as states.");
+  }
+  if (targets.cols() == 0) {
+    throw std::invalid_argument("targets must have at least one column.");
+  }
+
   Eigen::Index n_samples = states.rows();
   Eigen::Index n_features = states.cols();
   Eigen::Index n_outputs = targets.cols();
@@ -195,7 +212,17 @@ void RidgeReadout::partialFit(const Eigen::MatrixXd & /*state*/, const Eigen::Ma
 }
 
 Eigen::MatrixXd RidgeReadout::predict(const Eigen::MatrixXd &states) {
+  if (W_out.size() == 0) {
+    throw std::runtime_error("RidgeReadout must be fit before predict.");
+  }
+  if (states.rows() == 0 || states.cols() == 0) {
+    throw std::invalid_argument("states must be a non-empty 2D matrix.");
+  }
   Eigen::Index n_features = states.cols();
+  Eigen::Index expected_features = W_out.rows() - (include_bias ? 1 : 0);
+  if (n_features != expected_features) {
+    throw std::invalid_argument("states column count does not match fitted RidgeReadout.");
+  }
 
   if (include_bias) {
     // W_out = [W_weights; W_bias]

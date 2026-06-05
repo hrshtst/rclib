@@ -28,6 +28,10 @@ class ESN:
             The type of connection between reservoirs ("serial" or "parallel").
             Default is "serial".
         """
+        if connection_type not in {"serial", "parallel"}:
+            msg = "connection_type must be 'serial' or 'parallel'."
+            raise ValueError(msg)
+
         self.connection_type = connection_type
         self._reservoirs_params: list[Any] = []  # Store parameters for Python-side reservoir objects
         self._readout_params: Any = None  # Store parameters for Python-side readout object
@@ -61,7 +65,7 @@ class ESN:
             )
             self._cpp_model.addReservoir(cpp_res, self.connection_type)
         elif isinstance(reservoir, reservoirs.Nvar):
-            cpp_res = _rclib.NvarReservoir(reservoir.num_lags)
+            cpp_res = _rclib.NvarReservoir(reservoir.num_lags, reservoir.polynomial_order)
             self._cpp_model.addReservoir(cpp_res, self.connection_type)
         # Add other reservoir types here as they are implemented
         else:

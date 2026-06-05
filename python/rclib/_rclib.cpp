@@ -19,7 +19,8 @@ PYBIND11_MODULE(_rclib, m) {
   py::class_<Reservoir, std::shared_ptr<Reservoir>>(m, "Reservoir")
       .def("advance", &Reservoir::advance)
       .def("resetState", &Reservoir::resetState)
-      .def("getState", &Reservoir::getState);
+      .def("getState", &Reservoir::getState)
+      .def("getOutputDim", &Reservoir::getOutputDim);
 
   // Bind RandomSparseReservoir
   py::class_<RandomSparseReservoir, Reservoir, std::shared_ptr<RandomSparseReservoir>>(m, "RandomSparseReservoir")
@@ -29,7 +30,7 @@ PYBIND11_MODULE(_rclib, m) {
 
   // Bind NvarReservoir
   py::class_<NvarReservoir, Reservoir, std::shared_ptr<NvarReservoir>>(m, "NvarReservoir")
-      .def(py::init<int>(), py::arg("num_lags"));
+      .def(py::init<int, int>(), py::arg("num_lags"), py::arg("polynomial_order") = 1);
 
   // Bind Readout base class
   py::class_<Readout, std::shared_ptr<Readout>>(m, "Readout")

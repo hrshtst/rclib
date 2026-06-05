@@ -3,7 +3,11 @@
 #include <stdexcept>
 
 LmsReadout::LmsReadout(double learning_rate, bool include_bias)
-    : learning_rate(learning_rate), include_bias(include_bias), initialized(false) {}
+    : learning_rate(learning_rate), include_bias(include_bias), initialized(false) {
+  if (learning_rate <= 0.0) {
+    throw std::invalid_argument("learning_rate must be positive.");
+  }
+}
 
 void LmsReadout::fit(const Eigen::MatrixXd &states, const Eigen::MatrixXd &targets) {
   // LMS is an online algorithm, so fit will call partialFit repeatedly.
@@ -16,6 +20,16 @@ void LmsReadout::fit(const Eigen::MatrixXd &states, const Eigen::MatrixXd &targe
 }
 
 void LmsReadout::partialFit(const Eigen::MatrixXd &state, const Eigen::MatrixXd &target) {
+  if (state.rows() == 0 || state.cols() == 0) {
+    throw std::invalid_argument("state must be a non-empty 2D matrix.");
+  }
+  if (target.rows() != state.rows()) {
+    throw std::invalid_argument("target must have the same number of rows as state.");
+  }
+  if (target.cols() == 0) {
+    throw std::invalid_argument("target must have at least one column.");
+  }
+
   int n_samples = state.rows();
   int n_in = state.cols();
   int n_features = n_in + (include_bias ? 1 : 0);
@@ -25,6 +39,8 @@ void LmsReadout::partialFit(const Eigen::MatrixXd &state, const Eigen::MatrixXd 
     int n_targets = target.cols();
     W_out = Eigen::MatrixXd::Zero(n_features, n_targets);
     initialized = true;
+  } else if (W_out.rows() != n_features || W_out.cols() != target.cols()) {
+    throw std::invalid_argument("state or target dimensions changed after LmsReadout initialization.");
   }
 
   Eigen::MatrixXd x;
@@ -45,6 +61,16 @@ void LmsReadout::partialFit(const Eigen::MatrixXd &state, const Eigen::MatrixXd 
 }
 
 Eigen::MatrixXd LmsReadout::predict(const Eigen::MatrixXd &states) {
+  if (!initialized) {
+    throw std::runtime_error("LmsReadout must be fit before predict.");
+  }
+  if (states.rows() == 0 || states.cols() == 0) {
+    throw std::invalid_argument("states must be a non-empty 2D matrix.");
+  }
+  if (states.cols() != W_out.rows() - (include_bias ? 1 : 0)) {
+    throw std::invalid_argument("states column count does not match initialized LmsReadout.");
+  }
+
   Eigen::MatrixXd X = states;
   if (include_bias) {
     X.conservativeResize(X.rows(), X.cols() + 1);

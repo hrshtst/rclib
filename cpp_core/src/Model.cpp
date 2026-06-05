@@ -6,15 +6,38 @@
 #include <stdexcept>
 
 void Model::addReservoir(std::shared_ptr<Reservoir> res, std::string connection_type) {
+  if (!res) {
+    throw std::invalid_argument("Reservoir must not be null.");
+  }
+  if (connection_type != "serial" && connection_type != "parallel") {
+    throw std::invalid_argument("connection_type must be 'serial' or 'parallel'.");
+  }
+  if (!reservoirs.empty() && this->connection_type != connection_type) {
+    throw std::invalid_argument("All reservoirs in a model must use the same connection_type.");
+  }
   reservoirs.push_back(res);
   this->connection_type = connection_type;
 }
 
-void Model::setReadout(std::shared_ptr<Readout> readout) { this->readout = readout; }
+void Model::setReadout(std::shared_ptr<Readout> readout) {
+  if (!readout) {
+    throw std::invalid_argument("Readout must not be null.");
+  }
+  this->readout = readout;
+}
 
 void Model::fit(const Eigen::MatrixXd &inputs, const Eigen::MatrixXd &targets, int washout_len) {
   if (reservoirs.empty() || !readout) {
     throw std::runtime_error("Model is not fully configured. Add at least one reservoir and a readout.");
+  }
+  if (inputs.rows() == 0 || inputs.cols() == 0) {
+    throw std::invalid_argument("inputs must be a non-empty 2D matrix.");
+  }
+  if (targets.rows() != inputs.rows()) {
+    throw std::invalid_argument("targets must have the same number of rows as inputs.");
+  }
+  if (targets.cols() == 0) {
+    throw std::invalid_argument("targets must have at least one column.");
   }
 
   if (washout_len < 0 || washout_len >= inputs.rows()) {
@@ -23,46 +46,7 @@ void Model::fit(const Eigen::MatrixXd &inputs, const Eigen::MatrixXd &targets, i
 
   resetReservoirs();
 
-  // Collect states from all reservoirs for the entire input sequence
-  Eigen::MatrixXd all_states_full;
-
-  if (connection_type == "serial") {
-    Eigen::MatrixXd current_input = inputs;
-    for (const auto &res : reservoirs) {
-      Eigen::MatrixXd res_states(inputs.rows(), res->getState().cols());
-      for (int i = 0; i < inputs.rows(); ++i) {
-        res_states.row(i) = res->advance(current_input.row(i));
-      }
-      current_input = res_states;
-    }
-    all_states_full = current_input;
-  } else if (connection_type == "parallel") {
-    std::vector<Eigen::MatrixXd> reservoir_outputs(reservoirs.size());
-#ifdef RCLIB_USE_OPENMP
-#  pragma omp parallel for
-#endif
-    for (size_t r = 0; r < reservoirs.size(); ++r) {
-      auto &res = reservoirs[r];
-      Eigen::MatrixXd res_states_for_all_inputs(inputs.rows(), res->getState().cols());
-      for (int i = 0; i < inputs.rows(); ++i) {
-        res_states_for_all_inputs.row(i) = res->advance(inputs.row(i));
-      }
-      reservoir_outputs[r] = res_states_for_all_inputs;
-    }
-
-    if (!reservoir_outputs.empty()) {
-      int total_cols = 0;
-      for (const auto &mat : reservoir_outputs) {
-        total_cols += mat.cols();
-      }
-      all_states_full.resize(inputs.rows(), total_cols);
-      int current_col = 0;
-      for (const auto &mat : reservoir_outputs) {
-        all_states_full.middleCols(current_col, mat.cols()) = mat;
-        current_col += mat.cols();
-      }
-    }
-  }
+  Eigen::MatrixXd all_states_full = collectStates(inputs);
 
   // Apply washout period
   Eigen::MatrixXd fit_states = all_states_full.bottomRows(all_states_full.rows() - washout_len);
@@ -75,28 +59,17 @@ void Model::partialFit(const Eigen::MatrixXd &input, const Eigen::MatrixXd &targ
   if (reservoirs.empty() || !readout) {
     throw std::runtime_error("Model is not fully configured. Add at least one reservoir and a readout.");
   }
-
-  // Collect states from all reservoirs
-  Eigen::MatrixXd all_states;
-
-  if (connection_type == "serial") {
-    Eigen::MatrixXd current_input = input;
-    for (const auto &res : reservoirs) {
-      current_input = res->advance(current_input);
-    }
-    all_states = current_input;
-  } else if (connection_type == "parallel") {
-    for (const auto &res : reservoirs) {
-      Eigen::MatrixXd res_state = res->advance(input);
-      if (all_states.size() == 0) {
-        all_states = res_state;
-      } else {
-        all_states.conservativeResize(all_states.rows(), all_states.cols() + res_state.cols());
-        all_states.rightCols(res_state.cols()) = res_state;
-      }
-    }
+  if (input.rows() == 0 || input.cols() == 0) {
+    throw std::invalid_argument("input must be a non-empty 2D matrix.");
+  }
+  if (target.rows() != input.rows()) {
+    throw std::invalid_argument("target must have the same number of rows as input.");
+  }
+  if (target.cols() == 0) {
+    throw std::invalid_argument("target must have at least one column.");
   }
 
+  Eigen::MatrixXd all_states = collectStates(input);
   readout->partialFit(all_states, target);
 }
 
@@ -108,48 +81,11 @@ Eigen::MatrixXd Model::predict(const Eigen::MatrixXd &inputs, bool reset_state_b
   if (reset_state_before_predict) {
     resetReservoirs();
   }
-
-  // Collect states from all reservoirs
-  Eigen::MatrixXd all_states;
-
-  if (connection_type == "serial") {
-    Eigen::MatrixXd current_input = inputs;
-    for (const auto &res : reservoirs) {
-      Eigen::MatrixXd res_states(inputs.rows(), res->getState().cols());
-      for (int i = 0; i < inputs.rows(); ++i) {
-        res_states.row(i) = res->advance(current_input.row(i));
-      }
-      current_input = res_states;
-    }
-    all_states = current_input;
-  } else if (connection_type == "parallel") {
-    std::vector<Eigen::MatrixXd> reservoir_outputs(reservoirs.size());
-#ifdef RCLIB_USE_OPENMP
-#  pragma omp parallel for
-#endif
-    for (size_t r = 0; r < reservoirs.size(); ++r) {
-      auto &res = reservoirs[r];
-      Eigen::MatrixXd res_states_for_all_inputs(inputs.rows(), res->getState().cols());
-      for (int i = 0; i < inputs.rows(); ++i) {
-        res_states_for_all_inputs.row(i) = res->advance(inputs.row(i));
-      }
-      reservoir_outputs[r] = res_states_for_all_inputs;
-    }
-
-    if (!reservoir_outputs.empty()) {
-      int total_cols = 0;
-      for (const auto &mat : reservoir_outputs) {
-        total_cols += mat.cols();
-      }
-      all_states.resize(inputs.rows(), total_cols);
-      int current_col = 0;
-      for (const auto &mat : reservoir_outputs) {
-        all_states.middleCols(current_col, mat.cols()) = mat;
-        current_col += mat.cols();
-      }
-    }
+  if (inputs.rows() == 0 || inputs.cols() == 0) {
+    throw std::invalid_argument("inputs must be a non-empty 2D matrix.");
   }
 
+  Eigen::MatrixXd all_states = collectStates(inputs);
   return readout->predict(all_states);
 }
 
@@ -157,28 +93,11 @@ Eigen::MatrixXd Model::predictOnline(const Eigen::MatrixXd &input) {
   if (reservoirs.empty() || !readout) {
     throw std::runtime_error("Model is not fully configured. Add at least one reservoir and a readout.");
   }
-
-  // Collect states from all reservoirs
-  Eigen::MatrixXd all_states;
-
-  if (connection_type == "serial") {
-    Eigen::MatrixXd current_input = input;
-    for (const auto &res : reservoirs) {
-      current_input = res->advance(current_input);
-    }
-    all_states = current_input;
-  } else if (connection_type == "parallel") {
-    for (const auto &res : reservoirs) {
-      Eigen::MatrixXd res_state = res->advance(input);
-      if (all_states.size() == 0) {
-        all_states = res_state;
-      } else {
-        all_states.conservativeResize(all_states.rows(), all_states.cols() + res_state.cols());
-        all_states.rightCols(res_state.cols()) = res_state;
-      }
-    }
+  if (input.rows() == 0 || input.cols() == 0) {
+    throw std::invalid_argument("input must be a non-empty 2D matrix.");
   }
 
+  Eigen::MatrixXd all_states = collectStates(input);
   return readout->predict(all_states);
 }
 
@@ -200,57 +119,20 @@ Eigen::MatrixXd Model::predictGenerative(const Eigen::MatrixXd &prime_inputs, in
   if (reservoirs.empty() || !readout) {
     throw std::runtime_error("Model is not fully configured. Add at least one reservoir and a readout.");
   }
+  if (n_steps < 0) {
+    throw std::invalid_argument("n_steps must be non-negative.");
+  }
+  if (prime_inputs.rows() > 0 && prime_inputs.cols() == 0) {
+    throw std::invalid_argument("prime_inputs must have at least one column when non-empty.");
+  }
 
   // 1. Priming phase
   Eigen::MatrixXd last_state;
   if (prime_inputs.rows() > 0) {
-    if (connection_type == "serial") {
-      Eigen::MatrixXd current_input = prime_inputs;
-      for (const auto &res : reservoirs) {
-        Eigen::MatrixXd res_states(prime_inputs.rows(), res->getState().cols());
-        for (int i = 0; i < prime_inputs.rows(); ++i) {
-          res_states.row(i) = res->advance(current_input.row(i));
-        }
-        current_input = res_states;
-      }
-      last_state = current_input.row(current_input.rows() - 1);
-    } else { // parallel
-      std::vector<Eigen::MatrixXd> reservoir_outputs;
-      for (const auto &res : reservoirs) {
-        Eigen::MatrixXd res_states_for_all_inputs(prime_inputs.rows(), res->getState().cols());
-        for (int i = 0; i < prime_inputs.rows(); ++i) {
-          res_states_for_all_inputs.row(i) = res->advance(prime_inputs.row(i));
-        }
-        reservoir_outputs.push_back(res_states_for_all_inputs.row(res_states_for_all_inputs.rows() - 1));
-      }
-
-      int total_cols = 0;
-      for (const auto &mat : reservoir_outputs) {
-        total_cols += mat.cols();
-      }
-      last_state.resize(1, total_cols);
-      int current_col = 0;
-      for (const auto &mat : reservoir_outputs) {
-        last_state.middleCols(current_col, mat.cols()) = mat;
-        current_col += mat.cols();
-      }
-    }
+    Eigen::MatrixXd states = collectStates(prime_inputs);
+    last_state = states.row(states.rows() - 1);
   } else {
-    // If no priming, start from the current state of the reservoirs
-    if (connection_type == "serial") {
-      last_state = reservoirs.back()->getState();
-    } else { // parallel
-      int total_cols = 0;
-      for (const auto &res : reservoirs) {
-        total_cols += res->getState().cols();
-      }
-      last_state.resize(1, total_cols);
-      int current_col = 0;
-      for (const auto &res : reservoirs) {
-        last_state.middleCols(current_col, res->getState().cols()) = res->getState();
-        current_col += res->getState().cols();
-      }
-    }
+    last_state = collectCurrentStates(0);
   }
 
   // First prediction is based on the last state of the priming phase
@@ -263,24 +145,7 @@ Eigen::MatrixXd Model::predictGenerative(const Eigen::MatrixXd &prime_inputs, in
   }
 
   for (int i = 1; i < n_steps; ++i) {
-    Eigen::MatrixXd current_state;
-    if (connection_type == "serial") {
-      Eigen::MatrixXd current_step_input = next_input;
-      for (const auto &res : reservoirs) {
-        current_step_input = res->advance(current_step_input);
-      }
-      current_state = current_step_input;
-    } else { // parallel
-      for (const auto &res : reservoirs) {
-        Eigen::MatrixXd res_state = res->advance(next_input);
-        if (current_state.size() == 0) {
-          current_state = res_state;
-        } else {
-          current_state.conservativeResize(current_state.rows(), current_state.cols() + res_state.cols());
-          current_state.rightCols(res_state.cols()) = res_state;
-        }
-      }
-    }
+    Eigen::MatrixXd current_state = collectStates(next_input);
     next_input = readout->predict(current_state);
     generated_outputs.row(i) = next_input;
   }
@@ -295,4 +160,75 @@ void Model::resetReservoirs() {
   for (int i = 0; i < static_cast<int>(reservoirs.size()); ++i) {
     reservoirs[i]->resetState();
   }
+}
+
+Eigen::MatrixXd Model::collectStates(const Eigen::MatrixXd &inputs) {
+  if (connection_type == "serial") {
+    Eigen::MatrixXd current_input = inputs;
+    for (const auto &res : reservoirs) {
+      Eigen::MatrixXd res_states(inputs.rows(), res->getOutputDim(static_cast<int>(current_input.cols())));
+      for (int i = 0; i < current_input.rows(); ++i) {
+        res_states.row(i) = res->advance(current_input.row(i));
+      }
+      current_input = res_states;
+    }
+    return current_input;
+  }
+
+  std::vector<Eigen::MatrixXd> reservoir_outputs(reservoirs.size());
+#ifdef RCLIB_USE_OPENMP
+#  pragma omp parallel for
+#endif
+  for (int r = 0; r < static_cast<int>(reservoirs.size()); ++r) {
+    auto &res = reservoirs[static_cast<size_t>(r)];
+    Eigen::MatrixXd res_states(inputs.rows(), res->getOutputDim(static_cast<int>(inputs.cols())));
+    for (int i = 0; i < inputs.rows(); ++i) {
+      res_states.row(i) = res->advance(inputs.row(i));
+    }
+    reservoir_outputs[static_cast<size_t>(r)] = res_states;
+  }
+
+  int total_cols = 0;
+  for (const auto &mat : reservoir_outputs) {
+    total_cols += static_cast<int>(mat.cols());
+  }
+
+  Eigen::MatrixXd all_states(inputs.rows(), total_cols);
+  int current_col = 0;
+  for (const auto &mat : reservoir_outputs) {
+    all_states.middleCols(current_col, mat.cols()) = mat;
+    current_col += static_cast<int>(mat.cols());
+  }
+  return all_states;
+}
+
+Eigen::MatrixXd Model::collectCurrentStates(int input_dim) const {
+  if (connection_type == "serial") {
+    const Eigen::MatrixXd &state = reservoirs.back()->getState();
+    if (state.cols() == 0) {
+      throw std::runtime_error("Cannot generate without priming an uninitialized reservoir.");
+    }
+    return state;
+  }
+
+  int total_cols = 0;
+  for (const auto &res : reservoirs) {
+    int cols = static_cast<int>(res->getState().cols());
+    if (cols == 0) {
+      if (input_dim <= 0) {
+        throw std::runtime_error("Cannot generate without priming an uninitialized reservoir.");
+      }
+      cols = res->getOutputDim(input_dim);
+    }
+    total_cols += cols;
+  }
+
+  Eigen::MatrixXd all_states(1, total_cols);
+  int current_col = 0;
+  for (const auto &res : reservoirs) {
+    const Eigen::MatrixXd &state = res->getState();
+    all_states.middleCols(current_col, state.cols()) = state;
+    current_col += static_cast<int>(state.cols());
+  }
+  return all_states;
 }

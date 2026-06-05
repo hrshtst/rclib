@@ -3,6 +3,7 @@
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 #include <random>
+#include <stdexcept>
 #include <vector>
 
 #ifdef RCLIB_USE_OPENMP
@@ -47,6 +48,21 @@ RandomSparseReservoir::RandomSparseReservoir(int n_neurons, double spectral_radi
                                              double input_scaling, bool include_bias, unsigned int seed)
     : n_neurons(n_neurons), spectral_radius(spectral_radius), sparsity(sparsity), leak_rate(leak_rate),
       input_scaling(input_scaling), include_bias(include_bias), W_in_initialized(false) {
+  if (n_neurons <= 0) {
+    throw std::invalid_argument("n_neurons must be positive.");
+  }
+  if (spectral_radius < 0.0) {
+    throw std::invalid_argument("spectral_radius must be non-negative.");
+  }
+  if (sparsity < 0.0 || sparsity > 1.0) {
+    throw std::invalid_argument("sparsity must be in [0, 1].");
+  }
+  if (leak_rate <= 0.0 || leak_rate > 1.0) {
+    throw std::invalid_argument("leak_rate must be in (0, 1].");
+  }
+  if (input_scaling < 0.0) {
+    throw std::invalid_argument("input_scaling must be non-negative.");
+  }
 
   state = Eigen::MatrixXd::Zero(1, n_neurons);
 
@@ -74,6 +90,9 @@ RandomSparseReservoir::RandomSparseReservoir(int n_neurons, double spectral_radi
 }
 
 void RandomSparseReservoir::initialize_W_in(int input_dim) {
+  if (input_dim <= 0) {
+    throw std::invalid_argument("input_dim must be positive.");
+  }
   // Use a different seed sequence for W_in based on the original seed
   std::mt19937 gen(seed + 1);
   std::uniform_real_distribution<> dis(-1.0, 1.0);
@@ -82,6 +101,9 @@ void RandomSparseReservoir::initialize_W_in(int input_dim) {
 }
 
 const Eigen::MatrixXd &RandomSparseReservoir::advance(const Eigen::MatrixXd &input) {
+  if (input.rows() != 1) {
+    throw std::invalid_argument("RandomSparseReservoir::advance expects a single input row.");
+  }
   if (!W_in_initialized) {
     initialize_W_in(input.cols());
     temp_state.resize(state.rows(), state.cols());
@@ -125,3 +147,5 @@ const Eigen::MatrixXd &RandomSparseReservoir::advance(const Eigen::MatrixXd &inp
 void RandomSparseReservoir::resetState() { state.setZero(); }
 
 const Eigen::MatrixXd &RandomSparseReservoir::getState() const { return state; }
+
+int RandomSparseReservoir::getOutputDim(int /*input_dim*/) const { return n_neurons; }
