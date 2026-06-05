@@ -11,22 +11,22 @@ license = "Apache-2.0"
 license-files = ["LICEN[CS]E*"]
 authors = [{ name = "Hiroshi Atsuta" }]
 requires-python = ">=3.11"
+# The core library depends on numpy alone. Plotting/data deps used only by the
+# examples and benchmarks live in the optional `examples` extra (see below).
 dependencies = [
-  "matplotlib>=3.10.7",
   "numpy>=2.0.0",
-  "pandas>=2.3.3",
-  "seaborn>=0.13.2",
 ]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",
   "Intended Audience :: Science/Research",
-  "Operating System :: OS Independent",
+  # Wheels are built for Linux only at this stage; macOS/Windows users build
+  # from source. Keep this in sync with [tool.cibuildwheel] and CI.
+  "Operating System :: POSIX :: Linux",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
-  "Programming Language :: Python :: 3.14",
   "Topic :: Scientific/Engineering :: Physics",
   "Typing :: Typed",
 ]
@@ -34,6 +34,15 @@ keywords = ["reservoir-computing", "echo-state-networks", "machine-learning", "t
 
 [project.urls]
 Repository = "https://github.com/hrshtst/rclib"
+
+[project.optional-dependencies]
+# Plotting/dataframe deps required only to run the examples and benchmarks, not
+# by the core library. End users: `pip install rclib[examples]`.
+examples = [
+  "matplotlib>=3.10.7",
+  "pandas>=2.3.3",
+  "seaborn>=0.13.2",
+]
 
 [dependency-groups]
 dev = [
@@ -48,6 +57,13 @@ dev = [
 ]
 benchmark = [
   "reservoirpy>=0.3.11",
+]
+# Mirrors the `examples` optional-dependency so the dev workspace (default-groups
+# = "all") provisions everything needed to run examples and benchmarks.
+examples = [
+  "matplotlib>=3.10.7",
+  "pandas>=2.3.3",
+  "seaborn>=0.13.2",
 ]
 build = [
   "pybind11>=3.0.1",
@@ -98,7 +114,8 @@ before-all = "yum install -y libomp-devel"
 [tool.ruff]
 line-length = 120
 indent-width = 4
-target-version = "py312"
+# Matches requires-python floor (>=3.11) so 3.11-incompatible syntax is caught.
+target-version = "py311"
 
 # Exclude a variety of commonly ignored directories.
 exclude = [
@@ -203,8 +220,8 @@ exclude = [
 ]
 venvPath = "."
 venv = ".venv"
-pythonVersion = "3.12"
-pythonPlatform = "All"
+pythonVersion = "3.11"
+pythonPlatform = "Linux"
 typeCheckingMode = "basic"
 
 # Type checking behavior
@@ -258,21 +275,3 @@ markers = [
   "integration: marks tests as integration tests",
   "serious: marks as serious tests to be investigated on a priority basis",
 ]
-
-[tool.mypy]
-files = ["python", "tests", "examples", "benchmarks"]
-python_executable = ".venv/bin/python"
-check_untyped_defs = true       # Type-checks the interior of functions without type annotations.
-
-[[tool.mypy.overrides]]
-  module = [
-    "joblib.*",
-    "numpy.*",
-    "pandas.*",
-    "reservoirpy.*",
-    "scienceplots.*",
-    "scipy.*",
-    "seaborn.*",
-    "tomli.*",
-  ]
-  ignore_missing_imports = true
