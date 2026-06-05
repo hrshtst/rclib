@@ -40,7 +40,7 @@ def plot_metric(data: pd.DataFrame, title: str, filename_suffix: str, path: Path
     # Plot serial baseline as a horizontal line
     serial_data = data[data["mode"] == "serial"]
     if not serial_data.empty:
-        serial_avg = float(serial_data["time_s"].mean())
+        serial_avg = float(serial_data["time_s"].to_numpy().mean())
         plt.axhline(y=serial_avg, color="r", linestyle="--", label=f"Serial Baseline ({serial_avg:.4f}s)")
 
     plt.title(title, fontsize=16)
