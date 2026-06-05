@@ -1,7 +1,7 @@
 # Reservoir Performance Optimization Report
 
 **Date:** February 3, 2026
-**Author:** Gemini Agent
+**Author:** AI Coding Assistant
 
 ## Executive Summary
 
