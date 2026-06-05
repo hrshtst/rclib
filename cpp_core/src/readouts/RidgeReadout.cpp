@@ -189,7 +189,7 @@ void RidgeReadout::fit(const Eigen::MatrixXd &states, const Eigen::MatrixXd &tar
   }
 }
 
-void RidgeReadout::partialFit(const Eigen::MatrixXd &state, const Eigen::MatrixXd &target) {
+void RidgeReadout::partialFit(const Eigen::MatrixXd & /*state*/, const Eigen::MatrixXd & /*target*/) {
   // RidgeReadout is a batch-trained method, so partialFit is not applicable.
   throw std::logic_error("partialFit is not implemented for RidgeReadout");
 }

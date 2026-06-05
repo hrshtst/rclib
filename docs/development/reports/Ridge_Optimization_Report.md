@@ -1,7 +1,7 @@
 # Ridge Solver Optimization Report
 
 **Date:** February 19, 2026
-**Author:** Gemini Agent
+**Author:** AI Coding Assistant
 
 ## Executive Summary
 

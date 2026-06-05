@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 import nox
 
 # Define the supported Python versions
@@ -44,6 +46,7 @@ def tests(session: nox.Session) -> None:
         "--cov=rclib",
         "--cov-report=term-missing",
         "--cov-report=xml",
+        "--cov-fail-under=80",
         *session.posargs,
     )
 
@@ -60,6 +63,43 @@ def docs(session: nox.Session) -> None:
 @nox.session(reuse_venv=True)
 def tests_cpp(session: nox.Session) -> None:
     """Build and run C++ tests."""
-    session.run("cmake", "-S", ".", "-B", "build_nox", "-DBUILD_TESTING=ON", "-DRCLIB_USE_OPENMP=ON")
+    configure = ["cmake", "-S", ".", "-B", "build_nox", "-DBUILD_TESTING=ON", "-DRCLIB_USE_OPENMP=ON"]
+    # CI sets RCLIB_WERROR=ON to fail the build on warnings in our own sources.
+    if os.environ.get("RCLIB_WERROR"):
+        configure.append("-DRCLIB_WERROR=ON")
+    session.run(*configure)
     session.run("cmake", "--build", "build_nox", "--config", "Release", "-j")
     session.run("ctest", "--test-dir", "build_nox", "--output-on-failure")
+
+
+@nox.session(reuse_venv=True)
+def tests_cpp_sanitizers(session: nox.Session) -> None:
+    """Build and run C++ tests under AddressSanitizer + UndefinedBehaviorSanitizer.
+
+    OpenMP is disabled to avoid sanitizer false positives from the OpenMP runtime,
+    isolating real memory/UB issues in the core numerical code.
+    """
+    san_flags = "-fsanitize=address,undefined -fno-omit-frame-pointer -g"
+    session.run(
+        "cmake",
+        "-S",
+        ".",
+        "-B",
+        "build_asan",
+        "-DBUILD_TESTING=ON",
+        "-DRCLIB_USE_OPENMP=OFF",
+        "-DCMAKE_BUILD_TYPE=RelWithDebInfo",
+        f"-DCMAKE_CXX_FLAGS={san_flags}",
+        f"-DCMAKE_EXE_LINKER_FLAGS={san_flags}",
+    )
+    session.run("cmake", "--build", "build_asan", "-j")
+    session.run(
+        "ctest",
+        "--test-dir",
+        "build_asan",
+        "--output-on-failure",
+        env={
+            "ASAN_OPTIONS": "detect_leaks=1:abort_on_error=1",
+            "UBSAN_OPTIONS": "halt_on_error=1:print_stacktrace=1",
+        },
+    )

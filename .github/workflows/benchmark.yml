@@ -1,0 +1,38 @@
+name: Benchmark
+
+# Manual only. Performance numbers on shared GitHub runners are too noisy to gate
+# PRs on (high variance run-to-run), so this is an on-demand snapshot rather than a
+# blocking regression check. Run it before/after a perf-sensitive change and compare
+# the uploaded artifacts. See docs/development/testing_roadmap.md (item 6).
+on:
+  workflow_dispatch:
+
+jobs:
+  benchmark:
+    name: C++ Ridge solver benchmark
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libomp-dev
+
+      - name: Build benchmarks
+        run: |
+          cmake -S . -B build -DBUILD_BENCHMARKS=ON -DBUILD_TESTING=OFF
+          cmake --build build --target benchmark_ridge_all_solvers -j
+
+      - name: Run benchmark
+        run: |
+          ./build/benchmarks/benchmark_ridge_all_solvers | tee benchmark_results.txt
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-${{ github.sha }}
+          path: benchmark_results.txt

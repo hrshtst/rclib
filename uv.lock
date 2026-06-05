@@ -1414,8 +1414,12 @@ name = "rclib"
 version = "0.0.5"
 source = { editable = "." }
 dependencies = [
-    { name = "matplotlib" },
     { name = "numpy" },
+]
+
+[package.optional-dependencies]
+examples = [
+    { name = "matplotlib" },
     { name = "pandas" },
     { name = "seaborn" },
 ]
@@ -1443,14 +1447,20 @@ docs = [
     { name = "mkdocs-material" },
     { name = "mkdocstrings", extra = ["python"] },
 ]
+examples = [
+    { name = "matplotlib" },
+    { name = "pandas" },
+    { name = "seaborn" },
+]
 
 [package.metadata]
 requires-dist = [
-    { name = "matplotlib", specifier = ">=3.10.7" },
+    { name = "matplotlib", marker = "extra == 'examples'", specifier = ">=3.10.7" },
     { name = "numpy", specifier = ">=2.0.0" },
-    { name = "pandas", specifier = ">=2.3.3" },
-    { name = "seaborn", specifier = ">=0.13.2" },
+    { name = "pandas", marker = "extra == 'examples'", specifier = ">=2.3.3" },
+    { name = "seaborn", marker = "extra == 'examples'", specifier = ">=0.13.2" },
 ]
+provides-extras = ["examples"]
 
 [package.metadata.requires-dev]
 benchmark = [{ name = "reservoirpy", specifier = ">=0.3.11" }]
@@ -1472,6 +1482,11 @@ docs = [
     { name = "mkdocs", specifier = ">=1.6.1" },
     { name = "mkdocs-material", specifier = ">=9.6.7" },
     { name = "mkdocstrings", extras = ["python"], specifier = ">=0.28.2" },
+]
+examples = [
+    { name = "matplotlib", specifier = ">=3.10.7" },
+    { name = "pandas", specifier = ">=2.3.3" },
+    { name = "seaborn", specifier = ">=0.13.2" },
 ]
 
 [[package]]

@@ -12,7 +12,8 @@
 namespace py = pybind11;
 
 PYBIND11_MODULE(_rclib, m) {
-  m.doc() = "pybind11 example plugin"; // Optional module docstring
+  m.doc() = "rclib C++ core: high-performance reservoir computing (reservoirs, "
+            "readouts, and models) backed by Eigen, exposed via pybind11.";
 
   // Bind Reservoir base class
   py::class_<Reservoir, std::shared_ptr<Reservoir>>(m, "Reservoir")

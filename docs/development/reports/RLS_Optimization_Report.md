@@ -1,7 +1,7 @@
 # RLS Optimization Report
 
 **Date:** December 4, 2025
-**Author:** Gemini Agent
+**Author:** AI Coding Assistant
 
 ## Executive Summary
 

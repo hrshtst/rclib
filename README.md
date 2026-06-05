@@ -287,11 +287,11 @@ uv run pre-commit install
 
 ## AI Assistance & Development Workflow
 
-This project is developed with the assistance of an AI coding agent using the [Gemini CLI](https://geminicli.com/) tool. The AI is also used to generate commit messages and parts of the documentation, including API and theoretical reference sections.
+This project is developed with the assistance of an AI coding assistant. The AI is also used to generate commit messages and parts of the documentation, including API and theoretical reference sections.
 
 **Workflow:**
-1.  **Context & Theory (Human):** The maintainer, **[Hiroshi Atsuta](https://github.com/hrshtst)**, establishes the project roadmap in `GEMINI.md` and writes the theoretical background implemented as documentation in [docs/theory/](docs/theory/).
-2.  **Implementation (AI):** The AI assistant uses these documents and the constraints defined in `GEMINI.md` to implement code scaffolding, core logic, tests, and documentation.
+1.  **Context & Theory (Human):** The maintainer, **[Hiroshi Atsuta](https://github.com/hrshtst)**, establishes the project roadmap in `AGENTS.md` and writes the theoretical background implemented as documentation in [docs/theory/](docs/theory/).
+2.  **Implementation (AI):** The AI assistant uses these documents and the constraints defined in `AGENTS.md` to implement code scaffolding, core logic, tests, and documentation.
 3.  **Review & Revision (Human):** The maintainer reviews, tests, and revises the generated code to ensure quality and correctness. This iterative cycle ensures high standards while leveraging AI efficiency.
 
 **Responsibility:**

@@ -35,6 +35,7 @@ jobs:
         uses: astral-sh/setup-uv@v5
         with:
           version: "latest"
+          enable-cache: true
 
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
@@ -45,6 +46,11 @@ jobs:
   tests-cpp:
     name: C++ Tests
     runs-on: ubuntu-latest
+    env:
+      # Fail the build on warnings in our own sources (see RCLIB_WERROR in CMake).
+      RCLIB_WERROR: "ON"
+      # Route compilation through ccache (cache populated by the action below).
+      CMAKE_CXX_COMPILER_LAUNCHER: ccache
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -56,16 +62,43 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libomp-dev
 
+      - name: Set up ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ github.job }}
+
       - name: Install uv
         uses: astral-sh/setup-uv@v5
         with:
           version: "latest"
+          enable-cache: true
 
       - name: Set up Python
         run: uv python install 3.12
 
       - name: Run C++ Tests
         run: uv run nox -s tests_cpp
+
+  tests-cpp-sanitizers:
+    name: C++ Sanitizers (ASan/UBSan)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Run C++ tests under sanitizers
+        run: uv run nox -s tests_cpp_sanitizers
 
   lint-type-check:
     name: Lint & Type Check
@@ -85,6 +118,7 @@ jobs:
         uses: astral-sh/setup-uv@v5
         with:
           version: "latest"
+          enable-cache: true
 
       - name: Set up Python
         run: uv python install 3.12
