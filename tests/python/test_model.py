@@ -165,3 +165,39 @@ def test_model_minibatch_partial_fit() -> None:
     pred = model.predict(x)
 
     assert pred.shape == y.shape
+
+
+def test_serial_model_partial_fit_none_uses_current_final_state() -> None:
+    """Test x=None online update for serial multi-reservoir models."""
+    model = ESN()
+    model.add_reservoir(reservoirs.RandomSparse(n_neurons=10, spectral_radius=0.9, seed=42))
+    model.add_reservoir(reservoirs.RandomSparse(n_neurons=5, spectral_radius=0.9, seed=43))
+    model.set_readout(readouts.Rls(lambda_=0.99, delta=1.0, include_bias=True))
+
+    rng = np.random.default_rng(seed=42)
+    x_train = rng.random((20, 1))
+    y_train = rng.random((20, 1))
+    model.fit(x_train, y_train)
+
+    x = rng.random((1, 1))
+    y = rng.random((1, 1))
+    model.predict_online(x)
+    model.partial_fit(None, y)
+
+
+def test_parallel_model_partial_fit_none_uses_combined_current_state() -> None:
+    """Test x=None online update for parallel multi-reservoir models."""
+    model = ESN(connection_type="parallel")
+    model.add_reservoir(reservoirs.RandomSparse(n_neurons=10, spectral_radius=0.9, seed=42))
+    model.add_reservoir(reservoirs.RandomSparse(n_neurons=5, spectral_radius=0.9, seed=43))
+    model.set_readout(readouts.Rls(lambda_=0.99, delta=1.0, include_bias=True))
+
+    rng = np.random.default_rng(seed=43)
+    x_train = rng.random((20, 1))
+    y_train = rng.random((20, 1))
+    model.fit(x_train, y_train)
+
+    x = rng.random((1, 1))
+    y = rng.random((1, 1))
+    model.predict_online(x)
+    model.partial_fit(None, y)

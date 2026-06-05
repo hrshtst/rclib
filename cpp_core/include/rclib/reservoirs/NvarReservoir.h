@@ -3,6 +3,7 @@
 #include "rclib/Reservoir.h"
 
 #include <Eigen/Dense>
+#include <vector>
 
 class NvarReservoir : public Reservoir {
 public:
@@ -18,6 +19,7 @@ private:
   void appendMonomials(const Eigen::RowVectorXd &delayed, int start_index, int remaining_degree, double current_value,
                        std::vector<double> &features) const;
   static int countMonomials(int n_variables, int degree);
+  static constexpr int max_feature_count = 1000000;
 
   int num_lags;
   int polynomial_order;

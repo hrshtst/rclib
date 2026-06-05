@@ -4,6 +4,21 @@
 #include <Eigen/Dense>
 #include <catch2/catch_all.hpp>
 
+class MinimalReservoir : public Reservoir {
+public:
+  const Eigen::MatrixXd &advance(const Eigen::MatrixXd & /*input*/) override { return state; }
+  void resetState() override { state.setZero(); }
+  const Eigen::MatrixXd &getState() const override { return state; }
+
+private:
+  Eigen::MatrixXd state = Eigen::MatrixXd::Zero(1, 3);
+};
+
+TEST_CASE("Reservoir - default output dimension", "[Reservoir]") {
+  MinimalReservoir res;
+  REQUIRE(res.getOutputDim(1) == 3);
+}
+
 TEST_CASE("RandomSparseReservoir - Constructor and Initialization", "[RandomSparseReservoir]") {
   int n_neurons = 10;
   double spectral_radius = 0.9;

@@ -2,7 +2,6 @@
 
 #include <limits>
 #include <stdexcept>
-#include <vector>
 
 NvarReservoir::NvarReservoir(int num_lags, int polynomial_order)
     : num_lags(num_lags), polynomial_order(polynomial_order), input_dim(0), initialized(false) {
@@ -82,6 +81,9 @@ int NvarReservoir::getOutputDim(int input_dim) const {
     if (total > std::numeric_limits<int>::max()) {
       throw std::overflow_error("NVAR feature count exceeds int range.");
     }
+    if (total > max_feature_count) {
+      throw std::length_error("NVAR feature count exceeds the supported maximum.");
+    }
   }
   return static_cast<int>(total);
 }
@@ -105,6 +107,9 @@ int NvarReservoir::countMonomials(int n_variables, int degree) {
     result = result * (n_variables + i - 1) / i;
     if (result > std::numeric_limits<int>::max()) {
       throw std::overflow_error("NVAR feature count exceeds int range.");
+    }
+    if (result > max_feature_count) {
+      throw std::length_error("NVAR feature count exceeds the supported maximum.");
     }
   }
   return static_cast<int>(result);

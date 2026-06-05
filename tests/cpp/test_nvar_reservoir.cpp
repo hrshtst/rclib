@@ -64,6 +64,9 @@ TEST_CASE("NvarReservoir - Validation", "[NvarReservoir]") {
   NvarReservoir res(1);
   Eigen::MatrixXd batch = Eigen::MatrixXd::Zero(2, 1);
   REQUIRE_THROWS_AS(res.advance(batch), std::invalid_argument);
+
+  NvarReservoir large_res(10, 8);
+  REQUIRE_THROWS_AS(large_res.getOutputDim(10), std::length_error);
 }
 
 TEST_CASE("NvarReservoir - State Reset", "[NvarReservoir]") {

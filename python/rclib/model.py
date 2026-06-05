@@ -264,14 +264,12 @@ class ESN:
         self._update_readout()
 
         if x is None:
-            # If x is None, we use the current state of reservoirs
-            # But the C++ partialFit expects an input to advance.
-            # So if x is None, we call readout.partialFit directly with current state.
             cpp_readout = self._cpp_model.getReadout()
-            # For multiple reservoirs, we'd need to combine states, which Model::partialFit handles.
-            # If we want to support x=None for multiple reservoirs, we should add it to Model.cpp.
-            # For now, let's keep it simple as it was.
-            cpp_res = self._cpp_model.getReservoir(0)
-            cpp_readout.partialFit(cpp_res.getState(), y)
+            states = [self._cpp_model.getReservoir(i).getState() for i in range(len(self._reservoirs_params))]
+            if any(state.shape[1] == 0 for state in states):
+                msg = "Reservoir state is uninitialized; call predict_online or partial_fit with input first."
+                raise RuntimeError(msg)
+            current_state = states[-1] if self.connection_type == "serial" else np.hstack(states)
+            cpp_readout.partialFit(current_state, y)
         else:
             self._cpp_model.partialFit(x, y)
