@@ -122,6 +122,21 @@ def test_nvar_reservoir_advance() -> None:
     assert np.allclose(state[:, 2 * input_dim : 3 * input_dim], input1)
 
 
+def test_nvar_reservoir_polynomial_features() -> None:
+    """Test NVAR polynomial feature ordering."""
+    expected_output_dim = 14
+    res = _rclib.NvarReservoir(num_lags=2, polynomial_order=2)
+
+    res.advance(np.array([[1.0, 2.0]]))
+    expected1 = np.array([[1.0, 2.0, 0.0, 0.0, 1.0, 2.0, 0.0, 0.0, 4.0, 0.0, 0.0, 0.0, 0.0, 0.0]])
+    assert np.allclose(res.getState(), expected1)
+
+    res.advance(np.array([[3.0, 4.0]]))
+    expected2 = np.array([[3.0, 4.0, 1.0, 2.0, 9.0, 12.0, 3.0, 6.0, 16.0, 4.0, 8.0, 1.0, 2.0, 4.0]])
+    assert np.allclose(res.getState(), expected2)
+    assert res.getOutputDim(2) == expected_output_dim
+
+
 def test_nvar_reservoir_reset() -> None:
     """Test NvarReservoir reset."""
     num_lags = 3
@@ -135,3 +150,15 @@ def test_nvar_reservoir_reset() -> None:
 
     res.resetState()
     assert np.all(res.getState() == 0)
+
+
+def test_reservoir_validation() -> None:
+    """Test public reservoir config validation."""
+    from rclib import reservoirs
+
+    with np.testing.assert_raises(ValueError):
+        reservoirs.RandomSparse(n_neurons=0, spectral_radius=0.9)
+    with np.testing.assert_raises(ValueError):
+        reservoirs.Nvar(num_lags=0)
+    with np.testing.assert_raises(ValueError):
+        reservoirs.Nvar(num_lags=1, polynomial_order=0)

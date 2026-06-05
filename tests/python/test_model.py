@@ -73,6 +73,11 @@ def test_model_reset_reservoirs() -> None:
     readout = readouts.Ridge(alpha=1e-6, include_bias=False)
     model.set_readout(readout)
 
+    rng = np.random.default_rng(seed=42)
+    x_train = rng.random((20, 1))
+    y_train = rng.random((20, 1))
+    model.fit(x_train, y_train)
+
     # Advance states to ensure they are not zero
     input_data = np.ones((10, 1))
     model.predict(input_data, reset_state_before_predict=False)
@@ -127,3 +132,36 @@ def test_parallel_model_partial_fit() -> None:
 
     # Should not raise any error
     model.partial_fit(x, y)
+
+
+def test_nvar_model_fit_predict() -> None:
+    """Test batch fit/predict with lazily-sized NVAR states."""
+    mse_threshold = 1e-6
+    model = ESN()
+    model.add_reservoir(reservoirs.Nvar(num_lags=2, polynomial_order=2))
+    model.set_readout(readouts.Ridge(alpha=1e-6, include_bias=True))
+
+    x = np.linspace(0, 1, 50).reshape(-1, 1)
+    y = 0.5 * x + 0.25
+
+    model.fit(x, y, washout_len=2)
+    y_pred = model.predict(x)
+
+    assert y_pred.shape == y.shape
+    assert np.mean((y_pred[2:] - y[2:]) ** 2) < mse_threshold
+
+
+def test_model_minibatch_partial_fit() -> None:
+    """Test model-level mini-batch partial_fit advances one row at a time."""
+    model = ESN()
+    model.add_reservoir(reservoirs.RandomSparse(n_neurons=20, spectral_radius=0.9, seed=42))
+    model.set_readout(readouts.Rls(lambda_=1.0, delta=1.0, include_bias=True, solver="rank_k_update"))
+
+    rng = np.random.default_rng(seed=42)
+    x = rng.random((8, 1))
+    y = rng.random((8, 1))
+
+    model.partial_fit(x, y)
+    pred = model.predict(x)
+
+    assert pred.shape == y.shape

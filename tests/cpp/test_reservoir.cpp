@@ -11,7 +11,7 @@ TEST_CASE("RandomSparseReservoir - Constructor and Initialization", "[RandomSpar
   double leak_rate = 0.1;
   bool include_bias = true;
 
-  RandomSparseReservoir res(n_neurons, spectral_radius, sparsity, leak_rate, include_bias);
+  RandomSparseReservoir res(n_neurons, spectral_radius, sparsity, leak_rate, 1.0, include_bias);
 
   SECTION("State is initialized to zeros") {
     REQUIRE(res.getState().rows() == 1);
@@ -27,7 +27,7 @@ TEST_CASE("RandomSparseReservoir - State Advancement", "[RandomSparseReservoir]"
   double leak_rate = 0.1;
   bool include_bias = true;
 
-  RandomSparseReservoir res(n_neurons, spectral_radius, sparsity, leak_rate, include_bias);
+  RandomSparseReservoir res(n_neurons, spectral_radius, sparsity, leak_rate, 1.0, include_bias);
 
   Eigen::MatrixXd input = Eigen::MatrixXd::Random(1, 5); // Assuming input_dim = 5 for now
 
@@ -49,7 +49,7 @@ TEST_CASE("RandomSparseReservoir - State Reset", "[RandomSparseReservoir]") {
   double leak_rate = 0.1;
   bool include_bias = true;
 
-  RandomSparseReservoir res(n_neurons, spectral_radius, sparsity, leak_rate, include_bias);
+  RandomSparseReservoir res(n_neurons, spectral_radius, sparsity, leak_rate, 1.0, include_bias);
 
   Eigen::MatrixXd input = Eigen::MatrixXd::Random(1, 5); // Assuming input_dim = 5 for now
 
