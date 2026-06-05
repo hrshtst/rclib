@@ -4,7 +4,7 @@ NvarReservoir::NvarReservoir(int num_lags) : num_lags(num_lags), initialized(fal
 
 void NvarReservoir::initialize(int input_dim) {
   this->input_dim = input_dim;
-  state = Eigen::MatrixXd::Zero(1, num_lags * input_dim);
+  state = Eigen::MatrixXd::Zero(1, static_cast<Eigen::Index>(num_lags) * input_dim);
   past_inputs = Eigen::MatrixXd::Zero(num_lags, input_dim);
   initialized = true;
 }
@@ -23,7 +23,7 @@ const Eigen::MatrixXd &NvarReservoir::advance(const Eigen::MatrixXd &input) {
 
   // Update state
   for (int i = 0; i < num_lags; ++i) {
-    state.block(0, i * input_dim, 1, input_dim) = past_inputs.row(i);
+    state.block(0, static_cast<Eigen::Index>(i) * input_dim, 1, input_dim) = past_inputs.row(i);
   }
 
   return state;
