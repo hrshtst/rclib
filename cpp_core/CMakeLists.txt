@@ -40,3 +40,16 @@ endif()
 if(NOT RCLIB_ENABLE_EIGEN_PARALLELIZATION)
   target_compile_definitions(rclib_core PUBLIC EIGEN_DONT_PARALLELIZE)
 endif()
+
+# Warnings on our own sources only (PRIVATE: not propagated to consumers or to third-party headers). RCLIB_WERROR
+# promotes them to errors and is enabled in CI so the build stays clean.
+option(RCLIB_WERROR "Treat compiler warnings as errors (used in CI)" OFF)
+target_compile_options(rclib_core PRIVATE -Wall -Wextra -Wpedantic)
+if(RCLIB_WERROR)
+  target_compile_options(rclib_core PRIVATE -Werror)
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    # Eigen's headers trip a known GCC -Wmaybe-uninitialized false positive at -O3; keep that one non-fatal so -Werror
+    # still guards our own code.
+    target_compile_options(rclib_core PRIVATE -Wno-error=maybe-uninitialized)
+  endif()
+endif()
