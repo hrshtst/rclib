@@ -159,6 +159,14 @@ def test_reservoir_validation() -> None:
     with np.testing.assert_raises(ValueError):
         reservoirs.RandomSparse(n_neurons=0, spectral_radius=0.9)
     with np.testing.assert_raises(ValueError):
+        reservoirs.RandomSparse(n_neurons=10, spectral_radius=-0.1)
+    with np.testing.assert_raises(ValueError):
+        reservoirs.RandomSparse(n_neurons=10, spectral_radius=0.9, sparsity=1.5)
+    with np.testing.assert_raises(ValueError):
+        reservoirs.RandomSparse(n_neurons=10, spectral_radius=0.9, leak_rate=0.0)
+    with np.testing.assert_raises(ValueError):
+        reservoirs.RandomSparse(n_neurons=10, spectral_radius=0.9, input_scaling=-1.0)
+    with np.testing.assert_raises(ValueError):
         reservoirs.Nvar(num_lags=0)
     with np.testing.assert_raises(ValueError):
         reservoirs.Nvar(num_lags=1, polynomial_order=0)

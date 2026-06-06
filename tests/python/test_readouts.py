@@ -290,3 +290,17 @@ def test_explicit_solver() -> None:
     cpp_readout = model._cpp_model.getReadout()  # noqa: SLF001
     assert cpp_readout.getSolver() == _rclib.RidgeReadout.Solver.CHOLESKY
     assert cpp_readout.getEffectiveSolver() == _rclib.RidgeReadout.Solver.CHOLESKY
+
+
+def test_readout_validation() -> None:
+    """Test public readout config validation rejects invalid parameters."""
+    with pytest.raises(ValueError, match="alpha"):
+        readouts.Ridge(alpha=-1.0, include_bias=True)
+    with pytest.raises(ValueError, match="tolerance"):
+        readouts.Ridge(alpha=1.0, include_bias=True, tolerance=0.0)
+    with pytest.raises(ValueError, match="lambda"):
+        readouts.Rls(lambda_=1.5, delta=1.0, include_bias=True)
+    with pytest.raises(ValueError, match="delta"):
+        readouts.Rls(lambda_=0.99, delta=0.0, include_bias=True)
+    with pytest.raises(ValueError, match="learning_rate"):
+        readouts.Lms(learning_rate=0.0, include_bias=True)
