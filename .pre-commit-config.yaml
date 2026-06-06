@@ -15,6 +15,9 @@
 ci:
   autoupdate_commit_msg: "chore: update pre-commit hooks"
   autofix_commit_msg: "style: pre-commit fixes"
+  # pytest-coverage is pre-push only and needs uv + the built extension, which
+  # pre-commit.ci doesn't have. Skip it there (the real gate runs in GitHub CI).
+  skip: [pytest-coverage]
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -83,3 +86,13 @@ repos:
         language: system
         types: [python]
         pass_filenames: false # Pyright needs full project context, not just changed files
+
+      # Runs the test suite with the same coverage gate as CI, on `git push` only.
+      # Activate once per clone with: pre-commit install --hook-type pre-push
+      - id: pytest-coverage
+        name: pytest coverage gate (pre-push)
+        entry: uv run pytest -n auto --cov=rclib --cov-report=term-missing --cov-fail-under=80
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
