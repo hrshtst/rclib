@@ -82,7 +82,12 @@ repos:
     hooks:
       - id: basedpyright
         name: basedpyright
-        entry: uv run basedpyright
+        # basedpyright resolves imports against ./.venv (see [tool.basedpyright]
+        # venvPath/venv) and type-checks examples/ and benchmarks/, which import
+        # the examples/benchmark dependency groups. Pull in all groups so the
+        # light default sync (default-groups = ["dev"]) does not leave those
+        # imports unresolved.
+        entry: uv run --all-groups basedpyright
         language: system
         types: [python]
         pass_filenames: false # Pyright needs full project context, not just changed files

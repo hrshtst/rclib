@@ -14,6 +14,20 @@ nox.options.default_venv_backend = "uv|virtualenv"
 nox.options.reuse_existing_virtualenvs = True
 
 
+@nox.session(venv_backend="none")
+def dev(session: nox.Session) -> None:
+    """Provision the local dev environment with fast incremental C++ rebuilds.
+
+    Runs the two-step ``uv sync`` required by the no-build-isolation +
+    rebuild-on-import setup (https://github.com/astral-sh/uv/issues/13998), so a
+    single ``uv run nox -s dev`` prepares the project ``.venv``. This operates on
+    the project environment directly (no nox-managed venv). Extra arguments are
+    forwarded to the second sync, e.g. ``uv run nox -s dev -- --group examples``.
+    """
+    session.run("uv", "sync", "--no-install-project", "--only-group", "build", external=True)
+    session.run("uv", "sync", *session.posargs, external=True)
+
+
 @nox.session(python="3.12", reuse_venv=True)
 def lint(session: nox.Session) -> None:
     """Run linting checks."""
@@ -24,13 +38,18 @@ def lint(session: nox.Session) -> None:
     session.run("cmake-format", "--check", "CMakeLists.txt", "cpp_core/CMakeLists.txt", "python/CMakeLists.txt")
 
 
-@nox.session(python="3.12", reuse_venv=True)
+@nox.session(venv_backend="none")
 def type_check(session: nox.Session) -> None:
-    """Run type checking."""
-    session.install("scikit-build-core", "pybind11")
-    session.install("--no-build-isolation", ".")
-    session.install("basedpyright", "matplotlib", "numpy", "pandas", "seaborn")
-    session.run("basedpyright")
+    """Run type checking against the project environment.
+
+    basedpyright resolves imports against the project's ./.venv (see
+    [tool.basedpyright] venvPath/venv) and also checks examples/ and benchmarks/,
+    which import the example/benchmark dependency groups. Run via `uv run
+    --all-groups` so ./.venv is synced with every group (the default sync is light
+    and omits those stacks). This deliberately uses no nox-managed venv: otherwise
+    the sync would target the session venv, not the ./.venv basedpyright reads.
+    """
+    session.run("uv", "run", "--all-groups", "basedpyright", external=True)
 
 
 @nox.session(python=PYTHON_VERSIONS, reuse_venv=True)
