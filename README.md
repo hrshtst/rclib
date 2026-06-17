@@ -203,14 +203,13 @@ uv run nox -s docs
 If you prefer to run `mkdocs` directly:
 
 ```bash
-# 1. Install documentation dependencies
-uv sync --group docs
+# Build the documentation (the `docs` group provides mkdocs; it is not part of
+# the light default sync, so pass --group docs on each command — a plain
+# `uv run` would re-sync ./.venv to the default groups and prune mkdocs).
+uv run --group docs mkdocs build
 
-# 2. Build the documentation
-uv run mkdocs build
-
-# 3. Serve the documentation locally with live-reloading
-uv run mkdocs serve
+# Serve the documentation locally with live-reloading
+uv run --group docs mkdocs serve
 ```
 
 The documentation is automatically deployed to [https://hrshtst.github.io/rclib/](https://hrshtst.github.io/rclib/) on every push to the `main` branch.

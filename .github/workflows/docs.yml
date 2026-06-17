@@ -40,8 +40,10 @@ jobs:
         run: uv run nox -s docs
 
       - name: Deploy documentation
-        run: |
-          uv run nox -s docs
-          uv run mkdocs gh-deploy --force --clean --verbose
+        # `mkdocs` lives in the `docs` dependency group, which the light default
+        # sync (default-groups = ["dev"]) does not install, so run with that group
+        # to make it resolvable in ./.venv (the `dev` group it pulls in alongside
+        # also builds the rclib extension that mkdocstrings imports for the API docs).
+        run: uv run --group docs mkdocs gh-deploy --force --clean --verbose
         env:
           GH_TOKEN: ${{ github.token }}
