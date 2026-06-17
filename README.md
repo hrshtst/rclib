@@ -51,15 +51,16 @@
 
 This project provides Python bindings for the core C++ code, leveraging `uv`, `scikit-build-core`, and `pybind11`.
 
-To enable fast incremental builds and automatic rebuilding when C++ source files change (see [astral-sh/uv#13998](https://github.com/astral-sh/uv/issues/13998)), use the following two-step installation process:
+The development install combines scikit-build-core's *rebuild-on-import* with uv's no-build-isolation, so editing any C++ source in `cpp_core` (or the bindings in `python/rclib/_rclib.cpp`) and re-running `uv run python ...` automatically recompiles the extension on the next import — there is no separate build step to remember.
+
+Because the build backend must be installed *before* the project itself is built, this currently requires a two-step `uv sync` (see [astral-sh/uv#13998](https://github.com/astral-sh/uv/issues/13998)). A helper wraps both steps into a single command:
 
 ```bash
-# 1. Install build dependencies without installing the project
-uv sync --no-install-project --only-group build
+# Option A: shell script
+./scripts/setup-dev.sh
 
-# 2. Install the project and remaining dependencies
-# (Optional: Pass CMAKE_ARGS to customize the build, e.g., for OpenMP)
-uv sync
+# Option B: equivalent nox session
+uv run nox -s dev
 
 # Run the quick start example
 uv run python examples/python/quick_start.py
@@ -68,8 +69,36 @@ uv run python examples/python/quick_start.py
 uv run python examples/python/quick_online.py
 ```
 
-> **Tip:** If you need to customize the build (e.g., to disable OpenMP or Eigen parallelization), pass `CMAKE_ARGS` to `uv sync`:
-> `CMAKE_ARGS="-DRCLIB_USE_OPENMP=OFF" uv sync`
+> **Tip (custom build flags):** To customize the build (e.g., to disable OpenMP or Eigen parallelization), pass `CMAKE_ARGS` as an environment variable; the setup helper forwards it to the build:
+> `CMAKE_ARGS="-DRCLIB_USE_OPENMP=OFF" ./scripts/setup-dev.sh`
+
+> **Note (light default):** A default sync installs only the build, test, and lint tooling (the `dev` group). The plotting examples, benchmarks, and docs live in opt-in groups (`examples`, `benchmark`, `docs`). Add them on demand by forwarding `--group` flags to the helper — repeat the flag to select **multiple** groups, or use `--all-groups` to enable every group at once:
+>
+> ```bash
+> # A single extra group
+> ./scripts/setup-dev.sh --group examples
+>
+> # Multiple groups: repeat --group once per group
+> ./scripts/setup-dev.sh --group examples --group docs
+>
+> # Everything (the former default-groups = "all" behavior)
+> ./scripts/setup-dev.sh --all-groups
+>
+> # The same flags work through the nox session, after the `--` separator
+> uv run nox -s dev -- --group examples --group docs
+> ```
+>
+> The selection is not sticky: a later plain `uv sync` reverts to the default `dev` group and prunes the extras, so re-pass the `--group` flags (or run the helper again) when you need them. Type-checking (the `basedpyright` pre-commit hook and `nox -s type_check`) transiently pulls in all groups on its own, because it also resolves the imports in the example and benchmark scripts.
+
+If you prefer to run the two steps explicitly instead of using the helper:
+
+```bash
+# 1. Install the build backend without installing the project
+uv sync --no-install-project --only-group build
+
+# 2. Build the project and install the development environment
+uv sync
+```
 
 With this configuration, any changes to the C++ source code in `cpp_core` will automatically trigger a rebuild of the Python extension module upon the next import.
 
@@ -146,15 +175,14 @@ ctest --test-dir build --output-on-failure
 ```
 
 #### Python Tests
-```bash
-# 1. Build and install the C++ extension in the current environment
-cmake -S . -B build
-cmake --build build --config Release -j $(nproc) --target _rclib
 
-# 2. Run pytest (excluding slow tests)
+The editable install rebuilds the C++ extension automatically on import (see [Using the Python Interface](#using-the-python-interface)), so there is no separate build step — `uv run pytest` compiles any pending C++ changes on the first import.
+
+```bash
+# Run pytest (excluding slow tests)
 uv run pytest
 
-# 3. Run all tests including slow tests
+# Run all tests including slow tests
 uv run pytest -m "slow or not slow"
 
 # Note: Because slow tests are deselected by default in pyproject.toml,

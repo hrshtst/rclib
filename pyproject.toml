@@ -45,29 +45,51 @@ examples = [
 ]
 
 [dependency-groups]
-dev = [
-  "basedpyright>=1.36.2",
-  "nox>=2025.11.12",
-  "pre-commit>=4.5.0",
+# Build toolchain for the editable, no-build-isolation dev install. This group
+# must stay reachable from `default-groups`, otherwise a plain `uv sync` would
+# prune these packages and break scikit-build-core's rebuild-on-import hook.
+# It mirrors [build-system].requires and additionally pins cmake/ninja: with
+# build isolation disabled, uv does not install scikit-build-core's dynamic
+# build requirements, so the dev environment must provide them explicitly
+# instead of silently relying on whatever cmake/ninja happen to be on PATH.
+build = [
+  "pybind11>=3.0.1",
+  "scikit-build-core>=0.11.6",
+  "cmake>=3.15",
+  "ninja>=1.11",
+]
+# Test runner and plugins.
+test = [
   "pytest>=8.4.2",
   "pytest-cov>=7.0.0",
   "pytest-randomly>=4.0.1",
   "pytest-xdist>=3.8.0",
+]
+# Default development environment: build toolchain, tests, linters, type checker
+# and task automation. Intentionally excludes the heavier examples/benchmark/docs
+# groups so a fresh `uv sync` stays light; pull those in on demand with
+# `uv sync --group examples` (or `benchmark`/`docs`).
+dev = [
+  { include-group = "build" },
+  { include-group = "test" },
+  "basedpyright>=1.36.2",
+  "nox>=2025.11.12",
+  "pre-commit>=4.5.0",
   "ruff>=0.14.3",
 ]
-benchmark = [
-  "reservoirpy>=0.3.11",
-]
-# Mirrors the `examples` optional-dependency so the dev workspace (default-groups
-# = "all") provisions everything needed to run examples and benchmarks.
+# Plotting/dataframe deps required only to run the examples. Mirrors the
+# `examples` optional-dependency (kept in sync for `pip install rclib[examples]`
+# end users) so contributors get the same stack via `uv sync --group examples`.
 examples = [
   "matplotlib>=3.10.7",
   "pandas>=2.3.3",
   "seaborn>=0.13.2",
 ]
-build = [
-  "pybind11>=3.0.1",
-  "scikit-build-core>=0.11.6",
+# Benchmark suite: reservoirpy for comparison, plus the plotting stack the
+# benchmark scripts share with the examples.
+benchmark = [
+  "reservoirpy>=0.3.11",
+  { include-group = "examples" },
 ]
 docs = [
   "mkdocs>=1.6.1",
@@ -79,13 +101,20 @@ docs = [
 # Disable build isolation, but only for the current package in development.
 # Ref: https://github.com/astral-sh/uv/issues/13998
 no-build-isolation-package = ["rclib"]
-default-groups = "all"
+# Keep the default sync light: `dev` transitively pulls in `build` and `test`,
+# but not examples/benchmark/docs. Add those explicitly when needed.
+default-groups = ["dev"]
 
 [tool.scikit-build]
 cmake.source-dir = "."
 wheel.packages = ["python/rclib"]
 
-# Turn on verbose output for the editable mode rebuilds.
+# Keep the editable-mode rebuild-on-import quiet on success. Build *failures* are
+# surfaced regardless of this setting (scikit-build-core raises with the full
+# compiler/ninja error), so verbose=false yields clean output for routine
+# `uv run python ...` while still showing real errors. Enabling it would instead
+# dump the bundled-Eigen header install log on every import, including no-op
+# rebuilds. Flip to true temporarily if you need to watch a slow recompile.
 editable.verbose = false
 
 # Rebuild the project when the package is imported.
