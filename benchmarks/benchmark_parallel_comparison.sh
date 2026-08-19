@@ -36,7 +36,7 @@ echo "--------------------------------------------------"
 
 # --- 1. Serial Benchmark ---
 echo "[1/3] Running Serial Benchmark (RCLIB_USE_OPENMP=OFF)..."
-cmake -S . -B build_serial -DCMAKE_BUILD_TYPE=Release -DRCLIB_USE_OPENMP=OFF -DRCLIB_ENABLE_EIGEN_PARALLELIZATION=OFF > /dev/null
+cmake -S . -B build_serial -DCMAKE_BUILD_TYPE=Release -DBUILD_EXAMPLES=ON -DRCLIB_USE_OPENMP=OFF -DRCLIB_ENABLE_EIGEN_PARALLELIZATION=OFF > /dev/null
 cmake --build build_serial --target performance_benchmark --config Release > /dev/null
 
 for (( i=1; i<=NUM_RUNS; i++ )); do
@@ -46,7 +46,7 @@ echo "      Done."
 
 # --- 2. User Parallelism (OpenMP) ---
 echo "[2/3] Running User Parallelism Benchmark (RCLIB_USE_OPENMP=ON, RCLIB_ENABLE_EIGEN_PARALLELIZATION=OFF)..."
-cmake -S . -B build_user_omp -DCMAKE_BUILD_TYPE=Release -DRCLIB_USE_OPENMP=ON -DRCLIB_ENABLE_EIGEN_PARALLELIZATION=OFF > /dev/null
+cmake -S . -B build_user_omp -DCMAKE_BUILD_TYPE=Release -DBUILD_EXAMPLES=ON -DRCLIB_USE_OPENMP=ON -DRCLIB_ENABLE_EIGEN_PARALLELIZATION=OFF > /dev/null
 cmake --build build_user_omp --target performance_benchmark --config Release > /dev/null
 
 for threads in "${THREAD_COUNTS[@]}"; do
@@ -61,7 +61,7 @@ done
 
 # --- 3. Eigen Parallelism ---
 echo "[3/3] Running Eigen Parallelism Benchmark (RCLIB_USE_OPENMP=ON, RCLIB_ENABLE_EIGEN_PARALLELIZATION=ON)..."
-cmake -S . -B build_eigen_omp -DCMAKE_BUILD_TYPE=Release -DRCLIB_USE_OPENMP=ON -DRCLIB_ENABLE_EIGEN_PARALLELIZATION=ON > /dev/null
+cmake -S . -B build_eigen_omp -DCMAKE_BUILD_TYPE=Release -DBUILD_EXAMPLES=ON -DRCLIB_USE_OPENMP=ON -DRCLIB_ENABLE_EIGEN_PARALLELIZATION=ON > /dev/null
 cmake --build build_eigen_omp --target performance_benchmark --config Release > /dev/null
 
 for threads in "${THREAD_COUNTS[@]}"; do
