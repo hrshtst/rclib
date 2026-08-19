@@ -1,3 +1,6 @@
+# Copyright (c) 2025-2026 Hiroshi Atsuta
+# SPDX-License-Identifier: Apache-2.0
+
 """Model module for Reservoir Computing."""
 
 from __future__ import annotations

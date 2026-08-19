@@ -190,6 +190,7 @@ ignore = [
   "PLR0912",                    # Too many branches ({branches} > {max_branches})
   "PLR0913",                    # Too many arguments in function definition ({c_args} > {max_args})
   "PLR0915",                    # Too many statements ({statements} > {max_statements})
+  "PLR0917",                    # Too many positional arguments ({c_pos} > {max_pos})
   "S101",                       # Use of `assert` detected
   "SIM108",                     # Use ternary operator {contents} instead of `if`-`else`-block
   "RET504",                     # Unnecessary assignment to {name} before `return` statement

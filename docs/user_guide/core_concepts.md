@@ -6,13 +6,13 @@ The reservoir is the dynamical core of the ESN. `rclib` provides `RandomSparse` 
 
 ```python
 res = reservoirs.RandomSparse(
-    n_neurons=1000,      # Size of the reservoir
-    spectral_radius=0.9, # Scaling of spectral radius
-    sparsity=0.1,        # Density of connections
-    leak_rate=1.0,       # 1.0 = full update, < 1.0 = leaky integrator
-    input_scaling=1.0,   # Scaling of input weights
+    n_neurons=1000,  # Size of the reservoir
+    spectral_radius=0.9,  # Scaling of spectral radius
+    sparsity=0.1,  # Density of connections
+    leak_rate=1.0,  # 1.0 = full update, < 1.0 = leaky integrator
+    input_scaling=1.0,  # Scaling of input weights
     include_bias=False,  # Add bias neuron to reservoir
-    seed=42              # Random seed for reproducibility
+    seed=42,  # Random seed for reproducibility
 )
 ```
 
@@ -32,7 +32,7 @@ feature when `include_bias=True`.
 The `ESN` class acts as a container.
 
 ```python
-model = ESN(connection_type="serial") # "serial" or "parallel"
+model = ESN(connection_type="serial")  # "serial" or "parallel"
 model.add_reservoir(res1)
 # For deep ESNs:
 # model.add_reservoir(res2)

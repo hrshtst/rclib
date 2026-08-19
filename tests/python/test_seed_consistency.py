@@ -1,3 +1,6 @@
+# Copyright (c) 2025-2026 Hiroshi Atsuta
+# SPDX-License-Identifier: Apache-2.0
+
 """Unit tests for seed consistency in rclib."""
 
 from __future__ import annotations

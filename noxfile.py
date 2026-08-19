@@ -1,3 +1,6 @@
+# Copyright (c) 2025-2026 Hiroshi Atsuta
+# SPDX-License-Identifier: Apache-2.0
+
 """Nox configuration for rclib."""
 
 from __future__ import annotations
@@ -31,7 +34,9 @@ def dev(session: nox.Session) -> None:
 @nox.session(python="3.12", reuse_venv=True)
 def lint(session: nox.Session) -> None:
     """Run linting checks."""
-    session.install("ruff", "shellcheck-py", "cmakelang", "PyYAML")
+    # Pin ruff to the version locked in uv.lock: an unpinned install drifts to
+    # the latest release, whose newly added rules fail `select = ["ALL"]`.
+    session.install("ruff==0.16.2", "shellcheck-py", "cmakelang", "PyYAML")
     session.run("ruff", "check", ".")
     session.run("ruff", "format", "--check", ".")
     session.run("shellcheck", "scripts/bump_version.sh", "docs/development/reports/generate_pdf.sh")

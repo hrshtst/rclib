@@ -18,17 +18,12 @@ The `Rls` readout provides two strategies for handling mini-batches:
 
 ```python
 # Create an RLS readout optimized for mini-batches
-readout = readouts.Rls(
-    lambda_=1.0,
-    delta=1.0,
-    include_bias=True,
-    solver="rank_k_update"
-)
+readout = readouts.Rls(lambda_=1.0, delta=1.0, include_bias=True, solver="rank_k_update")
 model.set_readout(readout)
 
 # In a loop (processing 64 samples at once):
 for i in range(0, len(X), 64):
-    model.partial_fit(X[i:i+64], Y[i:i+64])
+    model.partial_fit(X[i : i + 64], Y[i : i + 64])
 ```
 
 > **Note:** `rank_k_update` is mathematically equivalent to sequential RLS only when the forgetting factor `lambda` is 1.0. For `lambda < 1.0`, `rclib` automatically falls back to sequential `rank1_update` to ensure mathematical correctness.
@@ -52,11 +47,7 @@ generated = model.predict_generative(prime_data, n_steps=200)
 # Create a Ridge readout with an explicit solver
 # Available: "auto", "cholesky", "dual_cholesky",
 #            "conjugate_gradient", "conjugate_gradient_implicit"
-readout = readouts.Ridge(
-    alpha=1e-8,
-    include_bias=True,
-    solver="dual_cholesky"
-)
+readout = readouts.Ridge(alpha=1e-8, include_bias=True, solver="dual_cholesky")
 ```
 
 | Solver | Best For |

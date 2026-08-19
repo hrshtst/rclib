@@ -16,13 +16,7 @@ x_train, y_train = x[:train_len], y[:train_len]
 x_test, y_test = x[train_len:], y[train_len:]
 
 # 2. Configure Reservoir
-res = reservoirs.RandomSparse(
-    n_neurons=500,
-    spectral_radius=0.9,
-    sparsity=0.1,
-    leak_rate=0.5,
-    seed=42
-)
+res = reservoirs.RandomSparse(n_neurons=500, spectral_radius=0.9, sparsity=0.1, leak_rate=0.5, seed=42)
 
 # 3. Configure Readout (Ridge Regression)
 readout = readouts.Ridge(alpha=1e-6, include_bias=True)

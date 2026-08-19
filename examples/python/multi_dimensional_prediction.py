@@ -1,3 +1,6 @@
+# Copyright (c) 2025-2026 Hiroshi Atsuta
+# SPDX-License-Identifier: Apache-2.0
+
 """Multi-dimensional prediction example (Lorenz Attractor)."""
 
 from __future__ import annotations
