@@ -2,10 +2,10 @@
 
 ## Prerequisites
 
-*   **Operating System**: Linux, macOS, or Windows (tested primarily on Linux).
-*   **C++ Compiler**: Must support C++17 (e.g., GCC 9+, Clang 10+, MSVC 2019+).
+*   **Operating System**: Linux (the only platform tested and supported).
+*   **C++ Compiler**: Must support C++17 (e.g., GCC 9+, Clang 10+).
 *   **CMake**: Version 3.15 or higher.
-*   **Python**: Version 3.10 or higher.
+*   **Python**: Version 3.11 or higher.
 *   **OpenMP**: Required for parallelization.
     *   Ubuntu/Debian: `sudo apt install libomp-dev`
 
@@ -18,8 +18,8 @@ The recommended way to install and manage `rclib` for development is using `uv`.
 git clone --recursive https://github.com/hrshtst/rclib.git
 cd rclib
 
-# Install dependencies and the project
-uv sync
+# Install dependencies and the project (wraps the required two-step `uv sync`)
+./scripts/setup-dev.sh
 ```
 
 ## Installing via `pip`

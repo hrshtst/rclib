@@ -14,9 +14,9 @@
 
 ### Prerequisites
 
-*   **C++ Compiler:** GCC, Clang, or MSVC supporting C++17.
+*   **C++ Compiler:** GCC or Clang supporting C++17.
 *   **CMake:** Version 3.15 or higher.
-*   **Python:** Version 3.10 or higher (for Python bindings).
+*   **Python:** Version 3.11 or higher (for Python bindings).
 *   **Build Tool:** `uv` is recommended for managing the Python environment, but standard `pip` works too.
 *   **OpenMP:** Required for parallelization.
     *   Ubuntu/Debian: `sudo apt install libomp-dev`
@@ -235,7 +235,7 @@ The documentation is automatically deployed to [https://hrshtst.github.io/rclib/
     # C++ Core
     cmake -S . -B build -DRCLIB_ADAPTIVE_PARALLELIZATION=ON
     # Python (uv)
-    CMAKE_ARGS="-DRCLIB_ADAPTIVE_PARALLELIZATION=ON" uv sync
+    CMAKE_ARGS="-DRCLIB_ADAPTIVE_PARALLELIZATION=ON" ./scripts/setup-dev.sh
     ```
 
 #### 2. Forced Parallelism
@@ -245,7 +245,7 @@ The documentation is automatically deployed to [https://hrshtst.github.io/rclib/
     # C++ Core
     cmake -S . -B build -DRCLIB_ADAPTIVE_PARALLELIZATION=OFF
     # Python (uv)
-    CMAKE_ARGS="-DRCLIB_ADAPTIVE_PARALLELIZATION=OFF" uv sync
+    CMAKE_ARGS="-DRCLIB_ADAPTIVE_PARALLELIZATION=OFF" ./scripts/setup-dev.sh
     ```
 
 #### 3. Serial (Single-Threaded)
@@ -255,7 +255,7 @@ The documentation is automatically deployed to [https://hrshtst.github.io/rclib/
     # C++ Core
     cmake -S . -B build -DRCLIB_USE_OPENMP=OFF
     # Python (uv)
-    CMAKE_ARGS="-DRCLIB_USE_OPENMP=OFF" uv sync
+    CMAKE_ARGS="-DRCLIB_USE_OPENMP=OFF" ./scripts/setup-dev.sh
     ```
 
 ## Performance Benchmarking
@@ -270,14 +270,16 @@ The `benchmarks/` directory contains scripts to evaluate performance across diff
 
 2.  **Visualize Results:**
     ```bash
-    uv run python benchmarks/plot_parallel_comparison.py
+    # The plotting stack lives in the opt-in `benchmark` group (not the light
+    # default sync), so pass --group benchmark on each command.
+    uv run --group benchmark python benchmarks/plot_parallel_comparison.py
     ```
     This generates plots comparing execution time and MSE for different methods and configurations.
 
 3.  **Compare with ReservoirPy:**
     ```bash
     # Run the comparison benchmark with statistical analysis (default: 10 iterations)
-    uv run python benchmarks/compare_auto_solver.py --n-iter 10
+    uv run --group benchmark python benchmarks/compare_auto_solver.py --n-iter 10
     ```
     This script compares `rclib`'s automatic solver selection (Cholesky vs. Implicit CG) against `reservoirpy` across various reservoir sizes, producing mean and standard deviation for performance metrics.
 
