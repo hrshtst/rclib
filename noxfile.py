@@ -36,7 +36,7 @@ def lint(session: nox.Session) -> None:
     """Run linting checks."""
     # Pin ruff to the version locked in uv.lock: an unpinned install drifts to
     # the latest release, whose newly added rules fail `select = ["ALL"]`.
-    session.install("ruff==0.16.2", "shellcheck-py", "cmakelang", "PyYAML")
+    session.install("ruff==0.16.3", "shellcheck-py", "cmakelang", "PyYAML")
     session.run("ruff", "check", ".")
     session.run("ruff", "format", "--check", ".")
     session.run("shellcheck", "scripts/bump_version.sh", "docs/development/reports/generate_pdf.sh")

@@ -36,7 +36,7 @@ repos:
       - id: debug-statements
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.2 # Keep in sync with the ruff version locked in uv.lock
+    rev: v0.16.3 # Keep in sync with the ruff version locked in uv.lock
     hooks:
       # Run the linter and apply fixes
       - id: ruff-check
