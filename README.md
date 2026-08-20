@@ -334,7 +334,7 @@ External contributors are welcome to use AI tools for assistance, provided they 
 
 ## Acknowledgments
 
-<img src="docs/assets/ipa_logo.png" height="60" alt="IPA Logo"> &nbsp; &nbsp; <img src="docs/assets/mitou_target_logo.png" height="60" alt="MITOU Target Logo">
+<img src="docs/assets/ipa_logo.png" height="60" alt="IPA Logo"> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <img src="docs/assets/mitou_target_logo.png" height="60" alt="MITOU Target Logo">
 
 This project has been continuously supported by the **[MITOU Target Program](https://www.ipa.go.jp/jinzai/mitou/koubo/programs/target.html)** (Reservoir Computing field) of the [Innovation Platform Agency, Japan (IPA)](https://www.ipa.go.jp/en/index.html) since 2025. Details of the supported project can be found in the official overviews for [FY2025](https://www.ipa.go.jp/jinzai/mitou/target/2025_reservoir/gaiyou-ky-1.html) and [FY2026](https://www.ipa.go.jp/jinzai/mitou/target/2026-reservoir/gaiyou-tg-1.html) (Japanese).
 
