@@ -307,3 +307,26 @@ def test_readout_validation() -> None:
         readouts.Rls(lambda_=0.99, delta=0.0, include_bias=True)
     with pytest.raises(ValueError, match="learning_rate"):
         readouts.Lms(learning_rate=0.0, include_bias=True)
+
+
+def test_ridge_readout_weights_are_readable_and_read_only() -> None:
+    """The fitted weights are exposed as a copy with the bias row last; reading them never alters prediction."""
+    rng = np.random.default_rng(seed=7)
+    states = rng.random((60, 8))
+    targets = rng.random((60, 3))
+    readout = _rclib.RidgeReadout(alpha=0.1, include_bias=True, solver=_rclib.RidgeReadout.Solver.CHOLESKY)
+    with pytest.raises(RuntimeError, match="must be fit before getWeights"):
+        readout.getWeights()
+    assert readout.getIncludeBias() is True
+    readout.fit(states, targets)
+    weights = readout.getWeights()
+    assert weights.shape == (9, 3)
+    expected = states @ weights[:-1] + weights[-1]
+    assert np.allclose(readout.predict(states), expected, atol=1e-12, rtol=0.0)
+    weights[:] = 0.0  # a copy: mutating it leaves the readout untouched
+    assert np.allclose(readout.predict(states), expected, atol=1e-12, rtol=0.0)
+    plain = _rclib.RidgeReadout(alpha=0.1, include_bias=False, solver=_rclib.RidgeReadout.Solver.DUAL_CHOLESKY)
+    plain.fit(states, targets)
+    assert plain.getIncludeBias() is False
+    assert plain.getWeights().shape == (8, 3)
+    assert np.allclose(plain.predict(states), states @ plain.getWeights(), atol=1e-12, rtol=0.0)
