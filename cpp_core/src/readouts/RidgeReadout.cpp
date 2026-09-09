@@ -211,6 +211,13 @@ void RidgeReadout::partialFit(const Eigen::MatrixXd & /*state*/, const Eigen::Ma
   throw std::logic_error("partialFit is not implemented for RidgeReadout");
 }
 
+const Eigen::MatrixXd &RidgeReadout::getWeights() const {
+  if (W_out.size() == 0) {
+    throw std::runtime_error("RidgeReadout must be fit before getWeights.");
+  }
+  return W_out;
+}
+
 Eigen::MatrixXd RidgeReadout::predict(const Eigen::MatrixXd &states) {
   if (W_out.size() == 0) {
     throw std::runtime_error("RidgeReadout must be fit before predict.");

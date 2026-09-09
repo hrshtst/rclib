@@ -107,3 +107,49 @@ TEST_CASE("RidgeReadout Adaptive Solver Selection", "[readout][ridge][.slow]") {
     CHECK(readout.getEffectiveSolver() == RidgeReadout::CONJUGATE_GRADIENT_IMPLICIT);
   }
 }
+
+TEST_CASE("RidgeReadout - fitted weights are readable", "[RidgeReadout]") {
+  int n_samples = 60;
+  int n_features = 8;
+  int n_targets = 3;
+  Eigen::MatrixXd states = Eigen::MatrixXd::Random(n_samples, n_features);
+  Eigen::MatrixXd targets = Eigen::MatrixXd::Random(n_samples, n_targets);
+
+  SECTION("Before fit") {
+    RidgeReadout readout(0.1, true, RidgeReadout::CHOLESKY);
+    REQUIRE_THROWS_AS(readout.getWeights(), std::runtime_error);
+    REQUIRE(readout.getIncludeBias());
+  }
+
+  SECTION("With bias the last row is the bias term") {
+    RidgeReadout readout(0.1, true, RidgeReadout::CHOLESKY);
+    readout.fit(states, targets);
+    const Eigen::MatrixXd &weights = readout.getWeights();
+    REQUIRE(weights.rows() == n_features + 1);
+    REQUIRE(weights.cols() == n_targets);
+    Eigen::MatrixXd expected = states * weights.topRows(n_features);
+    expected.rowwise() += weights.row(n_features);
+    REQUIRE((readout.predict(states) - expected).norm() < 1e-12);
+  }
+
+  SECTION("Without bias the matrix is the plain map") {
+    RidgeReadout readout(0.1, false, RidgeReadout::DUAL_CHOLESKY);
+    readout.fit(states, targets);
+    const Eigen::MatrixXd &weights = readout.getWeights();
+    REQUIRE(weights.rows() == n_features);
+    REQUIRE(weights.cols() == n_targets);
+    REQUIRE(!readout.getIncludeBias());
+    REQUIRE((readout.predict(states) - states * weights).norm() < 1e-12);
+  }
+
+  SECTION("Reading the weights does not change fitting or prediction") {
+    RidgeReadout untouched(0.1, true, RidgeReadout::CHOLESKY);
+    untouched.fit(states, targets);
+    Eigen::MatrixXd before = untouched.predict(states);
+    RidgeReadout inspected(0.1, true, RidgeReadout::CHOLESKY);
+    inspected.fit(states, targets);
+    Eigen::MatrixXd copy = inspected.getWeights();
+    copy.setZero();
+    REQUIRE(inspected.predict(states) == before);
+  }
+}

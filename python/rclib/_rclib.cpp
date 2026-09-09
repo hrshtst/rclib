@@ -54,7 +54,10 @@ PYBIND11_MODULE(_rclib, m) {
       .def(py::init<double, bool, RidgeReadout::Solver, double>(), py::arg("alpha"), py::arg("include_bias"),
            py::arg("solver") = RidgeReadout::Solver::AUTO, py::arg("tolerance") = 1e-10)
       .def("getSolver", &RidgeReadout::getSolver)
-      .def("getEffectiveSolver", &RidgeReadout::getEffectiveSolver);
+      .def("getEffectiveSolver", &RidgeReadout::getEffectiveSolver)
+      .def("getIncludeBias", &RidgeReadout::getIncludeBias)
+      .def("getWeights", &RidgeReadout::getWeights, py::return_value_policy::copy,
+           "The fitted weights as a copy: shape (n_features + include_bias, n_outputs), bias row last.");
 
   // Bind RlsReadout
   py::class_<RlsReadout, Readout, std::shared_ptr<RlsReadout>> rls(m, "RlsReadout");
