@@ -8,7 +8,7 @@ $$ \mathbf{y}(t) = \mathbf{W}_{out} \mathbf{x}(t) $$
 
 Ridge regression (also known as Tikhonov regularization) minimizes the squared error while penalizing large weights to prevent overfitting. `rclib` implements several strategies to solve this efficiently.
 
-### Primal Formulation ($N \le T$)
+### Primal Formulation ($N \le T$) { data-toc-label="Primal Formulation (N ≤ T)" }
 
 When the number of neurons ($N$) is less than or equal to the number of samples ($T$), we solve the normal equations:
 
@@ -16,7 +16,7 @@ $$ \mathbf{W}_{out} = (\mathbf{X}^T \mathbf{X} + \alpha \mathbf{I})^{-1} \mathbf
 
 Where $\mathbf{X}$ is the $T \times N$ state matrix, $\mathbf{Y}$ is the $T \times O$ target matrix, and $\alpha$ is the regularization parameter. `rclib` uses optimized matrix-matrix multiplication (GEMM) to form the $N \times N$ covariance matrix $\mathbf{X}^T \mathbf{X}$ efficiently, leveraging multi-core parallelization.
 
-### Dual Formulation ($N > T$)
+### Dual Formulation ($N > T$) { data-toc-label="Dual Formulation (N > T)" }
 
 When the reservoir is very large ($N > T$), the dual formulation is more efficient as it operates in the $T \times T$ sample space:
 

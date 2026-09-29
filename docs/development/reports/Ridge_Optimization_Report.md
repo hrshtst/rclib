@@ -19,7 +19,7 @@ This has a computational complexity of **$O(N^3)$** due to the $N \times N$ matr
 
 ## Optimization Details
 
-### 1. Matrix-Free Implicit CG ($N \ge 8,000$)
+### 1. Matrix-Free Implicit CG ($N \ge 8,000$) { data-toc-label="1. Matrix-Free Implicit CG (N ≥ 8,000)" }
 
 For extremely large reservoirs, even the $O(N^2)$ memory requirement for storing the covariance matrix $X^T X$ becomes a bottleneck. We implemented a **Matrix-Free Conjugate Gradient** solver.
 
@@ -31,7 +31,7 @@ $$Av = X^T(Xv) + \alpha v$$
 *   **Zero-Copy Design:** The `RidgeLinearOperator` uses Eigen's expression templates to perform these operations directly on the state matrix $X$, avoiding any intermediate large allocations.
 *   **Parallelism:** Each output dimension (target) is solved in parallel using OpenMP, sharing the same matrix-free operator.
 
-### 2. Dual Ridge Formulation ($N > T$)
+### 2. Dual Ridge Formulation ($N > T$) { data-toc-label="2. Dual Ridge Formulation (N > T)" }
 
 When $N > T$, it is mathematically superior to solve the **Dual problem**, which operates in the sample space ($T \times T$) rather than the feature space.
 

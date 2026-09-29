@@ -40,9 +40,13 @@ The `P` matrix in RLS represents the inverse covariance matrix, which is inheren
 #### 1. The Concept of a Rank-1 Update
 
 A **Rank-1 update** modifies a matrix $\mathbf{A}$ by adding the outer product of two vectors, $\mathbf{u}$ and $\mathbf{v}$:
+
 $$ \mathbf{A}_{new} = \mathbf{A} + \alpha \mathbf{u} \mathbf{v}^T $$
+
 If $\mathbf{u} = \mathbf{v}$, the update is **Symmetric**:
+
 $$ \mathbf{A}_{new} = \mathbf{A} + \alpha \mathbf{v} \mathbf{v}^T $$
+
 This operation maintains the symmetry of the matrix $\mathbf{A}$.
 
 #### 2. Mathematical Derivation in RLS
