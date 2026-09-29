@@ -27,6 +27,7 @@ This approach significantly reduces computational complexity from $O(N^3)$ to $O
 ### Adaptive Solver Selection
 
 `rclib` automatically selects a solver based on the problem dimensions:
+
 - **Primal Cholesky**: Standard case ($N \le T$).
 - **Dual Cholesky**: High-dimensional case ($N > T$).
 - **Implicit Conjugate Gradient**: Very high-dimensional case
