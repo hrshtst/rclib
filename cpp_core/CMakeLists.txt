@@ -12,6 +12,7 @@ add_library(
   rclib_core STATIC
   src/Reservoir.cpp
   src/Readout.cpp
+  src/Serialization.cpp
   src/Model.cpp
   src/reservoirs/RandomSparseReservoir.cpp
   src/reservoirs/NvarReservoir.cpp

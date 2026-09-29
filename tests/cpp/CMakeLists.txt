@@ -48,3 +48,7 @@ catch_discover_tests(test_integration_online_learning)
 add_executable(test_seed_consistency test_seed_consistency.cpp)
 target_link_libraries(test_seed_consistency PRIVATE rclib_core Catch2::Catch2WithMain)
 catch_discover_tests(test_seed_consistency)
+
+add_executable(test_serialization test_serialization.cpp)
+target_link_libraries(test_serialization PRIVATE rclib_core Catch2::Catch2WithMain)
+catch_discover_tests(test_serialization)
