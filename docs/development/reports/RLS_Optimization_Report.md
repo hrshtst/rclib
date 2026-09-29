@@ -14,11 +14,17 @@ This report details the optimizations applied to the Recursive Least Squares (RL
 The standard RLS update equations used were:
 
 1.  **Gain Calculation:**
+
     $$ \mathbf{k} = \frac{\mathbf{P} \mathbf{x}}{ \lambda + \mathbf{x}^T \mathbf{P} \mathbf{x} } $$
+
 2.  **Weight Update:**
+
     $$ \mathbf{W} \leftarrow \mathbf{W} + \mathbf{k} \mathbf{e}^T $$
+
     where $\mathbf{e} = \mathbf{d} - \mathbf{W}^T \mathbf{x}$ is the prediction error.
+
 3.  **Covariance Matrix Update:**
+
     $$ \mathbf{P} \leftarrow \lambda^{-1} (\mathbf{P} - \mathbf{k} \mathbf{x}^T \mathbf{P}) $$
 
 ### Optimization: Symmetric Rank-1 Update (Previous Summary)
@@ -26,9 +32,11 @@ The standard RLS update equations used were:
 Since $\mathbf{P}$ is a symmetric matrix (Inverse Covariance Matrix), we can optimize step 3. Note that $\mathbf{k} = \frac{\mathbf{P}\mathbf{x}}{D}$ where $D = \lambda + \mathbf{x}^T \mathbf{P} \mathbf{x}$.
 
 Substituting $\mathbf{k}$:
+
 $$ \mathbf{k} \mathbf{x}^T \mathbf{P} = \frac{\mathbf{P}\mathbf{x} (\mathbf{P}\mathbf{x})^T}{D} $$
 
 Thus the update becomes a symmetric rank-1 update:
+
 $$ \mathbf{P} \leftarrow \lambda^{-1} \left( \mathbf{P} - \frac{(\mathbf{P}\mathbf{x})(\mathbf{P}\mathbf{x})^T}{D} \right) $$
 
 In Eigen, this allows us to use the highly optimized `rankUpdate` method on a `selfadjointView`, which only computes and updates the upper triangular part of the matrix, reducing FLOPs by approximately 50%.
@@ -40,25 +48,36 @@ The `P` matrix in RLS represents the inverse covariance matrix, which is inheren
 #### 1. The Concept of a Rank-1 Update
 
 A **Rank-1 update** modifies a matrix $\mathbf{A}$ by adding the outer product of two vectors, $\mathbf{u}$ and $\mathbf{v}$:
+
 $$ \mathbf{A}_{new} = \mathbf{A} + \alpha \mathbf{u} \mathbf{v}^T $$
+
 If $\mathbf{u} = \mathbf{v}$, the update is **Symmetric**:
+
 $$ \mathbf{A}_{new} = \mathbf{A} + \alpha \mathbf{v} \mathbf{v}^T $$
+
 This operation maintains the symmetry of the matrix $\mathbf{A}$.
 
 #### 2. Mathematical Derivation in RLS
 
 Let's re-examine the RLS covariance update (step 3):
+
 $$ \mathbf{P}_{new} = \frac{1}{\lambda} (\mathbf{P} - \mathbf{k} \mathbf{x}^T \mathbf{P}) $$
+
 The gain vector $\mathbf{k}$ is defined as:
+
 $$ \mathbf{k} = \frac{\mathbf{P} \mathbf{x}}{\lambda + \mathbf{x}^T \mathbf{P} \mathbf{x}} $$
+
 Let $\mathbf{v} = \mathbf{P} \mathbf{x}$ and $D = \lambda + \mathbf{x}^T \mathbf{P} \mathbf{x}$. Then $\mathbf{k} = \frac{\mathbf{v}}{D}$.
 Since $\mathbf{P}$ is symmetric ($\mathbf{P} = \mathbf{P}^T$), we know that $\mathbf{x}^T \mathbf{P} = (\mathbf{P} \mathbf{x})^T = \mathbf{v}^T$.
 
 Substituting these into the subtraction term:
+
 $$ \mathbf{k} (\mathbf{x}^T \mathbf{P}) = \left( \frac{\mathbf{v}}{D} \right) \mathbf{v}^T = \frac{1}{D} \mathbf{v} \mathbf{v}^T $$
+
 This clearly shows that the term being subtracted from $\mathbf{P}$ is a symmetric rank-1 matrix formed by $\frac{1}{D} (\mathbf{P}\mathbf{x})(\mathbf{P}\mathbf{x})^T$.
 
 Thus, the optimized covariance matrix update becomes:
+
 $$ \mathbf{P} \leftarrow \lambda^{-1} \left( \mathbf{P} - \frac{(\mathbf{P}\mathbf{x})(\mathbf{P}\mathbf{x})^T}{\lambda + \mathbf{x}^T \mathbf{P} \mathbf{x}} \right) $$
 
 #### 3. Computational Advantages

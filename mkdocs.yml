@@ -62,6 +62,9 @@ plugins:
 
 markdown_extensions:
   - admonition
+  # Lets headings set a plain-text table-of-contents label with
+  # `{ data-toc-label="..." }`, e.g. for headings containing math.
+  - attr_list
   - pymdownx.details
   - pymdownx.highlight:
       anchor_linenums: true
