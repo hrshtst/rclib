@@ -1,11 +1,12 @@
 #include "rclib/readouts/LmsReadout.h"
 
+#include <cmath>
 #include <stdexcept>
 
 LmsReadout::LmsReadout(double learning_rate, bool include_bias)
     : learning_rate(learning_rate), include_bias(include_bias), initialized(false) {
-  if (learning_rate <= 0.0) {
-    throw std::invalid_argument("learning_rate must be positive.");
+  if (!std::isfinite(learning_rate) || learning_rate <= 0.0) {
+    throw std::invalid_argument("learning_rate must be finite and positive.");
   }
 }
 

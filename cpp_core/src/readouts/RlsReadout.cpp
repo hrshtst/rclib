@@ -5,11 +5,12 @@
 
 RlsReadout::RlsReadout(double lambda, double delta, bool include_bias, Solver solver)
     : lambda(lambda), delta(delta), include_bias(include_bias), solver(solver), initialized(false) {
-  if (lambda <= 0.0 || lambda > 1.0) {
+  // The range check is written so that NaN fails it; the one-sided bound also needs isfinite.
+  if (!(lambda > 0.0 && lambda <= 1.0)) {
     throw std::invalid_argument("lambda must be in (0, 1].");
   }
-  if (delta <= 0.0) {
-    throw std::invalid_argument("delta must be positive.");
+  if (!std::isfinite(delta) || delta <= 0.0) {
+    throw std::invalid_argument("delta must be finite and positive.");
   }
 }
 

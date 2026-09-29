@@ -2,6 +2,8 @@
 
 #include <Eigen/Dense>
 #include <catch2/catch_all.hpp>
+#include <limits>
+#include <stdexcept>
 
 TEST_CASE("RlsReadout - fit and predict", "[RlsReadout]") {
   int n_samples = 100;
@@ -57,4 +59,11 @@ TEST_CASE("RlsReadout - partialFit", "[RlsReadout]") {
   Eigen::MatrixXd predictions2 = readout.predict(state2);
   REQUIRE(predictions2.rows() == 1);
   REQUIRE(predictions2.cols() == n_targets);
+}
+
+TEST_CASE("RlsReadout - rejects non-finite hyperparameters", "[RlsReadout]") {
+  const double bad = GENERATE(std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::infinity(),
+                              -std::numeric_limits<double>::infinity());
+  REQUIRE_THROWS_AS(RlsReadout(bad, 1.0), std::invalid_argument);
+  REQUIRE_THROWS_AS(RlsReadout(0.99, bad), std::invalid_argument);
 }

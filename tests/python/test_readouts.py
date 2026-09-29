@@ -5,9 +5,15 @@
 
 from __future__ import annotations
 
+import math
+from typing import TYPE_CHECKING
+
 import numpy as np
 import pytest
 from rclib import ESN, _rclib, readouts, reservoirs
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 def test_ridge_readout_fit_predict() -> None:
@@ -307,6 +313,47 @@ def test_readout_validation() -> None:
         readouts.Rls(lambda_=0.99, delta=0.0, include_bias=True)
     with pytest.raises(ValueError, match="learning_rate"):
         readouts.Lms(learning_rate=0.0, include_bias=True)
+
+
+@pytest.mark.parametrize("bad", [math.nan, math.inf, -math.inf])
+@pytest.mark.parametrize(
+    ("name", "make_config", "make_cpp"),
+    [
+        (
+            "alpha",
+            lambda v: readouts.Ridge(alpha=v, include_bias=True),
+            lambda v: _rclib.RidgeReadout(alpha=v, include_bias=True),
+        ),
+        (
+            "tolerance",
+            lambda v: readouts.Ridge(alpha=1.0, include_bias=True, tolerance=v),
+            lambda v: _rclib.RidgeReadout(alpha=1.0, include_bias=True, tolerance=v),
+        ),
+        (
+            "lambda",
+            lambda v: readouts.Rls(lambda_=v, delta=1.0, include_bias=True),
+            lambda v: _rclib.RlsReadout(lambda_=v, delta=1.0, include_bias=True),
+        ),
+        (
+            "delta",
+            lambda v: readouts.Rls(lambda_=0.99, delta=v, include_bias=True),
+            lambda v: _rclib.RlsReadout(lambda_=0.99, delta=v, include_bias=True),
+        ),
+        (
+            "learning_rate",
+            lambda v: readouts.Lms(learning_rate=v, include_bias=True),
+            lambda v: _rclib.LmsReadout(learning_rate=v, include_bias=True),
+        ),
+    ],
+)
+def test_readout_rejects_non_finite(
+    name: str, make_config: Callable[[float], object], make_cpp: Callable[[float], object], bad: float
+) -> None:
+    """Non-finite hyperparameters are rejected by the config classes and by the C++ constructors."""
+    with pytest.raises(ValueError, match=name):
+        make_config(bad)
+    with pytest.raises(ValueError, match=name):
+        make_cpp(bad)
 
 
 def test_ridge_readout_weights_are_readable_and_read_only() -> None:

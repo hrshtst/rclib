@@ -2,6 +2,7 @@
 
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
+#include <cmath>
 #include <random>
 #include <stdexcept>
 #include <vector>
@@ -54,17 +55,18 @@ RandomSparseReservoir::RandomSparseReservoir(int n_neurons, double spectral_radi
   if (n_neurons <= 0) {
     throw std::invalid_argument("n_neurons must be positive.");
   }
-  if (spectral_radius < 0.0) {
-    throw std::invalid_argument("spectral_radius must be non-negative.");
+  // Range checks are written so that NaN fails them; one-sided bounds also need isfinite.
+  if (!std::isfinite(spectral_radius) || spectral_radius < 0.0) {
+    throw std::invalid_argument("spectral_radius must be finite and non-negative.");
   }
-  if (sparsity < 0.0 || sparsity > 1.0) {
+  if (!(sparsity >= 0.0 && sparsity <= 1.0)) {
     throw std::invalid_argument("sparsity must be in [0, 1].");
   }
-  if (leak_rate <= 0.0 || leak_rate > 1.0) {
+  if (!(leak_rate > 0.0 && leak_rate <= 1.0)) {
     throw std::invalid_argument("leak_rate must be in (0, 1].");
   }
-  if (input_scaling < 0.0) {
-    throw std::invalid_argument("input_scaling must be non-negative.");
+  if (!std::isfinite(input_scaling) || input_scaling < 0.0) {
+    throw std::invalid_argument("input_scaling must be finite and non-negative.");
   }
 
   state = Eigen::MatrixXd::Zero(1, n_neurons);

@@ -4,15 +4,16 @@
 
 #include <Eigen/Dense>
 #include <Eigen/IterativeLinearSolvers>
+#include <cmath>
 #include <stdexcept>
 
 RidgeReadout::RidgeReadout(double alpha, bool include_bias, Solver solver, double tolerance)
     : alpha(alpha), include_bias(include_bias), solver(solver), effective_solver(solver), tolerance(tolerance) {
-  if (alpha < 0.0) {
-    throw std::invalid_argument("alpha must be non-negative.");
+  if (!std::isfinite(alpha) || alpha < 0.0) {
+    throw std::invalid_argument("alpha must be finite and non-negative.");
   }
-  if (tolerance <= 0.0) {
-    throw std::invalid_argument("tolerance must be positive.");
+  if (!std::isfinite(tolerance) || tolerance <= 0.0) {
+    throw std::invalid_argument("tolerance must be finite and positive.");
   }
 }
 

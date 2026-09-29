@@ -3,6 +3,7 @@
 
 #include <Eigen/Dense>
 #include <catch2/catch_all.hpp>
+#include <limits>
 #include <stdexcept>
 
 class MinimalReservoir : public Reservoir {
@@ -101,4 +102,13 @@ TEST_CASE("RandomSparseReservoir - rejects input width changes after initializat
   // A rejected input leaves the state untouched.
   REQUIRE(res.getState() == state_before);
   REQUIRE_NOTHROW(res.advance(Eigen::MatrixXd::Random(1, 3)));
+}
+
+TEST_CASE("RandomSparseReservoir - rejects non-finite hyperparameters", "[RandomSparseReservoir]") {
+  const double bad = GENERATE(std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::infinity(),
+                              -std::numeric_limits<double>::infinity());
+  REQUIRE_THROWS_AS(RandomSparseReservoir(10, bad, 0.5, 0.5, 1.0), std::invalid_argument);
+  REQUIRE_THROWS_AS(RandomSparseReservoir(10, 0.9, bad, 0.5, 1.0), std::invalid_argument);
+  REQUIRE_THROWS_AS(RandomSparseReservoir(10, 0.9, 0.5, bad, 1.0), std::invalid_argument);
+  REQUIRE_THROWS_AS(RandomSparseReservoir(10, 0.9, 0.5, 0.5, bad), std::invalid_argument);
 }

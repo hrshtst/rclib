@@ -2,6 +2,8 @@
 
 #include <Eigen/Dense>
 #include <catch2/catch_all.hpp>
+#include <limits>
+#include <stdexcept>
 
 TEST_CASE("RidgeReadout - fit and predict", "[RidgeReadout]") {
   int n_samples = 100;
@@ -152,4 +154,11 @@ TEST_CASE("RidgeReadout - fitted weights are readable", "[RidgeReadout]") {
     copy.setZero();
     REQUIRE(inspected.predict(states) == before);
   }
+}
+
+TEST_CASE("RidgeReadout - rejects non-finite hyperparameters", "[RidgeReadout]") {
+  const double bad = GENERATE(std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::infinity(),
+                              -std::numeric_limits<double>::infinity());
+  REQUIRE_THROWS_AS(RidgeReadout(bad), std::invalid_argument);
+  REQUIRE_THROWS_AS(RidgeReadout(1e-6, true, RidgeReadout::AUTO, bad), std::invalid_argument);
 }
