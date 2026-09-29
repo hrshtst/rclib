@@ -1,4 +1,6 @@
 #include "rclib/Serialization.h"
+#include "rclib/reservoirs/NvarReservoir.h"
+#include "rclib/reservoirs/RandomSparseReservoir.h"
 
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
@@ -9,6 +11,7 @@
 #include <functional>
 #include <istream>
 #include <limits>
+#include <memory>
 #include <new>
 #include <ostream>
 #include <sstream>
@@ -20,6 +23,7 @@
 
 using Catch::Matchers::ContainsSubstring;
 using Catch::Matchers::MessageMatches;
+using Catch::Matchers::StartsWith;
 
 namespace {
 
@@ -74,6 +78,94 @@ bool sameLayout(const Eigen::SparseMatrix<double> &a, const Eigen::SparseMatrix<
          std::equal(a.innerIndexPtr(), a.innerIndexPtr() + nnz, b.innerIndexPtr()) &&
          sameBytes(a.valuePtr(), b.valuePtr(), nnz * sizeof(double));
 }
+
+// Serializes a component with its save() method.
+template <typename Component> std::string saveToBytes(const Component &component) {
+  std::stringstream buffer;
+  BinaryWriter writer(buffer);
+  component.save(writer);
+  return buffer.str();
+}
+
+// Loads a component with its static load() method and checks that exactly the
+// payload was consumed.
+template <typename Component> std::shared_ptr<Component> loadFromBytes(const std::string &bytes) {
+  std::istringstream input(bytes);
+  BinaryReader reader(input);
+  auto component = Component::load(reader);
+  REQUIRE(reader.remainingBytes() == 0);
+  return component;
+}
+
+// Ones on the main diagonal; also valid for rectangular shapes, unlike setIdentity().
+Eigen::SparseMatrix<double> sparseIdentity(Eigen::Index rows, Eigen::Index cols) {
+  Eigen::SparseMatrix<double> matrix(rows, cols);
+  for (Eigen::Index i = 0; i < std::min(rows, cols); ++i) {
+    matrix.insert(i, i) = 1.0;
+  }
+  matrix.makeCompressed();
+  return matrix;
+}
+
+// A RandomSparseReservoir payload built field by field, for crafting invalid input.
+struct RandomSparsePayload {
+  std::int32_t n_neurons = 3;
+  double spectral_radius = 0.9;
+  double sparsity = 0.5;
+  double leak_rate = 0.5;
+  double input_scaling = 1.0;
+  bool include_bias = false;
+  std::uint32_t seed = 1;
+  Eigen::SparseMatrix<double> W_res = sparseIdentity(3, 3);
+  Eigen::MatrixXd bias = Eigen::MatrixXd::Zero(1, 3);
+  Eigen::MatrixXd state = Eigen::MatrixXd::Zero(1, 3);
+  bool w_in_initialized = true;
+  Eigen::MatrixXd W_in = Eigen::MatrixXd::Ones(2, 3);
+
+  std::string bytes() const {
+    std::stringstream buffer;
+    BinaryWriter writer(buffer);
+    writer.writeInt(n_neurons);
+    writer.writeDouble(spectral_radius);
+    writer.writeDouble(sparsity);
+    writer.writeDouble(leak_rate);
+    writer.writeDouble(input_scaling);
+    writer.writeBool(include_bias);
+    writer.writeUInt(seed);
+    writer.writeSparse(W_res);
+    writer.writeMatrix(bias);
+    writer.writeMatrix(state);
+    writer.writeBool(w_in_initialized);
+    if (w_in_initialized) {
+      writer.writeMatrix(W_in);
+    }
+    return buffer.str();
+  }
+};
+
+// An NvarReservoir payload built field by field, for crafting invalid input.
+struct NvarPayload {
+  std::int32_t num_lags = 2;
+  std::int32_t polynomial_order = 1;
+  bool initialized = true;
+  std::int32_t input_dim = 1;
+  Eigen::MatrixXd state = Eigen::MatrixXd::Zero(1, 2);
+  Eigen::MatrixXd past_inputs = Eigen::MatrixXd::Zero(2, 1);
+
+  std::string bytes() const {
+    std::stringstream buffer;
+    BinaryWriter writer(buffer);
+    writer.writeInt(num_lags);
+    writer.writeInt(polynomial_order);
+    writer.writeBool(initialized);
+    if (initialized) {
+      writer.writeInt(input_dim);
+      writer.writeMatrix(state);
+      writer.writeMatrix(past_inputs);
+    }
+    return buffer.str();
+  }
+};
 
 // A stream buffer that serves `data` but cannot seek, like a pipe.
 class NonSeekableBuffer : public std::streambuf {
@@ -336,5 +428,120 @@ TEST_CASE("Serialization - translateSerializationErrors", "[serialization]") {
 
   SECTION("std::bad_alloc passes through unchanged") {
     REQUIRE_THROWS_AS(translateSerializationErrors("context", [] { throw std::bad_alloc(); }), std::bad_alloc);
+  }
+}
+
+TEST_CASE("RandomSparseReservoir - serialization round-trips", "[serialization][RandomSparseReservoir]") {
+  RandomSparseReservoir original(20, 0.9, 0.3, 0.5, 0.8, true, 123);
+  const Eigen::MatrixXd inputs = Eigen::MatrixXd::Random(6, 3);
+
+  SECTION("Before the first input (W_in not generated yet)") {}
+  SECTION("After advancing") {
+    for (int i = 0; i < 3; ++i) {
+      original.advance(inputs.row(i));
+    }
+  }
+
+  const std::string bytes = saveToBytes(original);
+  const auto restored = loadFromBytes<RandomSparseReservoir>(bytes);
+  REQUIRE(saveToBytes(*restored) == bytes);
+
+  REQUIRE(restored->getNNeurons() == original.getNNeurons());
+  REQUIRE(restored->getSpectralRadius() == original.getSpectralRadius());
+  REQUIRE(restored->getSparsity() == original.getSparsity());
+  REQUIRE(restored->getLeakRate() == original.getLeakRate());
+  REQUIRE(restored->getInputScaling() == original.getInputScaling());
+  REQUIRE(restored->getIncludeBias() == original.getIncludeBias());
+  REQUIRE(restored->getSeed() == original.getSeed());
+  REQUIRE(restored->getInputDim() == original.getInputDim());
+  REQUIRE(sameBits(restored->getState(), original.getState()));
+
+  // Later updates are bit-identical.
+  for (int i = 3; i < 6; ++i) {
+    REQUIRE(sameBits(restored->advance(inputs.row(i)), original.advance(inputs.row(i))));
+  }
+}
+
+TEST_CASE("NvarReservoir - serialization round-trips", "[serialization][NvarReservoir]") {
+  NvarReservoir original(3, 2);
+  const Eigen::MatrixXd inputs = Eigen::MatrixXd::Random(6, 2);
+
+  SECTION("Before the first input") {}
+  SECTION("After advancing") {
+    for (int i = 0; i < 3; ++i) {
+      original.advance(inputs.row(i));
+    }
+  }
+
+  const std::string bytes = saveToBytes(original);
+  const auto restored = loadFromBytes<NvarReservoir>(bytes);
+  REQUIRE(saveToBytes(*restored) == bytes);
+
+  REQUIRE(restored->getNumLags() == original.getNumLags());
+  REQUIRE(restored->getPolynomialOrder() == original.getPolynomialOrder());
+  REQUIRE(restored->getInputDim() == original.getInputDim());
+  REQUIRE(sameBits(restored->getState(), original.getState()));
+
+  for (int i = 3; i < 6; ++i) {
+    REQUIRE(sameBits(restored->advance(inputs.row(i)), original.advance(inputs.row(i))));
+  }
+}
+
+TEST_CASE("RandomSparseReservoir - invalid payloads are rejected", "[serialization][RandomSparseReservoir]") {
+  RandomSparsePayload payload;
+  REQUIRE_NOTHROW(loadFromBytes<RandomSparseReservoir>(payload.bytes()));
+
+  SECTION("Non-positive n_neurons") { payload.n_neurons = 0; }
+  SECTION("NaN leak_rate") { payload.leak_rate = nan_value; }
+  SECTION("Infinite spectral_radius") { payload.spectral_radius = inf_value; }
+  SECTION("Non-square W_res") { payload.W_res = sparseIdentity(3, 4); }
+  SECTION("W_res of the wrong size") { payload.W_res = sparseIdentity(4, 4); }
+  SECTION("bias that is not a row vector") { payload.bias = Eigen::MatrixXd::Zero(3, 1); }
+  SECTION("bias of the wrong length") { payload.bias = Eigen::MatrixXd::Zero(1, 2); }
+  SECTION("state of the wrong width") { payload.state = Eigen::MatrixXd::Zero(1, 4); }
+  SECTION("W_in with the wrong column count") { payload.W_in = Eigen::MatrixXd::Ones(2, 4); }
+  SECTION("W_in without rows although initialized") { payload.W_in = Eigen::MatrixXd(0, 3); }
+
+  REQUIRE_THROWS_MATCHES(loadFromBytes<RandomSparseReservoir>(payload.bytes()), SerializationError,
+                         MessageMatches(StartsWith("RandomSparseReservoir: ")));
+}
+
+TEST_CASE("NvarReservoir - invalid payloads are rejected", "[serialization][NvarReservoir]") {
+  NvarPayload payload;
+  REQUIRE_NOTHROW(loadFromBytes<NvarReservoir>(payload.bytes()));
+
+  SECTION("Non-positive num_lags") { payload.num_lags = 0; }
+  SECTION("polynomial_order above the maximum") { payload.polynomial_order = 33; }
+  SECTION("Non-positive input_dim although initialized") { payload.input_dim = 0; }
+  SECTION("state of the wrong width") { payload.state = Eigen::MatrixXd::Zero(1, 3); }
+  SECTION("past_inputs of the wrong shape") { payload.past_inputs = Eigen::MatrixXd::Zero(1, 1); }
+  SECTION("Feature count above the supported maximum") {
+    // getOutputDim throws std::length_error here; it must surface as SerializationError.
+    payload.num_lags = 100;
+    payload.polynomial_order = 4;
+    payload.input_dim = 10;
+  }
+
+  REQUIRE_THROWS_MATCHES(loadFromBytes<NvarReservoir>(payload.bytes()), SerializationError,
+                         MessageMatches(StartsWith("NvarReservoir: ")));
+}
+
+TEST_CASE("Reservoirs - truncated payloads are rejected", "[serialization]") {
+  RandomSparseReservoir random_sparse(5, 0.9, 0.5, 0.5, 1.0, true);
+  NvarReservoir nvar(2, 2);
+  random_sparse.advance(Eigen::MatrixXd::Random(1, 2));
+  nvar.advance(Eigen::MatrixXd::Random(1, 2));
+
+  const std::string random_sparse_bytes = saveToBytes(random_sparse);
+  for (std::size_t size = 0; size < random_sparse_bytes.size(); ++size) {
+    std::istringstream input(random_sparse_bytes.substr(0, size));
+    BinaryReader reader(input);
+    REQUIRE_THROWS_AS(RandomSparseReservoir::load(reader), SerializationError);
+  }
+  const std::string nvar_bytes = saveToBytes(nvar);
+  for (std::size_t size = 0; size < nvar_bytes.size(); ++size) {
+    std::istringstream input(nvar_bytes.substr(0, size));
+    BinaryReader reader(input);
+    REQUIRE_THROWS_AS(NvarReservoir::load(reader), SerializationError);
   }
 }

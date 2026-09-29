@@ -3,6 +3,10 @@
 #include "rclib/Reservoir.h"
 
 #include <Eigen/Sparse>
+#include <memory>
+
+class BinaryReader;
+class BinaryWriter;
 
 class RandomSparseReservoir : public Reservoir {
 public:
@@ -23,7 +27,18 @@ public:
   bool getIncludeBias() const { return include_bias; }
   unsigned int getSeed() const { return seed; }
 
+  /// Writes the hyperparameters and the full state (weights and current activations)
+  /// in the model file format; the type tag is written by Model. Throws SerializationError.
+  void save(BinaryWriter &writer) const;
+  /// Reads a payload written by save(). Throws SerializationError on invalid input.
+  static std::shared_ptr<RandomSparseReservoir> load(BinaryReader &reader);
+  /// Checks the hyperparameters and that the stored matrices have consistent shapes.
+  /// Saving and loading both run it. Throws SerializationError.
+  void checkConsistency() const;
+
 private:
+  RandomSparseReservoir() = default; // used by load(): skips generating the weights
+  void validateParameters() const;
   void initialize_W_in(int input_dim);
 
   int n_neurons;

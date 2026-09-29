@@ -75,6 +75,8 @@ public:
   void readHeader();
   /// The version read by readHeader (0 before it is called).
   std::uint32_t formatVersion() const { return format_version; }
+  /// Bytes left in the input after what has been read so far.
+  std::uint64_t remainingBytes() const { return remaining; }
   bool readBool();
   std::uint8_t readU8();
   std::int32_t readInt();

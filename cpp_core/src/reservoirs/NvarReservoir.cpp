@@ -1,6 +1,9 @@
 #include "rclib/reservoirs/NvarReservoir.h"
 
+#include "rclib/Serialization.h"
+
 #include <limits>
+#include <memory>
 #include <stdexcept>
 
 NvarReservoir::NvarReservoir(int num_lags, int polynomial_order)
@@ -116,4 +119,54 @@ int NvarReservoir::countMonomials(int n_variables, int degree) {
     }
   }
   return static_cast<int>(result);
+}
+
+void NvarReservoir::checkConsistency() const {
+  translateSerializationErrors("NvarReservoir", [&] {
+    // The hyperparameters were validated by the constructor; load() constructs through it.
+    if (!initialized) {
+      return; // nothing is sized until the first input fixes input_dim
+    }
+    if (input_dim <= 0) {
+      throw SerializationError("NvarReservoir: input_dim must be positive once initialized.");
+    }
+    const int output_dim = getOutputDim(input_dim); // rejects feature counts that are too large
+    if (state.rows() != 1 || state.cols() != output_dim) {
+      throw SerializationError("NvarReservoir: state must be 1 x the output dimension.");
+    }
+    if (past_inputs.rows() != num_lags || past_inputs.cols() != input_dim) {
+      throw SerializationError("NvarReservoir: past_inputs must be num_lags x input_dim.");
+    }
+  });
+}
+
+void NvarReservoir::save(BinaryWriter &writer) const {
+  translateSerializationErrors("NvarReservoir", [&] {
+    checkConsistency();
+    writer.writeInt(num_lags);
+    writer.writeInt(polynomial_order);
+    // The runtime state only exists once the first input has fixed input_dim.
+    writer.writeBool(initialized);
+    if (initialized) {
+      writer.writeInt(input_dim);
+      writer.writeMatrix(state);
+      writer.writeMatrix(past_inputs);
+    }
+  });
+}
+
+std::shared_ptr<NvarReservoir> NvarReservoir::load(BinaryReader &reader) {
+  return translateSerializationErrors("NvarReservoir", [&] {
+    const int num_lags = reader.readInt();
+    const int polynomial_order = reader.readInt();
+    auto res = std::make_shared<NvarReservoir>(num_lags, polynomial_order); // validates both
+    if (reader.readBool()) {
+      res->input_dim = reader.readInt();
+      res->state = reader.readMatrix();
+      res->past_inputs = reader.readMatrix();
+      res->initialized = true;
+    }
+    res->checkConsistency();
+    return res;
+  });
 }
