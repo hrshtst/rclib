@@ -70,10 +70,12 @@ For typical reservoir sizes (N=500 to 2000), the work per thread in a sparse mat
 
 **Solution:**
 Inner-loop parallelization was re-introduced but strictly gated:
+
 1.  **Thresholding:** Parallelization is only enabled for $N > 1000$.
 2.  **No Oversubscription:** A check for `!omp_in_parallel()` ensures that if the reservoir is part of a parallel ensemble (already threaded), it runs serially to avoid thread explosion.
 
 The library now combines:
+
 1.  **Fine-Grained Parallelism:** Multi-threaded updates for large single reservoirs.
 2.  **Course-Grained Parallelism:** Parallelizing at the `Model` level for ensembles.
 3.  **Vectorization:** Efficient sequential loops for small reservoirs ($N \le 1000$).
