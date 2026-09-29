@@ -207,18 +207,24 @@ def test_parallel_model_partial_fit_none_uses_combined_current_state() -> None:
     model.partial_fit(None, y)
 
 
-def test_parallel_model_reservoir_error_raises() -> None:
+@pytest.mark.parametrize(
+    "reservoir",
+    [reservoirs.Nvar(num_lags=2), reservoirs.RandomSparse(n_neurons=10, spectral_radius=0.9)],
+    ids=["nvar", "random_sparse"],
+)
+def test_parallel_model_reservoir_error_raises(reservoir: reservoirs.Nvar | reservoirs.RandomSparse) -> None:
     """Test that a reservoir error inside the parallel update raises instead of aborting."""
     model = ESN(connection_type="parallel")
-    model.add_reservoir(reservoirs.Nvar(num_lags=2))
-    model.add_reservoir(reservoirs.Nvar(num_lags=3))
+    # Each add_reservoir call creates a separate C++ reservoir from the configuration.
+    model.add_reservoir(reservoir)
+    model.add_reservoir(reservoir)
     model.set_readout(readouts.Ridge(alpha=1e-6, include_bias=True))
 
     rng = np.random.default_rng(seed=42)
     x = rng.random((20, 1))
     model.fit(x, x)
 
-    # NVAR locks its input width on first use, so a wider input must be rejected.
+    # Reservoirs lock their input width on first use, so a wider input must be rejected.
     with pytest.raises(ValueError, match="input dimension changed"):
         model.predict(rng.random((5, 2)))
 

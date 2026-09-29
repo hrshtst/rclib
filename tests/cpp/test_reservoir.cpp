@@ -3,6 +3,7 @@
 
 #include <Eigen/Dense>
 #include <catch2/catch_all.hpp>
+#include <stdexcept>
 
 class MinimalReservoir : public Reservoir {
 public:
@@ -86,4 +87,18 @@ TEST_CASE("RandomSparseReservoir - State Reset", "[RandomSparseReservoir]") {
   REQUIRE(res.getState().rows() == 1);
   REQUIRE(res.getState().cols() == n_neurons);
   REQUIRE(res.getState().isZero(0));
+}
+
+TEST_CASE("RandomSparseReservoir - rejects input width changes after initialization", "[RandomSparseReservoir]") {
+  RandomSparseReservoir res(10, 0.9, 0.5, 0.1, 1.0, true);
+
+  // The first input locks W_in to three columns.
+  res.advance(Eigen::MatrixXd::Random(1, 3));
+  const Eigen::MatrixXd state_before = res.getState();
+
+  REQUIRE_THROWS_AS(res.advance(Eigen::MatrixXd::Random(1, 4)), std::invalid_argument);
+  REQUIRE_THROWS_AS(res.advance(Eigen::MatrixXd::Random(1, 2)), std::invalid_argument);
+  // A rejected input leaves the state untouched.
+  REQUIRE(res.getState() == state_before);
+  REQUIRE_NOTHROW(res.advance(Eigen::MatrixXd::Random(1, 3)));
 }

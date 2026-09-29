@@ -90,15 +90,21 @@ TEST_CASE("Model - parallel connection", "[Model]") {
 TEST_CASE("Model - parallel reservoir errors propagate to the caller", "[Model]") {
   // Reservoir updates in a parallel model run inside an OpenMP region; an error
   // raised there must reach the caller as an exception instead of terminating.
+  // Both reservoir types lock their input width on first use.
   Model model;
-  model.addReservoir(std::make_shared<NvarReservoir>(2), "parallel");
-  model.addReservoir(std::make_shared<NvarReservoir>(3), "parallel");
+  SECTION("NvarReservoir") {
+    model.addReservoir(std::make_shared<NvarReservoir>(2), "parallel");
+    model.addReservoir(std::make_shared<NvarReservoir>(3), "parallel");
+  }
+  SECTION("RandomSparseReservoir") {
+    model.addReservoir(std::make_shared<RandomSparseReservoir>(10, 0.9, 0.5, 0.1, 1.0), "parallel");
+    model.addReservoir(std::make_shared<RandomSparseReservoir>(8, 0.9, 0.5, 0.1, 1.0), "parallel");
+  }
   model.setReadout(std::make_shared<RidgeReadout>(1e-6));
 
   Eigen::MatrixXd inputs = Eigen::MatrixXd::Random(20, 1);
   model.fit(inputs, inputs);
 
-  // NVAR locks its input width on first use, so a wider input must be rejected.
   Eigen::MatrixXd wider = Eigen::MatrixXd::Random(5, 2);
   REQUIRE_THROWS_AS(model.predict(wider), std::invalid_argument);
   REQUIRE_THROWS_AS(model.predictOnline(wider.row(0)), std::invalid_argument);

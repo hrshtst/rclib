@@ -110,6 +110,8 @@ const Eigen::MatrixXd &RandomSparseReservoir::advance(const Eigen::MatrixXd &inp
   if (!W_in_initialized) {
     initialize_W_in(input.cols());
     temp_state.resize(state.rows(), state.cols());
+  } else if (input.cols() != W_in.rows()) {
+    throw std::invalid_argument("input dimension changed after RandomSparseReservoir initialization.");
   }
 
   // 1. Initialize temp_state with (input * W_in + bias)
