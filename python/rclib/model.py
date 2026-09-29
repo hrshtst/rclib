@@ -366,7 +366,11 @@ class ESN:
         SerializationError
             If the file cannot be read or is not a valid model file.
         """
-        cpp_model = _rclib.Model.load(os.fspath(path))
+        return cls._from_cpp_model(_rclib.Model.load(os.fspath(path)))
+
+    @classmethod
+    def _from_cpp_model(cls, cpp_model: Any) -> ESN:  # noqa: ANN401
+        """Wrap a loaded C++ model, rebuilding the Python configuration objects."""
         esn = cls(cpp_model.getConnectionType())
         esn._cpp_model = cpp_model
         # partial_fit and _update_readout read these configuration objects.
@@ -379,3 +383,14 @@ class ESN:
             msg = f"Invalid model file: {err}"
             raise _rclib.SerializationError(msg) from err
         return esn
+
+    def __getstate__(self) -> dict[str, bytes]:
+        """Support pickle and copy.deepcopy by storing the model in the model file format.
+
+        Unpickling can run arbitrary code, so only unpickle data you trust.
+        """
+        return {"model": self._cpp_model.dumps()}
+
+    def __setstate__(self, state: dict[str, bytes]) -> None:
+        """Restore a model pickled by __getstate__."""
+        self.__dict__.update(ESN._from_cpp_model(_rclib.Model.loads(state["model"])).__dict__)

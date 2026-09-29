@@ -6,6 +6,8 @@
 from __future__ import annotations
 
 import contextlib
+import copy
+import pickle
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -244,3 +246,36 @@ def test_config_rebuild_errors_raise_serialization_error(tmp_path: Path, monkeyp
     monkeypatch.setattr(model, "_readout_config_from_cpp", reject)
     with pytest.raises(rclib.SerializationError, match="alpha"):
         ESN.load(tmp_path / "model.rclib")
+
+
+@pytest.mark.parametrize("topology", ["random_sparse", "parallel_mixed"])
+def test_pickle_round_trip(tmp_path: Path, topology: str) -> None:
+    """Pickling stores the same bytes as a model file and restores an identical model."""
+    original = _fitted(topology, "rls_rank1")
+    original.save(tmp_path / "model.rclib")
+    assert original._cpp_model.dumps() == (tmp_path / "model.rclib").read_bytes()  # noqa: SLF001
+
+    restored = pickle.loads(pickle.dumps(original))  # noqa: S301 - data pickled by this test
+    assert restored.connection_type == original.connection_type
+    assert _configs(restored) == _configs(original)
+    x = _signal(4, phase=0.5)
+    np.testing.assert_array_equal(restored.predict_online(x), original.predict_online(x))
+
+
+def test_deepcopy_is_independent() -> None:
+    """copy.deepcopy yields an identical model that no longer shares state with the original."""
+    original = _fitted("random_sparse", "rls_rank1")
+    duplicate = copy.deepcopy(original)
+    series = _signal(20, phase=0.5)
+    np.testing.assert_array_equal(duplicate.predict(series), original.predict(series))
+
+    before = original.predict(series)
+    duplicate.partial_fit(series[:-1], series[1:])
+    np.testing.assert_array_equal(original.predict(series), before)
+    assert not np.array_equal(duplicate.predict(series), before)
+
+
+def test_pickling_an_unsavable_model_raises() -> None:
+    """Pickling a model that cannot be saved raises SerializationError."""
+    with pytest.raises(rclib.SerializationError):
+        pickle.dumps(_without_readout())

@@ -9,6 +9,8 @@
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h> // For std::vector, etc.
+#include <sstream>
+#include <string>
 
 namespace py = pybind11;
 
@@ -115,5 +117,20 @@ PYBIND11_MODULE(_rclib, m) {
       .def("save", py::overload_cast<const std::string &>(&Model::save, py::const_), py::arg("path"),
            "Save the model to a file, replacing any existing file atomically.")
       .def_static("load", py::overload_cast<const std::string &>(&Model::load), py::arg("path"),
-                  "Load a model file written by Model.save.");
+                  "Load a model file written by Model.save.")
+      .def(
+          "dumps",
+          [](const Model &model) {
+            std::ostringstream buffer;
+            model.save(buffer);
+            return py::bytes(buffer.str());
+          },
+          "Serialize the model to bytes in the model file format.")
+      .def_static(
+          "loads",
+          [](const py::bytes &data) {
+            std::istringstream input{std::string(data)};
+            return Model::load(input);
+          },
+          py::arg("data"), "Load a model from bytes produced by Model.dumps.");
 }
