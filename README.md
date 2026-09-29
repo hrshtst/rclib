@@ -139,6 +139,25 @@ If you wish to use `rclib_core` as a static library in your own C++ project, the
     # ... rest of your project's CMakeLists.txt
     ```
 
+### Saving and Loading Trained Models
+
+Trained models can be saved to a file and loaded later from either Python or C++;
+the files are interchangeable between the two:
+
+```python
+model.save("model.rclib")
+restored = ESN.load("model.rclib")  # also supports pickle and copy.deepcopy
+```
+
+```cpp
+model.save("model.rclib");
+Model restored = Model::load("model.rclib");
+```
+
+Only load files from sources you trust. See
+[Saving and Loading Models](docs/user_guide/advanced_usage.md#saving-and-loading-models)
+for what is stored, error handling and portability.
+
 ## Running Tests
 
 ### Using Nox (Recommended)
