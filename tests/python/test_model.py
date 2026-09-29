@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+import copy
+
 import numpy as np
 import pytest
 from rclib import readouts, reservoirs
@@ -240,3 +242,50 @@ def test_model_reservoir_count_and_connection_type() -> None:
         model.add_reservoir(config)
     assert model._cpp_model.getNumReservoirs() == len(configs)  # noqa: SLF001
     assert model._cpp_model.getConnectionType() == "parallel"  # noqa: SLF001
+
+
+def _generative_model(output_columns: int = 1) -> ESN:
+    """A model trained to predict the next value of a sine wave."""
+    model = ESN(connection_type="parallel")
+    model.add_reservoir(reservoirs.RandomSparse(n_neurons=30, spectral_radius=0.9, include_bias=True, seed=7))
+    model.add_reservoir(reservoirs.Nvar(num_lags=2, polynomial_order=2))
+    model.set_readout(readouts.Ridge(alpha=1e-4, include_bias=True))
+    series = np.sin(0.3 * np.arange(81)).reshape(-1, 1)
+    model.fit(series[:-1], np.repeat(series[1:], output_columns, axis=1), washout_len=10)
+    return model
+
+
+@pytest.mark.parametrize("chunks", [[3, 4], [6, 1], [1] * 7])
+def test_predict_generative_in_chunks_equals_one_call(chunks: list[int]) -> None:
+    """Generating in chunks continues the sequence and ends in the same reservoir states."""
+    trained = _generative_model()
+    prime = np.sin(0.3 * np.arange(10) + 2.0).reshape(-1, 1)
+    whole = copy.deepcopy(trained)
+    expected = whole.predict_generative(prime, sum(chunks))
+
+    chunked = copy.deepcopy(trained)
+    parts = [chunked.predict_generative(prime if i == 0 else np.empty((0, 1)), n) for i, n in enumerate(chunks)]
+    np.testing.assert_array_equal(np.vstack(parts), expected)
+    for i in range(2):
+        np.testing.assert_array_equal(chunked.get_reservoir(i).getState(), whole.get_reservoir(i).getState())
+
+
+def test_predict_generative_zero_steps_feeds_nothing_back() -> None:
+    """Zero steps consume the priming data but feed no output back."""
+    trained = _generative_model()
+    prime = np.sin(0.3 * np.arange(10) + 2.0).reshape(-1, 1)
+    generative = copy.deepcopy(trained)
+    online = copy.deepcopy(trained)
+    assert generative.predict_generative(prime, 0).shape == (0, 1)
+    online.predict_online(prime)
+    for i in range(2):
+        np.testing.assert_array_equal(generative.get_reservoir(i).getState(), online.get_reservoir(i).getState())
+
+
+@pytest.mark.parametrize("n_steps", [1, 3])
+def test_predict_generative_rejects_outputs_that_cannot_be_fed_back(n_steps: int) -> None:
+    """Outputs wider than the model input raise ValueError, also for a single step."""
+    model = _generative_model(output_columns=2)
+    prime = np.sin(0.3 * np.arange(10)).reshape(-1, 1)
+    with pytest.raises(ValueError, match="input dimension changed"):
+        model.predict_generative(prime, n_steps)

@@ -117,6 +117,23 @@ def test_ridge_solver_names_round_trip(tmp_path: Path, solver: str) -> None:
     assert _configs(ESN.load(tmp_path / "model.rclib")) == _configs(esn)
 
 
+@pytest.mark.parametrize("topology", TOPOLOGIES)
+def test_generation_continues_across_save_and_load(tmp_path: Path, topology: str) -> None:
+    """Generating 3 steps, saving, loading and generating 4 more equals generating 7 steps."""
+    trained = _fitted(topology, "ridge")
+    prime = _signal(10, phase=2.0)
+    whole = copy.deepcopy(trained)
+    expected = whole.predict_generative(prime, 7)
+
+    first = copy.deepcopy(trained)
+    head = first.predict_generative(prime, 3)
+    first.save(tmp_path / "model.rclib")
+    second = ESN.load(tmp_path / "model.rclib")
+    tail = second.predict_generative(np.empty((0, 1)), 4)
+    np.testing.assert_array_equal(np.vstack([head, tail]), expected)
+    assert second._cpp_model.dumps() == whole._cpp_model.dumps()  # noqa: SLF001 - identical final states
+
+
 @pytest.mark.parametrize("readout", ONLINE_READOUTS)
 @pytest.mark.parametrize("topology", ["random_sparse", "serial_mixed", "parallel_mixed"])
 def test_online_learning_continues_identically(tmp_path: Path, topology: str, readout: str) -> None:

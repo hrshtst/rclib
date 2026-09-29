@@ -151,6 +151,13 @@ Eigen::MatrixXd Model::predictGenerative(const Eigen::MatrixXd &prime_inputs, in
     generated_outputs.row(i) = next_input;
   }
 
+  // Feed the last output back too, so the reservoirs end in the state that
+  // produces the next step and a following call without priming data continues
+  // the sequence instead of repeating its last output.
+  if (n_steps > 0) {
+    collectStates(next_input);
+  }
+
   return generated_outputs;
 }
 

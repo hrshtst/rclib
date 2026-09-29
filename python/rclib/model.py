@@ -246,6 +246,13 @@ class ESN:
     def predict_generative(self, prime_data: ArrayLike, n_steps: int) -> np.ndarray:
         """Generative prediction.
 
+        Advances the reservoirs through ``prime_data`` (if any), then generates
+        ``n_steps`` outputs, feeding each output back as the next input. Every
+        generated output, including the last, advances the reservoirs, so a following
+        call with empty ``prime_data`` continues the sequence: generating ``a`` steps
+        and then ``b`` steps equals generating ``a + b`` steps. With ``n_steps == 0``
+        no output is fed back.
+
         Parameters
         ----------
         prime_data : ArrayLike
@@ -257,6 +264,12 @@ class ESN:
         -------
         np.ndarray
             The generated data.
+
+        Raises
+        ------
+        ValueError
+            If a generated output cannot be fed back because its width differs from
+            the input width the reservoirs are locked to (also for ``n_steps == 1``).
         """
         # Call the C++ model's predictGenerative method
         return self._cpp_model.predictGenerative(prime_data, n_steps)

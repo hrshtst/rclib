@@ -216,6 +216,30 @@ TEST_CASE("Model serialization - generative prediction continues identically", "
   REQUIRE(sameBits(restored.predictGenerative(no_priming, 10), original.predictGenerative(no_priming, 10)));
 }
 
+TEST_CASE("Model serialization - generation continues across save and load", "[serialization][Model]") {
+  const auto topology =
+      GENERATE(Topology::RandomSparse, Topology::Nvar, Topology::SerialMixed, Topology::ParallelMixed);
+  Model trained = makeModel(topology, ReadoutKind::Ridge);
+  const Eigen::MatrixXd series = signal(81, 0.0);
+  trained.fit(series.topRows(80), series.bottomRows(80), 10);
+  const std::string trained_bytes = saveToBytes(trained);
+  const Eigen::MatrixXd prime = signal(10, 2.0);
+
+  Model whole = loadFromBytes(trained_bytes);
+  const Eigen::MatrixXd expected = whole.predictGenerative(prime, 7);
+
+  // Generate 3 steps, save, load, and generate the remaining 4 without priming.
+  Model first = loadFromBytes(trained_bytes);
+  const Eigen::MatrixXd head = first.predictGenerative(prime, 3);
+  Model second = loadFromBytes(saveToBytes(first));
+  const Eigen::MatrixXd tail = second.predictGenerative(Eigen::MatrixXd(0, 1), 4);
+
+  Eigen::MatrixXd generated(7, 1);
+  generated << head, tail;
+  REQUIRE(sameBits(generated, expected));
+  REQUIRE(saveToBytes(second) == saveToBytes(whole)); // identical final states
+}
+
 TEST_CASE("Model serialization - unfitted and uninitialized components round-trip", "[serialization][Model]") {
   const auto readout = GENERATE(ReadoutKind::Ridge, ReadoutKind::RlsRank1, ReadoutKind::Lms);
   Model original = makeModel(Topology::ParallelMixed, readout);

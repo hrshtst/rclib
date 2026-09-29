@@ -37,7 +37,15 @@ To generate sequences autonomously (feeding predictions back as inputs):
 prime_data = x_test[:100]
 # Generate the next 200 steps
 generated = model.predict_generative(prime_data, n_steps=200)
+# Continue the same sequence for another 100 steps
+more = model.predict_generative(np.empty((0, 1)), n_steps=100)
 ```
+
+Every generated output, including the last, is fed back into the reservoirs, so a
+call with empty priming data continues where the previous call stopped:
+generating 200 and then 100 steps gives the same outputs and final reservoir
+states as generating 300 steps at once. The readout's output width must match the
+model's input width, since each output becomes the next input.
 
 ## Ridge Regression Solver Selection
 
