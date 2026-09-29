@@ -1,4 +1,5 @@
 #include "rclib/Model.h"
+#include "rclib/Serialization.h"
 #include "rclib/readouts/LmsReadout.h"
 #include "rclib/readouts/RidgeReadout.h"
 #include "rclib/readouts/RlsReadout.h"
@@ -14,6 +15,9 @@ namespace py = pybind11;
 PYBIND11_MODULE(_rclib, m) {
   m.doc() = "rclib C++ core: high-performance reservoir computing (reservoirs, "
             "readouts, and models) backed by Eigen, exposed via pybind11.";
+
+  // Raised by every model save/load failure; a RuntimeError subclass in Python.
+  py::register_exception<SerializationError>(m, "SerializationError", PyExc_RuntimeError);
 
   // Bind Reservoir base class
   py::class_<Reservoir, std::shared_ptr<Reservoir>>(m, "Reservoir")
@@ -107,5 +111,9 @@ PYBIND11_MODULE(_rclib, m) {
       .def("getConnectionType", &Model::getConnectionType)
       .def("predictOnline", &Model::predictOnline)
       .def("predictGenerative", &Model::predictGenerative, py::arg("prime_inputs"), py::arg("n_steps"))
-      .def("resetReservoirs", &Model::resetReservoirs);
+      .def("resetReservoirs", &Model::resetReservoirs)
+      .def("save", py::overload_cast<const std::string &>(&Model::save, py::const_), py::arg("path"),
+           "Save the model to a file, replacing any existing file atomically.")
+      .def_static("load", py::overload_cast<const std::string &>(&Model::load), py::arg("path"),
+                  "Load a model file written by Model.save.");
 }
