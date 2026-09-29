@@ -9,6 +9,7 @@ The standard Echo State Network (ESN) update equation is:
 $$ \mathbf{x}(t+1) = (1-\alpha)\mathbf{x}(t) + \alpha \tanh(\mathbf{W}_{in}\mathbf{u}(t+1) + \mathbf{W}_{res}\mathbf{x}(t)) $$
 
 Where:
+
 *   $\mathbf{x}(t)$ is the reservoir state vector.
 *   $\mathbf{u}(t)$ is the input vector.
 *   $\mathbf{W}_{in}$ is the input weight matrix.

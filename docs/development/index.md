@@ -25,6 +25,7 @@ uv run pre-commit install
 ```
 
 Tools used:
+
 *   `ruff` (Python linting/formatting)
 *   `basedpyright` (Static type checking)
 *   `clang-format` (C++ formatting)

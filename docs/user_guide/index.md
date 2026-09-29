@@ -7,6 +7,7 @@ Welcome to the `rclib` User Guide. This guide will help you install the library,
 `rclib` is a C++ based Reservoir Computing library with Python bindings. It offers high performance for training large-scale Echo State Networks (ESNs) and related architectures.
 
 Key features include:
+
 *   **Speed**: Heavy lifting is done in C++ using the Eigen library.
 *   **Flexibility**: Mix and match different reservoir types and readout algorithms.
 *   **Scalability**: Supports large sparse reservoirs and multi-threading.
