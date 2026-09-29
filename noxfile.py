@@ -75,13 +75,20 @@ def tests(session: nox.Session) -> None:
     )
 
 
-@nox.session(python="3.12", reuse_venv=True)
+@nox.session(venv_backend="none")
 def docs(session: nox.Session) -> None:
-    """Build the documentation."""
-    session.install("scikit-build-core", "pybind11")
-    session.install("--no-build-isolation", ".")
-    session.install("mkdocs", "mkdocs-material", "mkdocstrings[python]", "pymdown-extensions")
-    session.run("mkdocs", "build")
+    """Build the documentation with the locked `docs` dependency group.
+
+    Runs in the project's ./.venv (no nox-managed venv), so the build uses exactly
+    the versions in uv.lock, the same ones the deployment uses; an unpinned install
+    would drift to releases the configuration was never tested with. The `build`
+    group is bootstrapped first because the editable rclib install, which
+    mkdocstrings imports for the API reference, is built without build isolation
+    (https://github.com/astral-sh/uv/issues/13998). `--inexact` leaves other
+    installed groups in place. Extra arguments are passed to `mkdocs build`.
+    """
+    session.run("uv", "sync", "--locked", "--inexact", "--no-install-project", "--only-group", "build", external=True)
+    session.run("uv", "run", "--locked", "--group", "docs", "mkdocs", "build", *session.posargs, external=True)
 
 
 @nox.session(reuse_venv=True)
