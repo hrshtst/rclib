@@ -687,10 +687,6 @@ TEST_CASE("LmsReadout - serialization round-trips and continues identically", "[
 
   SECTION("Unfitted") {}
   SECTION("Fitted") { original.partialFit(states.topRows(4), targets.topRows(4)); }
-  SECTION("Unfitted by an empty fit that left stale weights") {
-    original.partialFit(states.topRows(4), targets.topRows(4));
-    original.fit(Eigen::MatrixXd(0, 4), Eigen::MatrixXd(0, 2));
-  }
 
   const std::string bytes = saveToBytes(original);
   const auto restored = loadFromBytes<LmsReadout>(bytes);

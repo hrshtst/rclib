@@ -356,6 +356,24 @@ def test_readout_rejects_non_finite(
         make_cpp(bad)
 
 
+@pytest.mark.parametrize(
+    ("states_shape", "targets_shape"),
+    [((0, 4), (0, 2)), ((5, 0), (5, 2)), ((5, 4), (3, 2)), ((5, 4), (7, 2)), ((5, 4), (5, 0))],
+    ids=["no_rows", "no_state_columns", "fewer_target_rows", "more_target_rows", "no_target_columns"],
+)
+def test_lms_fit_rejects_invalid_input(states_shape: tuple[int, int], targets_shape: tuple[int, int]) -> None:
+    """LMS fit rejects malformed input before resetting, keeping a trained readout intact."""
+    rng = np.random.default_rng(seed=5)
+    states = rng.random((5, 4))
+    readout = _rclib.LmsReadout(learning_rate=0.05, include_bias=True)
+    readout.fit(states, rng.random((5, 2)))
+    before = readout.predict(states)
+
+    with pytest.raises(ValueError, match=r"states|targets"):
+        readout.fit(rng.random(states_shape), rng.random(targets_shape))
+    np.testing.assert_array_equal(readout.predict(states), before)
+
+
 def test_ridge_readout_weights_are_readable_and_read_only() -> None:
     """The fitted weights are exposed as a copy with the bias row last; reading them never alters prediction."""
     rng = np.random.default_rng(seed=7)

@@ -251,17 +251,13 @@ TEST_CASE("Model serialization - unused reservoirs with a matching fitted readou
 }
 
 TEST_CASE("Model serialization - a readout left unfitted by a failed fit", "[serialization][Model]") {
-  const auto readout = GENERATE(ReadoutKind::RlsRank1, ReadoutKind::Lms);
-  Model original = makeModel(Topology::RandomSparse, readout);
+  Model original = makeModel(Topology::RandomSparse, ReadoutKind::RlsRank1);
   const Eigen::MatrixXd series = signal(41, 0.0);
   original.fit(series.topRows(20), series.middleRows(1, 20));
 
-  // RLS throws on an empty batch and LMS accepts it; both end up unfitted with
-  // their previous weights still allocated.
-  try {
-    original.getReadout()->fit(Eigen::MatrixXd(0, 20), Eigen::MatrixXd(0, 1));
-  } catch (const std::invalid_argument &) {
-  }
+  // RLS clears its fitted flag before validating the batch, so a rejected fit
+  // leaves it unfitted with its previous weights still allocated.
+  REQUIRE_THROWS_AS(original.getReadout()->fit(Eigen::MatrixXd(0, 20), Eigen::MatrixXd(0, 1)), std::invalid_argument);
   REQUIRE(original.getReadout()->getInputDim() == 0);
 
   Model restored = loadFromBytes(saveToBytes(original));

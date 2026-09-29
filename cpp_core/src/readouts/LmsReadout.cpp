@@ -14,8 +14,20 @@ LmsReadout::LmsReadout(double learning_rate, bool include_bias)
 }
 
 void LmsReadout::fit(const Eigen::MatrixXd &states, const Eigen::MatrixXd &targets) {
-  // LMS is an online algorithm, so fit will call partialFit repeatedly.
-  // Reset the state before fitting.
+  // Validate before resetting, so rejected input keeps a trained readout intact
+  // and targets.row(i) below never indexes past the end.
+  if (states.rows() == 0 || states.cols() == 0) {
+    throw std::invalid_argument("states must be a non-empty 2D matrix.");
+  }
+  if (targets.rows() != states.rows()) {
+    throw std::invalid_argument("targets must have the same number of rows as states.");
+  }
+  if (targets.cols() == 0) {
+    throw std::invalid_argument("targets must have at least one column.");
+  }
+
+  // LMS is an online algorithm: fit restarts it and applies one update per sample.
+  // A single partialFit on the whole batch would average the gradients instead.
   initialized = false; // Force re-initialization in partialFit
 
   for (int i = 0; i < states.rows(); ++i) {

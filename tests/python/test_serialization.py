@@ -5,7 +5,6 @@
 
 from __future__ import annotations
 
-import contextlib
 import copy
 import pickle
 from typing import TYPE_CHECKING
@@ -154,14 +153,14 @@ def test_generative_prediction_continues_identically(tmp_path: Path, topology: s
     )
 
 
-@pytest.mark.parametrize("readout", ["rls_rank1", "lms"])
-def test_readout_left_unfitted_by_a_failed_fit(tmp_path: Path, readout: str) -> None:
+def test_readout_left_unfitted_by_a_failed_fit(tmp_path: Path) -> None:
     """A readout emptied by a failed fit loads unfitted and restarts identically."""
-    original = _build("random_sparse", readout)
+    original = _build("random_sparse", "rls_rank1")
     series = _signal(41)
     original.fit(series[:20], series[1:21])
-    # RLS rejects an empty batch and LMS accepts it; both end up unfitted.
-    with contextlib.suppress(ValueError):
+    # RLS clears its fitted flag before validating the batch, so a rejected fit
+    # leaves it unfitted with its previous weights still allocated.
+    with pytest.raises(ValueError, match="non-empty"):
         original._cpp_model.getReadout().fit(np.empty((0, 30)), np.empty((0, 1)))  # noqa: SLF001
     original.save(tmp_path / "model.rclib")
     restored = ESN.load(tmp_path / "model.rclib")
