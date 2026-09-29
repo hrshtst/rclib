@@ -179,3 +179,14 @@ TEST_CASE("Model - partialFit", "[Model]") {
     REQUIRE_NOTHROW(pmodel.partialFit(input, target));
   }
 }
+
+TEST_CASE("Model - reservoir count and connection type", "[Model]") {
+  Model model;
+  REQUIRE(model.getNumReservoirs() == 0);
+  REQUIRE(model.getConnectionType() == "serial");
+
+  model.addReservoir(std::make_shared<NvarReservoir>(2), "parallel");
+  model.addReservoir(std::make_shared<NvarReservoir>(3), "parallel");
+  REQUIRE(model.getNumReservoirs() == 2);
+  REQUIRE(model.getConnectionType() == "parallel");
+}

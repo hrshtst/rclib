@@ -20,23 +20,34 @@ PYBIND11_MODULE(_rclib, m) {
       .def("advance", &Reservoir::advance)
       .def("resetState", &Reservoir::resetState)
       .def("getState", &Reservoir::getState)
-      .def("getOutputDim", &Reservoir::getOutputDim);
+      .def("getOutputDim", &Reservoir::getOutputDim)
+      .def("getInputDim", &Reservoir::getInputDim);
 
   // Bind RandomSparseReservoir
   py::class_<RandomSparseReservoir, Reservoir, std::shared_ptr<RandomSparseReservoir>>(m, "RandomSparseReservoir")
       .def(py::init<int, double, double, double, double, bool, unsigned int>(), py::arg("n_neurons"),
            py::arg("spectral_radius"), py::arg("sparsity"), py::arg("leak_rate"), py::arg("input_scaling"),
-           py::arg("include_bias") = false, py::arg("seed") = 42);
+           py::arg("include_bias") = false, py::arg("seed") = 42)
+      .def("getNNeurons", &RandomSparseReservoir::getNNeurons)
+      .def("getSpectralRadius", &RandomSparseReservoir::getSpectralRadius)
+      .def("getSparsity", &RandomSparseReservoir::getSparsity)
+      .def("getLeakRate", &RandomSparseReservoir::getLeakRate)
+      .def("getInputScaling", &RandomSparseReservoir::getInputScaling)
+      .def("getIncludeBias", &RandomSparseReservoir::getIncludeBias)
+      .def("getSeed", &RandomSparseReservoir::getSeed);
 
   // Bind NvarReservoir
   py::class_<NvarReservoir, Reservoir, std::shared_ptr<NvarReservoir>>(m, "NvarReservoir")
-      .def(py::init<int, int>(), py::arg("num_lags"), py::arg("polynomial_order") = 1);
+      .def(py::init<int, int>(), py::arg("num_lags"), py::arg("polynomial_order") = 1)
+      .def("getNumLags", &NvarReservoir::getNumLags)
+      .def("getPolynomialOrder", &NvarReservoir::getPolynomialOrder);
 
   // Bind Readout base class
   py::class_<Readout, std::shared_ptr<Readout>>(m, "Readout")
       .def("fit", &Readout::fit)
       .def("partialFit", &Readout::partialFit)
-      .def("predict", &Readout::predict);
+      .def("predict", &Readout::predict)
+      .def("getInputDim", &Readout::getInputDim);
 
   // Bind RidgeReadout
   py::class_<RidgeReadout, Readout, std::shared_ptr<RidgeReadout>> ridge(m, "RidgeReadout");
@@ -53,6 +64,8 @@ PYBIND11_MODULE(_rclib, m) {
   ridge
       .def(py::init<double, bool, RidgeReadout::Solver, double>(), py::arg("alpha"), py::arg("include_bias"),
            py::arg("solver") = RidgeReadout::Solver::AUTO, py::arg("tolerance") = 1e-10)
+      .def("getAlpha", &RidgeReadout::getAlpha)
+      .def("getTolerance", &RidgeReadout::getTolerance)
       .def("getSolver", &RidgeReadout::getSolver)
       .def("getEffectiveSolver", &RidgeReadout::getEffectiveSolver)
       .def("getIncludeBias", &RidgeReadout::getIncludeBias)
@@ -69,11 +82,16 @@ PYBIND11_MODULE(_rclib, m) {
 
   rls.def(py::init<double, double, bool, RlsReadout::Solver>(), py::arg("lambda_"), py::arg("delta"),
           py::arg("include_bias"), py::arg("solver") = RlsReadout::Solver::RANK1_UPDATE)
+      .def("getLambda", &RlsReadout::getLambda)
+      .def("getDelta", &RlsReadout::getDelta)
+      .def("getIncludeBias", &RlsReadout::getIncludeBias)
       .def("getSolver", &RlsReadout::getSolver);
 
   // Bind LmsReadout
   py::class_<LmsReadout, Readout, std::shared_ptr<LmsReadout>>(m, "LmsReadout")
-      .def(py::init<double, bool>(), py::arg("learning_rate"), py::arg("include_bias"));
+      .def(py::init<double, bool>(), py::arg("learning_rate"), py::arg("include_bias"))
+      .def("getLearningRate", &LmsReadout::getLearningRate)
+      .def("getIncludeBias", &LmsReadout::getIncludeBias);
 
   // Bind Model class
   py::class_<Model>(m, "Model")
@@ -85,6 +103,8 @@ PYBIND11_MODULE(_rclib, m) {
       .def("predict", &Model::predict, py::arg("inputs"), py::arg("reset_state_before_predict") = true)
       .def("getReservoir", &Model::getReservoir)
       .def("getReadout", &Model::getReadout)
+      .def("getNumReservoirs", &Model::getNumReservoirs)
+      .def("getConnectionType", &Model::getConnectionType)
       .def("predictOnline", &Model::predictOnline)
       .def("predictGenerative", &Model::predictGenerative, py::arg("prime_inputs"), py::arg("n_steps"))
       .def("resetReservoirs", &Model::resetReservoirs);

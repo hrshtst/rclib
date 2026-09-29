@@ -12,6 +12,12 @@ public:
   void partialFit(const Eigen::MatrixXd &state, const Eigen::MatrixXd &target) override;
   Eigen::MatrixXd predict(const Eigen::MatrixXd &states) override;
 
+  int getInputDim() const override {
+    return W_out.size() == 0 ? 0 : static_cast<int>(W_out.rows()) - (include_bias ? 1 : 0);
+  }
+
+  double getAlpha() const { return alpha; }
+  double getTolerance() const { return tolerance; }
   Solver getSolver() const { return solver; }
   Solver getEffectiveSolver() const { return effective_solver; }
   bool getIncludeBias() const { return include_bias; }

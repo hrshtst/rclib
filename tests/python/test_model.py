@@ -230,3 +230,13 @@ def test_parallel_model_reservoir_error_raises(reservoir: reservoirs.Nvar | rese
 
     # The model remains usable with the original input width.
     assert model.predict(x).shape == x.shape
+
+
+def test_model_reservoir_count_and_connection_type() -> None:
+    """The C++ model reports its reservoir count and connection type."""
+    model = ESN(connection_type="parallel")
+    configs = [reservoirs.Nvar(num_lags=2), reservoirs.Nvar(num_lags=3)]
+    for config in configs:
+        model.add_reservoir(config)
+    assert model._cpp_model.getNumReservoirs() == len(configs)  # noqa: SLF001
+    assert model._cpp_model.getConnectionType() == "parallel"  # noqa: SLF001

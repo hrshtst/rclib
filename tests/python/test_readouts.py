@@ -377,3 +377,25 @@ def test_ridge_readout_weights_are_readable_and_read_only() -> None:
     assert plain.getIncludeBias() is False
     assert plain.getWeights().shape == (8, 3)
     assert np.allclose(plain.predict(states), states @ plain.getWeights(), atol=1e-12, rtol=0.0)
+
+
+def test_readout_getters_and_input_dim() -> None:
+    """Configuration getters return constructor values; getInputDim reports the fitted width."""
+    rng = np.random.default_rng(seed=3)
+    states = rng.random((20, 7))
+    targets = rng.random((20, 2))
+
+    ridge = _rclib.RidgeReadout(alpha=0.5, include_bias=True, tolerance=1e-7)
+    assert (ridge.getAlpha(), ridge.getTolerance(), ridge.getInputDim()) == (0.5, 1e-7, 0)
+    ridge.fit(states, targets)
+    assert ridge.getInputDim() == states.shape[1]
+
+    rls = _rclib.RlsReadout(lambda_=0.95, delta=2.0, include_bias=False)
+    assert (rls.getLambda(), rls.getDelta(), rls.getIncludeBias(), rls.getInputDim()) == (0.95, 2.0, False, 0)
+    rls.fit(states, targets)
+    assert rls.getInputDim() == states.shape[1]
+
+    lms = _rclib.LmsReadout(learning_rate=0.05, include_bias=True)
+    assert (lms.getLearningRate(), lms.getIncludeBias(), lms.getInputDim()) == (0.05, True, 0)
+    lms.fit(states, targets)
+    assert lms.getInputDim() == states.shape[1]

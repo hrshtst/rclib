@@ -20,6 +20,8 @@ public:
 
   std::shared_ptr<Reservoir> getReservoir(size_t index) const;
   std::shared_ptr<Readout> getReadout() const;
+  size_t getNumReservoirs() const { return reservoirs.size(); }
+  const std::string &getConnectionType() const { return connection_type; }
 
 private:
   Eigen::MatrixXd collectStates(const Eigen::MatrixXd &inputs);

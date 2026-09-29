@@ -112,3 +112,20 @@ TEST_CASE("RandomSparseReservoir - rejects non-finite hyperparameters", "[Random
   REQUIRE_THROWS_AS(RandomSparseReservoir(10, 0.9, 0.5, bad, 1.0), std::invalid_argument);
   REQUIRE_THROWS_AS(RandomSparseReservoir(10, 0.9, 0.5, 0.5, bad), std::invalid_argument);
 }
+
+TEST_CASE("RandomSparseReservoir - configuration getters and input width", "[RandomSparseReservoir]") {
+  RandomSparseReservoir res(10, 0.9, 0.5, 0.25, 2.0, true, 7);
+  REQUIRE(res.getNNeurons() == 10);
+  REQUIRE(res.getSpectralRadius() == 0.9);
+  REQUIRE(res.getSparsity() == 0.5);
+  REQUIRE(res.getLeakRate() == 0.25);
+  REQUIRE(res.getInputScaling() == 2.0);
+  REQUIRE(res.getIncludeBias());
+  REQUIRE(res.getSeed() == 7U);
+
+  REQUIRE(res.getInputDim() == 0);
+  res.advance(Eigen::MatrixXd::Random(1, 3));
+  REQUIRE(res.getInputDim() == 3);
+  res.resetState();
+  REQUIRE(res.getInputDim() == 3);
+}

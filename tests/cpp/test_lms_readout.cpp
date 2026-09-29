@@ -66,3 +66,19 @@ TEST_CASE("LmsReadout - rejects non-finite hyperparameters", "[LmsReadout]") {
                               -std::numeric_limits<double>::infinity());
   REQUIRE_THROWS_AS(LmsReadout(bad), std::invalid_argument);
 }
+
+TEST_CASE("LmsReadout - configuration getters and input width", "[LmsReadout]") {
+  LmsReadout readout(0.05, false);
+  REQUIRE(readout.getLearningRate() == 0.05);
+  REQUIRE_FALSE(readout.getIncludeBias());
+
+  REQUIRE(readout.getInputDim() == 0);
+  readout.partialFit(Eigen::MatrixXd::Random(1, 6), Eigen::MatrixXd::Random(1, 2));
+  REQUIRE(readout.getInputDim() == 6);
+
+  // fit() on an empty batch resets the readout without fitting it, leaving the
+  // previous weights allocated; getInputDim must follow the initialized flag.
+  readout.fit(Eigen::MatrixXd(0, 6), Eigen::MatrixXd(0, 2));
+  REQUIRE(readout.getInputDim() == 0);
+  REQUIRE_THROWS(readout.predict(Eigen::MatrixXd::Random(1, 6)));
+}

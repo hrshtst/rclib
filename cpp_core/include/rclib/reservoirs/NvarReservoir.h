@@ -13,6 +13,10 @@ public:
   void resetState() override;
   const Eigen::MatrixXd &getState() const override;
   int getOutputDim(int input_dim) const override;
+  int getInputDim() const override { return initialized ? input_dim : 0; }
+
+  int getNumLags() const { return num_lags; }
+  int getPolynomialOrder() const { return polynomial_order; }
 
 private:
   void initialize(int input_dim);

@@ -14,6 +14,13 @@ public:
   void partialFit(const Eigen::MatrixXd &state, const Eigen::MatrixXd &target) override;
   Eigen::MatrixXd predict(const Eigen::MatrixXd &states) override;
 
+  // Keyed on `initialized`, not on W_out: a failed fit() clears the flag but
+  // leaves the previous matrices in place, and the readout is then unfitted.
+  int getInputDim() const override { return initialized ? static_cast<int>(W_out.rows()) - (include_bias ? 1 : 0) : 0; }
+
+  double getLambda() const { return lambda; }
+  double getDelta() const { return delta; }
+  bool getIncludeBias() const { return include_bias; }
   Solver getSolver() const { return solver; }
 
 private:

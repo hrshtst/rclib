@@ -190,3 +190,20 @@ def test_random_sparse_rejects_non_finite(name: str, bad: float) -> None:
         reservoirs.RandomSparse(10, *args)
     with pytest.raises(ValueError, match=name):
         _rclib.RandomSparseReservoir(10, *args)
+
+
+def test_reservoir_getters_and_input_dim() -> None:
+    """Configuration getters return constructor values; getInputDim follows the first input."""
+    res = _rclib.RandomSparseReservoir(10, 0.9, 0.5, 0.25, 2.0, include_bias=True, seed=7)
+    assert (res.getNNeurons(), res.getSpectralRadius(), res.getSparsity()) == (10, 0.9, 0.5)
+    assert (res.getLeakRate(), res.getInputScaling(), res.getIncludeBias(), res.getSeed()) == (0.25, 2.0, True, 7)
+    assert res.getInputDim() == 0
+    x = np.ones((1, 3))
+    res.advance(x)
+    assert res.getInputDim() == x.shape[1]
+
+    nvar = _rclib.NvarReservoir(num_lags=3, polynomial_order=2)
+    assert (nvar.getNumLags(), nvar.getPolynomialOrder(), nvar.getInputDim()) == (3, 2, 0)
+    x = np.ones((1, 2))
+    nvar.advance(x)
+    assert nvar.getInputDim() == x.shape[1]
