@@ -28,6 +28,18 @@ void requireLittleEndian() {
 
 } // namespace
 
+std::int64_t sumFeatureWidths(const std::vector<std::int64_t> &widths) {
+  std::int64_t total = 0;
+  for (const std::int64_t width : widths) {
+    // Each width is an int, so the running total cannot overflow int64 before this check trips.
+    total += width;
+    if (total > max_count - 1) {
+      throw SerializationError("Model: the combined reservoir output width is too large.");
+    }
+  }
+  return total;
+}
+
 BinaryWriter::BinaryWriter(std::ostream &os) : os(os) { requireLittleEndian(); }
 
 void BinaryWriter::writeHeader() {

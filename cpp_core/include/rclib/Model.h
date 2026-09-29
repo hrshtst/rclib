@@ -3,6 +3,7 @@
 #include "Readout.h"
 #include "Reservoir.h"
 
+#include <iosfwd>
 #include <memory>
 #include <string>
 #include <vector>
@@ -22,6 +23,16 @@ public:
   std::shared_ptr<Readout> getReadout() const;
   size_t getNumReservoirs() const { return reservoirs.size(); }
   const std::string &getConnectionType() const { return connection_type; }
+
+  /// Saves the configuration, weights and current reservoir states in the rclib
+  /// model format. Throws SerializationError, before writing anything, if the model
+  /// lacks a reservoir or readout, holds the same reservoir object twice, contains a
+  /// component type other than the built-in ones, or is internally inconsistent.
+  void save(std::ostream &os) const;
+  /// Loads a model written by save(). Reads from the current position of a
+  /// seekable stream; the model must extend to the end of the stream. Throws
+  /// SerializationError (or std::bad_alloc) on invalid input.
+  static Model load(std::istream &is);
 
 private:
   Eigen::MatrixXd collectStates(const Eigen::MatrixXd &inputs);

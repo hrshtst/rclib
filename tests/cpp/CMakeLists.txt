@@ -52,3 +52,7 @@ catch_discover_tests(test_seed_consistency)
 add_executable(test_serialization test_serialization.cpp)
 target_link_libraries(test_serialization PRIVATE rclib_core Catch2::Catch2WithMain)
 catch_discover_tests(test_serialization)
+
+add_executable(test_model_serialization test_model_serialization.cpp)
+target_link_libraries(test_model_serialization PRIVATE rclib_core Catch2::Catch2WithMain)
+catch_discover_tests(test_model_serialization)

@@ -8,6 +8,7 @@
 #include <new>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 /// Raised when a model cannot be saved or a model file cannot be loaded.
 class SerializationError : public std::runtime_error {
@@ -35,6 +36,11 @@ template <typename Body> auto translateSerializationErrors(const char *context, 
     throw SerializationError(std::string(context) + ": " + e.what());
   }
 }
+
+/// Sums reservoir output widths into a readout feature count. Throws
+/// SerializationError if the total, plus a bias column, would overflow the int
+/// widths used by Model and the readouts.
+std::int64_t sumFeatureWidths(const std::vector<std::int64_t> &widths);
 
 /// Writes the primitives of the rclib model format (little-endian, fixed width).
 class BinaryWriter {
