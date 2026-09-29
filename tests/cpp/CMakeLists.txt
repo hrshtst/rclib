@@ -56,3 +56,8 @@ catch_discover_tests(test_serialization)
 add_executable(test_model_serialization test_model_serialization.cpp)
 target_link_libraries(test_model_serialization PRIVATE rclib_core Catch2::Catch2WithMain)
 catch_discover_tests(test_model_serialization)
+
+add_executable(test_serialization_fixtures test_serialization_fixtures.cpp)
+target_link_libraries(test_serialization_fixtures PRIVATE rclib_core Catch2::Catch2WithMain)
+target_compile_definitions(test_serialization_fixtures PRIVATE RCLIB_TEST_DATA_DIR="${PROJECT_SOURCE_DIR}/tests/data")
+catch_discover_tests(test_serialization_fixtures)
