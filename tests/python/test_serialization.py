@@ -222,7 +222,20 @@ def _with_mismatched_readout() -> ESN:
     return esn
 
 
-@pytest.mark.parametrize("make_model", [_without_readout, _without_reservoir, _with_mismatched_readout])
+def _with_mismatched_readout_after_unused_reservoir() -> ESN:
+    # A RandomSparse reservoir outputs n_neurons even before its first input.
+    esn = ESN()
+    esn.add_reservoir(reservoirs.RandomSparse(n_neurons=5, spectral_radius=0.9))
+    esn.set_readout(readouts.Ridge(alpha=1.0, include_bias=True))
+    rng = np.random.default_rng(seed=0)
+    esn._cpp_model.getReadout().fit(rng.random((10, 7)), rng.random((10, 1)))  # noqa: SLF001
+    return esn
+
+
+@pytest.mark.parametrize(
+    "make_model",
+    [_without_readout, _without_reservoir, _with_mismatched_readout, _with_mismatched_readout_after_unused_reservoir],
+)
 def test_rejected_save_keeps_the_existing_file(tmp_path: Path, make_model: Callable[[], ESN]) -> None:
     """A model that cannot be saved raises and leaves an existing file untouched."""
     path = tmp_path / "model.rclib"

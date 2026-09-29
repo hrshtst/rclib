@@ -86,8 +86,21 @@ std::shared_ptr<Readout> loadReadout(BinaryReader &reader) {
   throw SerializationError("Model: unknown readout type tag '" + tag + "'.");
 }
 
+// Output width of a reservoir fed `input` columns (0 = unknown), or 0 while it
+// cannot be known. A RandomSparse reservoir always outputs n_neurons, even before
+// its first input; NVAR's width depends on its input width.
+int outputWidth(const RandomSparseReservoir &reservoir, int /*input*/) { return reservoir.getNNeurons(); }
+int outputWidth(const NvarReservoir &reservoir, int input) { return input > 0 ? reservoir.getOutputDim(input) : 0; }
+
+int knownOutputWidth(const Reservoir &reservoir, int input) {
+  int width = 0;
+  visitReservoir(reservoir, [&](const auto &concrete, const char * /*tag*/) { width = outputWidth(concrete, input); });
+  return width;
+}
+
 // Threads widths through the model. getInputDim() is the width a component is
-// locked to (0 = not fixed yet); an unknown width skips the checks that need it.
+// locked to and knownOutputWidth() the width a reservoir produces; 0 means not
+// known yet, which skips the checks that need that width.
 void checkTopology(const std::vector<std::shared_ptr<Reservoir>> &reservoirs, bool parallel, const Readout &readout) {
   std::int64_t features = 0; // width reaching the readout
   if (parallel) {
@@ -101,13 +114,14 @@ void checkTopology(const std::vector<std::shared_ptr<Reservoir>> &reservoirs, bo
         input = locked;
       }
     }
-    if (input > 0) {
-      std::vector<std::int64_t> widths;
-      for (const auto &reservoir : reservoirs) {
-        widths.push_back(reservoir->getOutputDim(input));
-      }
-      features = sumFeatureWidths(widths);
+    std::vector<std::int64_t> widths;
+    bool all_known = true;
+    for (const auto &reservoir : reservoirs) {
+      const int width = knownOutputWidth(*reservoir, input);
+      all_known = all_known && width > 0;
+      widths.push_back(width);
     }
+    features = all_known ? sumFeatureWidths(widths) : 0;
   } else {
     int width = 0; // entering the current reservoir, then leaving it
     for (const auto &reservoir : reservoirs) {
@@ -116,8 +130,7 @@ void checkTopology(const std::vector<std::shared_ptr<Reservoir>> &reservoirs, bo
         throw SerializationError("Model: a serial reservoir is locked to an input width of " + std::to_string(locked) +
                                  " but the previous reservoir outputs " + std::to_string(width) + ".");
       }
-      const int input = locked > 0 ? locked : width;
-      width = input > 0 ? reservoir->getOutputDim(input) : 0;
+      width = knownOutputWidth(*reservoir, locked > 0 ? locked : width);
     }
     features = sumFeatureWidths({width});
   }

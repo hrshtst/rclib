@@ -231,6 +231,25 @@ TEST_CASE("Model serialization - unfitted and uninitialized components round-tri
   REQUIRE_THROWS(original.predict(probe));
 }
 
+TEST_CASE("Model serialization - unused reservoirs with a matching fitted readout", "[serialization][Model]") {
+  // Output widths known before any input (RandomSparse) must match the readout, and
+  // a matching model saves, loads and predicts like the original.
+  Model original;
+  SECTION("Serial") { original.addReservoir(std::make_shared<RandomSparseReservoir>(5, 0.9, 0.5, 0.5, 1.0, true)); }
+  SECTION("Parallel") {
+    original.addReservoir(std::make_shared<RandomSparseReservoir>(5, 0.9, 0.5, 0.5, 1.0, true), "parallel");
+    original.addReservoir(std::make_shared<RandomSparseReservoir>(4, 0.9, 0.5, 0.5, 1.0, true, 3), "parallel");
+  }
+  auto readout = std::make_shared<RidgeReadout>();
+  const auto features = static_cast<Eigen::Index>(original.getNumReservoirs() == 1 ? 5 : 9);
+  readout->fit(Eigen::MatrixXd::Random(20, features), Eigen::MatrixXd::Random(20, 1));
+  original.setReadout(readout);
+
+  Model restored = loadFromBytes(saveToBytes(original));
+  const Eigen::MatrixXd probe = signal(6, 0.0);
+  REQUIRE(sameBits(restored.predict(probe), original.predict(probe)));
+}
+
 TEST_CASE("Model serialization - a readout left unfitted by a failed fit", "[serialization][Model]") {
   const auto readout = GENERATE(ReadoutKind::RlsRank1, ReadoutKind::Lms);
   Model original = makeModel(Topology::RandomSparse, readout);
@@ -292,6 +311,30 @@ TEST_CASE("Model serialization - models that cannot be saved", "[serialization][
     readout->fit(Eigen::MatrixXd::Random(10, 7), Eigen::MatrixXd::Random(10, 1));
     model.setReadout(readout);
     expected_message = "fitted to 7 features but the reservoirs output 5";
+  }
+  // A RandomSparse reservoir's output width is known before it sees any input.
+  SECTION("A readout of the wrong width after a reservoir that never saw input") {
+    model.addReservoir(std::make_shared<RandomSparseReservoir>(5, 0.9));
+    auto readout = std::make_shared<RidgeReadout>();
+    readout->fit(Eigen::MatrixXd::Random(10, 7), Eigen::MatrixXd::Random(10, 1));
+    model.setReadout(readout);
+    expected_message = "fitted to 7 features but the reservoirs output 5";
+  }
+  SECTION("A reservoir locked to a width that an unused predecessor does not output") {
+    model.addReservoir(std::make_shared<RandomSparseReservoir>(5, 0.9));
+    auto nvar = std::make_shared<NvarReservoir>(2);
+    nvar->advance(Eigen::MatrixXd::Ones(1, 7));
+    model.addReservoir(nvar);
+    model.setReadout(std::make_shared<RidgeReadout>());
+    expected_message = "locked to an input width of 7 but the previous reservoir outputs 5";
+  }
+  SECTION("Unused parallel reservoirs and a readout of the wrong width") {
+    model.addReservoir(std::make_shared<RandomSparseReservoir>(5, 0.9), "parallel");
+    model.addReservoir(std::make_shared<RandomSparseReservoir>(4, 0.9), "parallel");
+    auto readout = std::make_shared<RidgeReadout>();
+    readout->fit(Eigen::MatrixXd::Random(10, 7), Eigen::MatrixXd::Random(10, 1));
+    model.setReadout(readout);
+    expected_message = "fitted to 7 features but the reservoirs output 9";
   }
 
   std::ostringstream output;
@@ -388,6 +431,38 @@ TEST_CASE("Model serialization - invalid model files are rejected", "[serializat
       writer.writeUInt(2);
       write_random_sparse(writer, *locked_random_sparse(5, 1));
       write_random_sparse(writer, *locked_random_sparse(4, 1));
+      write_ridge(writer, ridge_7);
+    });
+    expected_message = "fitted to 7 features but the reservoirs output 9";
+  }
+  SECTION("Readout of a different width after an unused reservoir") {
+    bytes = craftModel([&](BinaryWriter &writer) {
+      writer.writeU8(0);
+      writer.writeUInt(1);
+      write_random_sparse(writer, RandomSparseReservoir(5, 0.9));
+      write_ridge(writer, ridge_7);
+    });
+    expected_message = "fitted to 7 features but the reservoirs output 5";
+  }
+  SECTION("Reservoir locked to a width that an unused predecessor does not output") {
+    NvarReservoir nvar(2);
+    nvar.advance(Eigen::MatrixXd::Ones(1, 7));
+    bytes = craftModel([&](BinaryWriter &writer) {
+      writer.writeU8(0);
+      writer.writeUInt(2);
+      write_random_sparse(writer, RandomSparseReservoir(5, 0.9));
+      writer.writeString("NvarReservoir");
+      nvar.save(writer);
+      write_ridge(writer, unfitted_ridge);
+    });
+    expected_message = "locked to an input width of 7 but the previous reservoir outputs 5";
+  }
+  SECTION("Unused parallel reservoirs and a readout of a different width") {
+    bytes = craftModel([&](BinaryWriter &writer) {
+      writer.writeU8(1);
+      writer.writeUInt(2);
+      write_random_sparse(writer, RandomSparseReservoir(5, 0.9));
+      write_random_sparse(writer, RandomSparseReservoir(4, 0.9));
       write_ridge(writer, ridge_7);
     });
     expected_message = "fitted to 7 features but the reservoirs output 9";
@@ -493,6 +568,12 @@ TEST_CASE("Model serialization - a rejected save keeps the existing file", "[ser
     auto reservoir = std::make_shared<RandomSparseReservoir>(5, 0.9);
     reservoir->advance(Eigen::MatrixXd::Ones(1, 1));
     model.addReservoir(reservoir);
+    auto readout = std::make_shared<RidgeReadout>();
+    readout->fit(Eigen::MatrixXd::Random(10, 7), Eigen::MatrixXd::Random(10, 1));
+    model.setReadout(readout);
+  }
+  SECTION("A readout of the wrong width after a reservoir that never saw input") {
+    model.addReservoir(std::make_shared<RandomSparseReservoir>(5, 0.9));
     auto readout = std::make_shared<RidgeReadout>();
     readout->fit(Eigen::MatrixXd::Random(10, 7), Eigen::MatrixXd::Random(10, 1));
     model.setReadout(readout);

@@ -59,7 +59,10 @@ loaded:
 - each component's matrices have shapes consistent with its hyperparameters;
 - the components fit together: a serial reservoir's locked input width equals
   its predecessor's output width, parallel reservoirs share one input width, and
-  a fitted readout's input width equals the combined reservoir output width.
+  a fitted readout's input width equals the combined reservoir output width. A
+  RandomSparse reservoir's output width (`n_neurons`) is known even before its
+  first input; NVAR's is known once its input width is. A width that is not known
+  yet skips the check that needs it.
 
 Saving additionally rejects component types other than the built-in ones and a
 reservoir object that appears twice in a model.
