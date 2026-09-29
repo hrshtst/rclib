@@ -44,6 +44,7 @@ jobs:
         # sync (default-groups = ["dev"]) does not install, so run with that group
         # to make it resolvable in ./.venv (the `dev` group it pulls in alongside
         # also builds the rclib extension that mkdocstrings imports for the API docs).
-        run: uv run --group docs mkdocs gh-deploy --force --clean --verbose
+        # --locked uses the versions in uv.lock, the same ones `nox -s docs` builds with.
+        run: uv run --locked --group docs mkdocs gh-deploy --force --clean --verbose
         env:
           GH_TOKEN: ${{ github.token }}

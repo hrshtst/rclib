@@ -5,8 +5,11 @@
 
 from __future__ import annotations
 
+import math
+
 import numpy as np
-from rclib import _rclib  # Import the C++ bindings
+import pytest
+from rclib import _rclib, reservoirs  # Import the C++ bindings
 
 
 def test_random_sparse_reservoir_init() -> None:
@@ -175,3 +178,32 @@ def test_reservoir_validation() -> None:
         reservoirs.Nvar(num_lags=1, polynomial_order=0)
     with np.testing.assert_raises(ValueError):
         reservoirs.Nvar(num_lags=1, polynomial_order=33)
+
+
+@pytest.mark.parametrize("bad", [math.nan, math.inf, -math.inf])
+@pytest.mark.parametrize("name", ["spectral_radius", "sparsity", "leak_rate", "input_scaling"])
+def test_random_sparse_rejects_non_finite(name: str, bad: float) -> None:
+    """Non-finite hyperparameters are rejected by the config class and by the C++ constructor."""
+    params = {"spectral_radius": 0.9, "sparsity": 0.5, "leak_rate": 0.5, "input_scaling": 1.0} | {name: bad}
+    args = (params["spectral_radius"], params["sparsity"], params["leak_rate"], params["input_scaling"])
+    with pytest.raises(ValueError, match=name):
+        reservoirs.RandomSparse(10, *args)
+    with pytest.raises(ValueError, match=name):
+        _rclib.RandomSparseReservoir(10, *args)
+
+
+def test_reservoir_getters_and_input_dim() -> None:
+    """Configuration getters return constructor values; getInputDim follows the first input."""
+    res = _rclib.RandomSparseReservoir(10, 0.9, 0.5, 0.25, 2.0, include_bias=True, seed=7)
+    assert (res.getNNeurons(), res.getSpectralRadius(), res.getSparsity()) == (10, 0.9, 0.5)
+    assert (res.getLeakRate(), res.getInputScaling(), res.getIncludeBias(), res.getSeed()) == (0.25, 2.0, True, 7)
+    assert res.getInputDim() == 0
+    x = np.ones((1, 3))
+    res.advance(x)
+    assert res.getInputDim() == x.shape[1]
+
+    nvar = _rclib.NvarReservoir(num_lags=3, polynomial_order=2)
+    assert (nvar.getNumLags(), nvar.getPolynomialOrder(), nvar.getInputDim()) == (3, 2, 0)
+    x = np.ones((1, 2))
+    nvar.advance(x)
+    assert nvar.getInputDim() == x.shape[1]

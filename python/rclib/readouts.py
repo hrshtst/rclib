@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+import math
+
 
 class Ridge:
     """Ridge Regression Readout configuration."""
@@ -26,11 +28,11 @@ class Ridge:
                 "conjugate_gradient", "conjugate_gradient_implicit").
             tolerance: Convergence tolerance for iterative solvers (CG).
         """
-        if alpha < 0:
-            msg = "alpha must be non-negative."
+        if not math.isfinite(alpha) or alpha < 0:
+            msg = "alpha must be finite and non-negative."
             raise ValueError(msg)
-        if tolerance <= 0:
-            msg = "tolerance must be positive."
+        if not math.isfinite(tolerance) or tolerance <= 0:
+            msg = "tolerance must be finite and positive."
             raise ValueError(msg)
 
         self.alpha = alpha
@@ -63,8 +65,8 @@ class Rls:
         if not 0 < lambda_ <= 1:
             msg = "lambda_ must be in (0, 1]."
             raise ValueError(msg)
-        if delta <= 0:
-            msg = "delta must be positive."
+        if not math.isfinite(delta) or delta <= 0:
+            msg = "delta must be finite and positive."
             raise ValueError(msg)
 
         self.lambda_ = lambda_
@@ -83,8 +85,8 @@ class Lms:
             learning_rate: Learning rate for the LMS algorithm.
             include_bias: Whether to include a bias term.
         """
-        if learning_rate <= 0:
-            msg = "learning_rate must be positive."
+        if not math.isfinite(learning_rate) or learning_rate <= 0:
+            msg = "learning_rate must be finite and positive."
             raise ValueError(msg)
 
         self.learning_rate = learning_rate

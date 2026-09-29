@@ -42,6 +42,7 @@ nav:
   - Development:
       - Overview: development/index.md
       - Release Process: development/release_process.md
+      - Model File Format: development/model_file_format.md
       - Testing Roadmap: development/testing_roadmap.md
       - Reports:
           - Ridge Optimization: development/reports/Ridge_Optimization_Report.md
@@ -70,7 +71,10 @@ markdown_extensions:
       custom_fences:
         - name: math
           class: arithmatex
-          format: !!python/name:pymdownx.arithmatex.fence_mathjax_format
+          # Generic output, matching `generic: true` of pymdownx.arithmatex below.
+          format: !!python/object/apply:pymdownx.arithmatex.arithmatex_fenced_format
+            kwds:
+              mode: generic
   - pymdownx.arithmatex:
       generic: true
 

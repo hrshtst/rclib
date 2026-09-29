@@ -37,7 +37,15 @@ To generate sequences autonomously (feeding predictions back as inputs):
 prime_data = x_test[:100]
 # Generate the next 200 steps
 generated = model.predict_generative(prime_data, n_steps=200)
+# Continue the same sequence for another 100 steps
+more = model.predict_generative(np.empty((0, 1)), n_steps=100)
 ```
+
+Every generated output, including the last, is fed back into the reservoirs, so a
+call with empty priming data continues where the previous call stopped:
+generating 200 and then 100 steps gives the same outputs and final reservoir
+states as generating 300 steps at once. The readout's output width must match the
+model's input width, since each output becomes the next input.
 
 ## Ridge Regression Solver Selection
 
@@ -67,6 +75,56 @@ append all monomials with replacement up to that degree.
 res = reservoirs.Nvar(num_lags=5, polynomial_order=2)
 # ... use as a normal reservoir
 ```
+
+## Saving and Loading Models
+
+A model can be written to a file and restored later, from Python or from C++.
+Files are interchangeable between the two, because both go through the same C++
+code.
+
+```python
+from rclib import ESN
+
+model.fit(x_train, y_train, washout_len=100)
+model.save("mackey_glass.rclib")
+
+restored = ESN.load("mackey_glass.rclib")
+y_pred = restored.predict(x_test)
+```
+
+```cpp
+model.save("mackey_glass.rclib");
+Model restored = Model::load("mackey_glass.rclib");
+```
+
+The file holds the configuration, the trained weights (the random reservoir
+matrices themselves, not just their seed), the RLS/LMS training state and the
+current reservoir states. A restored model therefore continues where the
+original stopped: `predict_online`, `partial_fit`, and `predict_generative`
+without priming data all behave as they would have on the original. `ESN`
+objects also support `pickle` and `copy.deepcopy`, which use the same format.
+
+Saving replaces an existing file in one step: if saving fails, the existing
+file is left unchanged. Every save or load failure raises
+`rclib.SerializationError` (a `RuntimeError` subclass; `SerializationError` in
+C++). Examples are a model without a readout, a component whose widths do not
+match its neighbours, a custom reservoir or readout type, the same reservoir
+object added twice (C++ only), and a corrupted or truncated file. Running out of
+memory raises `MemoryError` (`std::bad_alloc` in C++) instead.
+
+> **Security:** Only load files from sources you trust. Unlike `pickle`, the
+> format contains no executable code, but it is parsed by native code. Loading a
+> pickled `ESN` is as unsafe as any other unpickling.
+
+> **Portability:** On the same build and settings, a restored model produces
+> bit-identical results. Files load on every supported (little-endian) platform
+> and the stored values are exact, but computations on a different compiler, CPU
+> or thread configuration can round differently, and nothing bounds how far such
+> differences grow: recurrent updates, generative rollouts and continued training
+> can amplify them. A `RandomSparse` reservoir that has never received input has
+> no input weights yet; they are generated from the seed on first use and can
+> differ across platforms, so fit the model before saving if you need portable
+> weights.
 
 ## Parallelization Configuration
 

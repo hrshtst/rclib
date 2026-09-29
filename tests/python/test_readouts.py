@@ -5,9 +5,15 @@
 
 from __future__ import annotations
 
+import math
+from typing import TYPE_CHECKING
+
 import numpy as np
 import pytest
 from rclib import ESN, _rclib, readouts, reservoirs
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 def test_ridge_readout_fit_predict() -> None:
@@ -309,6 +315,65 @@ def test_readout_validation() -> None:
         readouts.Lms(learning_rate=0.0, include_bias=True)
 
 
+@pytest.mark.parametrize("bad", [math.nan, math.inf, -math.inf])
+@pytest.mark.parametrize(
+    ("name", "make_config", "make_cpp"),
+    [
+        (
+            "alpha",
+            lambda v: readouts.Ridge(alpha=v, include_bias=True),
+            lambda v: _rclib.RidgeReadout(alpha=v, include_bias=True),
+        ),
+        (
+            "tolerance",
+            lambda v: readouts.Ridge(alpha=1.0, include_bias=True, tolerance=v),
+            lambda v: _rclib.RidgeReadout(alpha=1.0, include_bias=True, tolerance=v),
+        ),
+        (
+            "lambda",
+            lambda v: readouts.Rls(lambda_=v, delta=1.0, include_bias=True),
+            lambda v: _rclib.RlsReadout(lambda_=v, delta=1.0, include_bias=True),
+        ),
+        (
+            "delta",
+            lambda v: readouts.Rls(lambda_=0.99, delta=v, include_bias=True),
+            lambda v: _rclib.RlsReadout(lambda_=0.99, delta=v, include_bias=True),
+        ),
+        (
+            "learning_rate",
+            lambda v: readouts.Lms(learning_rate=v, include_bias=True),
+            lambda v: _rclib.LmsReadout(learning_rate=v, include_bias=True),
+        ),
+    ],
+)
+def test_readout_rejects_non_finite(
+    name: str, make_config: Callable[[float], object], make_cpp: Callable[[float], object], bad: float
+) -> None:
+    """Non-finite hyperparameters are rejected by the config classes and by the C++ constructors."""
+    with pytest.raises(ValueError, match=name):
+        make_config(bad)
+    with pytest.raises(ValueError, match=name):
+        make_cpp(bad)
+
+
+@pytest.mark.parametrize(
+    ("states_shape", "targets_shape"),
+    [((0, 4), (0, 2)), ((5, 0), (5, 2)), ((5, 4), (3, 2)), ((5, 4), (7, 2)), ((5, 4), (5, 0))],
+    ids=["no_rows", "no_state_columns", "fewer_target_rows", "more_target_rows", "no_target_columns"],
+)
+def test_lms_fit_rejects_invalid_input(states_shape: tuple[int, int], targets_shape: tuple[int, int]) -> None:
+    """LMS fit rejects malformed input before resetting, keeping a trained readout intact."""
+    rng = np.random.default_rng(seed=5)
+    states = rng.random((5, 4))
+    readout = _rclib.LmsReadout(learning_rate=0.05, include_bias=True)
+    readout.fit(states, rng.random((5, 2)))
+    before = readout.predict(states)
+
+    with pytest.raises(ValueError, match=r"states|targets"):
+        readout.fit(rng.random(states_shape), rng.random(targets_shape))
+    np.testing.assert_array_equal(readout.predict(states), before)
+
+
 def test_ridge_readout_weights_are_readable_and_read_only() -> None:
     """The fitted weights are exposed as a copy with the bias row last; reading them never alters prediction."""
     rng = np.random.default_rng(seed=7)
@@ -330,3 +395,25 @@ def test_ridge_readout_weights_are_readable_and_read_only() -> None:
     assert plain.getIncludeBias() is False
     assert plain.getWeights().shape == (8, 3)
     assert np.allclose(plain.predict(states), states @ plain.getWeights(), atol=1e-12, rtol=0.0)
+
+
+def test_readout_getters_and_input_dim() -> None:
+    """Configuration getters return constructor values; getInputDim reports the fitted width."""
+    rng = np.random.default_rng(seed=3)
+    states = rng.random((20, 7))
+    targets = rng.random((20, 2))
+
+    ridge = _rclib.RidgeReadout(alpha=0.5, include_bias=True, tolerance=1e-7)
+    assert (ridge.getAlpha(), ridge.getTolerance(), ridge.getInputDim()) == (0.5, 1e-7, 0)
+    ridge.fit(states, targets)
+    assert ridge.getInputDim() == states.shape[1]
+
+    rls = _rclib.RlsReadout(lambda_=0.95, delta=2.0, include_bias=False)
+    assert (rls.getLambda(), rls.getDelta(), rls.getIncludeBias(), rls.getInputDim()) == (0.95, 2.0, False, 0)
+    rls.fit(states, targets)
+    assert rls.getInputDim() == states.shape[1]
+
+    lms = _rclib.LmsReadout(learning_rate=0.05, include_bias=True)
+    assert (lms.getLearningRate(), lms.getIncludeBias(), lms.getInputDim()) == (0.05, True, 0)
+    lms.fit(states, targets)
+    assert lms.getInputDim() == states.shape[1]

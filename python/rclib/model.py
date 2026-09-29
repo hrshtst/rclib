@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -17,6 +18,61 @@ from . import (
 
 if TYPE_CHECKING:
     from numpy.typing import ArrayLike
+
+# Solver names of the Python configs mapped to the C++ enums, and back.
+_RIDGE_SOLVERS = {
+    "auto": _rclib.RidgeReadout.Solver.AUTO,
+    "cholesky": _rclib.RidgeReadout.Solver.CHOLESKY,
+    "dual_cholesky": _rclib.RidgeReadout.Solver.DUAL_CHOLESKY,
+    "conjugate_gradient": _rclib.RidgeReadout.Solver.CONJUGATE_GRADIENT,
+    "conjugate_gradient_implicit": _rclib.RidgeReadout.Solver.CONJUGATE_GRADIENT_IMPLICIT,
+}
+_RLS_SOLVERS = {
+    "rank1_update": _rclib.RlsReadout.Solver.RANK1_UPDATE,
+    "rank_k_update": _rclib.RlsReadout.Solver.RANK_K_UPDATE,
+}
+_RIDGE_SOLVER_NAMES = {solver: name for name, solver in _RIDGE_SOLVERS.items()}
+_RLS_SOLVER_NAMES = {solver: name for name, solver in _RLS_SOLVERS.items()}
+
+
+def _reservoir_config_from_cpp(cpp_reservoir: Any) -> reservoirs.RandomSparse | reservoirs.Nvar:  # noqa: ANN401
+    """Rebuild the Python configuration of a loaded C++ reservoir."""
+    if isinstance(cpp_reservoir, _rclib.RandomSparseReservoir):
+        return reservoirs.RandomSparse(
+            n_neurons=cpp_reservoir.getNNeurons(),
+            spectral_radius=cpp_reservoir.getSpectralRadius(),
+            sparsity=cpp_reservoir.getSparsity(),
+            leak_rate=cpp_reservoir.getLeakRate(),
+            input_scaling=cpp_reservoir.getInputScaling(),
+            include_bias=cpp_reservoir.getIncludeBias(),
+            seed=cpp_reservoir.getSeed(),
+        )
+    if isinstance(cpp_reservoir, _rclib.NvarReservoir):
+        return reservoirs.Nvar(num_lags=cpp_reservoir.getNumLags(), polynomial_order=cpp_reservoir.getPolynomialOrder())
+    msg = f"Unsupported reservoir type: {type(cpp_reservoir).__name__}"
+    raise TypeError(msg)
+
+
+def _readout_config_from_cpp(cpp_readout: Any) -> readouts.Ridge | readouts.Rls | readouts.Lms:  # noqa: ANN401
+    """Rebuild the Python configuration of a loaded C++ readout."""
+    if isinstance(cpp_readout, _rclib.RidgeReadout):
+        return readouts.Ridge(
+            alpha=cpp_readout.getAlpha(),
+            include_bias=cpp_readout.getIncludeBias(),
+            solver=_RIDGE_SOLVER_NAMES[cpp_readout.getSolver()],
+            tolerance=cpp_readout.getTolerance(),
+        )
+    if isinstance(cpp_readout, _rclib.RlsReadout):
+        return readouts.Rls(
+            lambda_=cpp_readout.getLambda(),
+            delta=cpp_readout.getDelta(),
+            include_bias=cpp_readout.getIncludeBias(),
+            solver=_RLS_SOLVER_NAMES[cpp_readout.getSolver()],
+        )
+    if isinstance(cpp_readout, _rclib.LmsReadout):
+        return readouts.Lms(learning_rate=cpp_readout.getLearningRate(), include_bias=cpp_readout.getIncludeBias())
+    msg = f"Unsupported readout type: {type(cpp_readout).__name__}"
+    raise TypeError(msg)
 
 
 class ESN:
@@ -112,32 +168,21 @@ class ESN:
 
         # Create and set the C++ readout to the C++ model
         if isinstance(readout, readouts.Ridge):
-            solver_map = {
-                "auto": _rclib.RidgeReadout.Solver.AUTO,
-                "cholesky": _rclib.RidgeReadout.Solver.CHOLESKY,
-                "dual_cholesky": _rclib.RidgeReadout.Solver.DUAL_CHOLESKY,
-                "conjugate_gradient": _rclib.RidgeReadout.Solver.CONJUGATE_GRADIENT,
-                "conjugate_gradient_implicit": _rclib.RidgeReadout.Solver.CONJUGATE_GRADIENT_IMPLICIT,
-            }
-            if readout.solver not in solver_map:
+            if readout.solver not in _RIDGE_SOLVERS:
                 msg = f"Unsupported solver: {readout.solver}"
                 raise ValueError(msg)
 
             cpp_readout = _rclib.RidgeReadout(
-                readout.alpha, readout.include_bias, solver_map[readout.solver], readout.tolerance
+                readout.alpha, readout.include_bias, _RIDGE_SOLVERS[readout.solver], readout.tolerance
             )
             self._cpp_model.setReadout(cpp_readout)
         elif isinstance(readout, readouts.Rls):
-            solver_map = {
-                "rank1_update": _rclib.RlsReadout.Solver.RANK1_UPDATE,
-                "rank_k_update": _rclib.RlsReadout.Solver.RANK_K_UPDATE,
-            }
-            if readout.solver not in solver_map:
+            if readout.solver not in _RLS_SOLVERS:
                 msg = f"Unsupported RLS solver: {readout.solver}"
                 raise ValueError(msg)
 
             cpp_readout = _rclib.RlsReadout(
-                readout.lambda_, readout.delta, readout.include_bias, solver_map[readout.solver]
+                readout.lambda_, readout.delta, readout.include_bias, _RLS_SOLVERS[readout.solver]
             )
             self._cpp_model.setReadout(cpp_readout)
         elif isinstance(readout, readouts.Lms):
@@ -201,6 +246,13 @@ class ESN:
     def predict_generative(self, prime_data: ArrayLike, n_steps: int) -> np.ndarray:
         """Generative prediction.
 
+        Advances the reservoirs through ``prime_data`` (if any), then generates
+        ``n_steps`` outputs, feeding each output back as the next input. Every
+        generated output, including the last, advances the reservoirs, so a following
+        call with empty ``prime_data`` continues the sequence: generating ``a`` steps
+        and then ``b`` steps equals generating ``a + b`` steps. With ``n_steps == 0``
+        no output is fed back.
+
         Parameters
         ----------
         prime_data : ArrayLike
@@ -212,6 +264,12 @@ class ESN:
         -------
         np.ndarray
             The generated data.
+
+        Raises
+        ------
+        ValueError
+            If a generated output cannot be fed back because its width differs from
+            the input width the reservoirs are locked to (also for ``n_steps == 1``).
         """
         # Call the C++ model's predictGenerative method
         return self._cpp_model.predictGenerative(prime_data, n_steps)
@@ -276,3 +334,82 @@ class ESN:
             cpp_readout.partialFit(current_state, y)
         else:
             self._cpp_model.partialFit(x, y)
+
+    def save(self, path: str | os.PathLike[str]) -> None:
+        """Save the model to a file.
+
+        The file holds the configuration, the trained weights and the current
+        reservoir states, so a loaded model continues exactly where this one
+        stopped. It can also be loaded from C++ with ``Model::load``. An existing
+        file at ``path`` is replaced in one step and is left unchanged if saving
+        fails.
+
+        Parameters
+        ----------
+        path : str or os.PathLike
+            Destination file.
+
+        Raises
+        ------
+        SerializationError
+            If the model lacks a reservoir or readout, is internally inconsistent,
+            or the file cannot be written.
+        """
+        self._cpp_model.save(os.fspath(path))
+
+    @classmethod
+    def load(cls, path: str | os.PathLike[str]) -> ESN:
+        """Load a model saved by :meth:`save` or by C++ ``Model::save``.
+
+        Only load files from sources you trust: the format contains no executable
+        code, but it is parsed by native code.
+
+        Parameters
+        ----------
+        path : str or os.PathLike
+            Model file to read.
+
+        Returns
+        -------
+        ESN
+            The restored model, including its reservoir states.
+
+        Raises
+        ------
+        SerializationError
+            If the file cannot be read or is not a valid model file.
+        """
+        return cls._from_cpp_model(_rclib.Model.load(os.fspath(path)))
+
+    @classmethod
+    def _from_cpp_model(cls, cpp_model: Any) -> ESN:  # noqa: ANN401
+        """Wrap a loaded C++ model, rebuilding the Python configuration objects."""
+        esn = cls(cpp_model.getConnectionType())
+        esn._cpp_model = cpp_model
+        # partial_fit and _update_readout read these configuration objects.
+        try:
+            esn._reservoirs_params = [
+                _reservoir_config_from_cpp(cpp_model.getReservoir(i)) for i in range(cpp_model.getNumReservoirs())
+            ]
+            esn._readout_params = _readout_config_from_cpp(cpp_model.getReadout())
+        except (TypeError, ValueError) as err:
+            msg = f"Invalid model file: {err}"
+            raise _rclib.SerializationError(msg) from err
+        return esn
+
+    def __getstate__(self) -> dict[str, Any]:
+        """Support pickle and copy.deepcopy.
+
+        Every instance attribute is kept, including ones added by users or
+        subclasses; the C++ model is stored as bytes in the model file format.
+        Unpickling can run arbitrary code, so only unpickle data you trust.
+        """
+        state = self.__dict__.copy()
+        state["_cpp_model"] = self._cpp_model.dumps()
+        return state
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        """Restore a model pickled by __getstate__."""
+        cpp_model = _rclib.Model.loads(state["_cpp_model"])  # before touching self, in case it fails
+        self.__dict__.update(state)
+        self._cpp_model = cpp_model

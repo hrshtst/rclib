@@ -1,7 +1,12 @@
 #include "rclib/reservoirs/RandomSparseReservoir.h"
 
+#include "rclib/Serialization.h"
+
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
+#include <cmath>
+#include <cstdint>
+#include <memory>
 #include <random>
 #include <stdexcept>
 #include <vector>
@@ -51,21 +56,7 @@ RandomSparseReservoir::RandomSparseReservoir(int n_neurons, double spectral_radi
                                              double input_scaling, bool include_bias, unsigned int seed)
     : n_neurons(n_neurons), spectral_radius(spectral_radius), sparsity(sparsity), leak_rate(leak_rate),
       input_scaling(input_scaling), include_bias(include_bias), W_in_initialized(false) {
-  if (n_neurons <= 0) {
-    throw std::invalid_argument("n_neurons must be positive.");
-  }
-  if (spectral_radius < 0.0) {
-    throw std::invalid_argument("spectral_radius must be non-negative.");
-  }
-  if (sparsity < 0.0 || sparsity > 1.0) {
-    throw std::invalid_argument("sparsity must be in [0, 1].");
-  }
-  if (leak_rate <= 0.0 || leak_rate > 1.0) {
-    throw std::invalid_argument("leak_rate must be in (0, 1].");
-  }
-  if (input_scaling < 0.0) {
-    throw std::invalid_argument("input_scaling must be non-negative.");
-  }
+  validateParameters();
 
   state = Eigen::MatrixXd::Zero(1, n_neurons);
 
@@ -92,6 +83,25 @@ RandomSparseReservoir::RandomSparseReservoir(int n_neurons, double spectral_radi
   this->seed = seed;
 }
 
+void RandomSparseReservoir::validateParameters() const {
+  if (n_neurons <= 0) {
+    throw std::invalid_argument("n_neurons must be positive.");
+  }
+  // Range checks are written so that NaN fails them; one-sided bounds also need isfinite.
+  if (!std::isfinite(spectral_radius) || spectral_radius < 0.0) {
+    throw std::invalid_argument("spectral_radius must be finite and non-negative.");
+  }
+  if (!(sparsity >= 0.0 && sparsity <= 1.0)) {
+    throw std::invalid_argument("sparsity must be in [0, 1].");
+  }
+  if (!(leak_rate > 0.0 && leak_rate <= 1.0)) {
+    throw std::invalid_argument("leak_rate must be in (0, 1].");
+  }
+  if (!std::isfinite(input_scaling) || input_scaling < 0.0) {
+    throw std::invalid_argument("input_scaling must be finite and non-negative.");
+  }
+}
+
 void RandomSparseReservoir::initialize_W_in(int input_dim) {
   if (input_dim <= 0) {
     throw std::invalid_argument("input_dim must be positive.");
@@ -110,6 +120,8 @@ const Eigen::MatrixXd &RandomSparseReservoir::advance(const Eigen::MatrixXd &inp
   if (!W_in_initialized) {
     initialize_W_in(input.cols());
     temp_state.resize(state.rows(), state.cols());
+  } else if (input.cols() != W_in.rows()) {
+    throw std::invalid_argument("input dimension changed after RandomSparseReservoir initialization.");
   }
 
   // 1. Initialize temp_state with (input * W_in + bias)
@@ -152,3 +164,73 @@ void RandomSparseReservoir::resetState() { state.setZero(); }
 const Eigen::MatrixXd &RandomSparseReservoir::getState() const { return state; }
 
 int RandomSparseReservoir::getOutputDim(int /*input_dim*/) const { return n_neurons; }
+
+void RandomSparseReservoir::checkConsistency() const {
+  translateSerializationErrors("RandomSparseReservoir", [&] {
+    validateParameters();
+    const auto n = static_cast<Eigen::Index>(n_neurons);
+    if (W_res.rows() != n || W_res.cols() != n) {
+      throw SerializationError("RandomSparseReservoir: W_res must be n_neurons x n_neurons.");
+    }
+    if (bias.size() != n) {
+      throw SerializationError("RandomSparseReservoir: bias must have n_neurons entries.");
+    }
+    if (state.rows() != 1 || state.cols() != n) {
+      throw SerializationError("RandomSparseReservoir: state must be 1 x n_neurons.");
+    }
+    if (W_in_initialized && (W_in.rows() < 1 || W_in.cols() != n)) {
+      throw SerializationError("RandomSparseReservoir: W_in must have at least one row and n_neurons columns.");
+    }
+  });
+}
+
+void RandomSparseReservoir::save(BinaryWriter &writer) const {
+  static_assert(sizeof(unsigned int) == sizeof(std::uint32_t), "the seed is stored as u32");
+  translateSerializationErrors("RandomSparseReservoir", [&] {
+    checkConsistency();
+    writer.writeInt(n_neurons);
+    writer.writeDouble(spectral_radius);
+    writer.writeDouble(sparsity);
+    writer.writeDouble(leak_rate);
+    writer.writeDouble(input_scaling);
+    writer.writeBool(include_bias);
+    writer.writeUInt(seed);
+    writer.writeSparse(W_res);
+    writer.writeMatrix(bias);
+    writer.writeMatrix(state);
+    // W_in only exists once the first input has fixed its width.
+    writer.writeBool(W_in_initialized);
+    if (W_in_initialized) {
+      writer.writeMatrix(W_in);
+    }
+  });
+}
+
+std::shared_ptr<RandomSparseReservoir> RandomSparseReservoir::load(BinaryReader &reader) {
+  return translateSerializationErrors("RandomSparseReservoir", [&] {
+    // The private constructor skips generating W_res, which would be discarded anyway
+    // and would consume the global std::rand() state through power iteration.
+    std::shared_ptr<RandomSparseReservoir> res(new RandomSparseReservoir());
+    res->n_neurons = reader.readInt();
+    res->spectral_radius = reader.readDouble();
+    res->sparsity = reader.readDouble();
+    res->leak_rate = reader.readDouble();
+    res->input_scaling = reader.readDouble();
+    res->include_bias = reader.readBool();
+    res->seed = reader.readUInt();
+    res->W_res = reader.readSparse();
+    const Eigen::MatrixXd bias = reader.readMatrix();
+    if (bias.rows() != 1) { // checked before assigning into a row vector
+      throw SerializationError("RandomSparseReservoir: bias must be a row vector.");
+    }
+    res->bias = bias;
+    res->state = reader.readMatrix();
+    res->W_in_initialized = reader.readBool();
+    if (res->W_in_initialized) {
+      res->W_in = reader.readMatrix();
+    }
+    res->checkConsistency();
+    res->temp_state.resize(res->state.rows(), res->state.cols());
+    return res;
+  });
+}

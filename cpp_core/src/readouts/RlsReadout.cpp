@@ -1,15 +1,47 @@
 #include "rclib/readouts/RlsReadout.h"
 
+#include "rclib/Serialization.h"
+
 #include <cmath>
+#include <cstdint>
+#include <memory>
 #include <stdexcept>
+#include <string>
+
+namespace {
+
+// Stable wire codes: the file format must not depend on the enum's declaration order.
+std::uint8_t solverToWire(RlsReadout::Solver solver) {
+  switch (solver) {
+    case RlsReadout::RANK1_UPDATE:
+      return 0;
+    case RlsReadout::RANK_K_UPDATE:
+      return 1;
+  }
+  throw SerializationError("RlsReadout: unknown solver value " + std::to_string(static_cast<int>(solver)) + ".");
+}
+
+RlsReadout::Solver solverFromWire(std::uint8_t code) {
+  switch (code) {
+    case 0:
+      return RlsReadout::RANK1_UPDATE;
+    case 1:
+      return RlsReadout::RANK_K_UPDATE;
+    default:
+      throw SerializationError("RlsReadout: unknown solver code " + std::to_string(code) + ".");
+  }
+}
+
+} // namespace
 
 RlsReadout::RlsReadout(double lambda, double delta, bool include_bias, Solver solver)
     : lambda(lambda), delta(delta), include_bias(include_bias), solver(solver), initialized(false) {
-  if (lambda <= 0.0 || lambda > 1.0) {
+  // The range check is written so that NaN fails it; the one-sided bound also needs isfinite.
+  if (!(lambda > 0.0 && lambda <= 1.0)) {
     throw std::invalid_argument("lambda must be in (0, 1].");
   }
-  if (delta <= 0.0) {
-    throw std::invalid_argument("delta must be positive.");
+  if (!std::isfinite(delta) || delta <= 0.0) {
+    throw std::invalid_argument("delta must be finite and positive.");
   }
 }
 
@@ -135,4 +167,59 @@ Eigen::MatrixXd RlsReadout::predict(const Eigen::MatrixXd &states) {
     X.col(X.cols() - 1) = Eigen::VectorXd::Ones(X.rows());
   }
   return X * W_out;
+}
+
+void RlsReadout::checkConsistency() const {
+  translateSerializationErrors("RlsReadout", [&] {
+    // The hyperparameters were validated by the constructor; load() constructs through it.
+    solverToWire(solver);
+    if (!initialized) {
+      return; // stale matrices left by a failed fit() are never used or saved
+    }
+    if (W_out.rows() < 1 + (include_bias ? 1 : 0) || W_out.cols() < 1) {
+      throw SerializationError("RlsReadout: W_out has too few rows or columns.");
+    }
+    if (P.rows() != W_out.rows() || P.cols() != W_out.rows()) {
+      throw SerializationError("RlsReadout: P must be square with one row per W_out row.");
+    }
+  });
+}
+
+void RlsReadout::save(BinaryWriter &writer) const {
+  translateSerializationErrors("RlsReadout", [&] {
+    checkConsistency();
+    writer.writeDouble(lambda);
+    writer.writeDouble(delta);
+    writer.writeBool(include_bias);
+    writer.writeU8(solverToWire(solver));
+    writer.writeBool(initialized);
+    if (initialized) {
+      writer.writeMatrix(W_out);
+      writer.writeMatrix(P); // stored whole, so later updates are bit-identical
+    }
+  });
+}
+
+std::shared_ptr<RlsReadout> RlsReadout::load(BinaryReader &reader) {
+  return translateSerializationErrors("RlsReadout", [&] {
+    const double lambda = reader.readDouble();
+    const double delta = reader.readDouble();
+    const bool include_bias = reader.readBool();
+    const Solver solver = solverFromWire(reader.readU8());
+    auto readout = std::make_shared<RlsReadout>(lambda, delta, include_bias, solver); // validates
+    if (reader.readBool()) {
+      readout->W_out = reader.readMatrix();
+      readout->P = reader.readMatrix();
+      readout->initialized = true;
+    }
+    readout->checkConsistency();
+    if (readout->initialized) {
+      // partialFit sizes these buffers only when it initializes the readout.
+      const Eigen::Index n_features = readout->W_out.rows();
+      readout->x_aug.resize(n_features);
+      readout->k.resize(n_features);
+      readout->Px.resize(n_features);
+    }
+    return readout;
+  });
 }

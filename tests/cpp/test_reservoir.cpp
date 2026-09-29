@@ -3,6 +3,8 @@
 
 #include <Eigen/Dense>
 #include <catch2/catch_all.hpp>
+#include <limits>
+#include <stdexcept>
 
 class MinimalReservoir : public Reservoir {
 public:
@@ -86,4 +88,44 @@ TEST_CASE("RandomSparseReservoir - State Reset", "[RandomSparseReservoir]") {
   REQUIRE(res.getState().rows() == 1);
   REQUIRE(res.getState().cols() == n_neurons);
   REQUIRE(res.getState().isZero(0));
+}
+
+TEST_CASE("RandomSparseReservoir - rejects input width changes after initialization", "[RandomSparseReservoir]") {
+  RandomSparseReservoir res(10, 0.9, 0.5, 0.1, 1.0, true);
+
+  // The first input locks W_in to three columns.
+  res.advance(Eigen::MatrixXd::Random(1, 3));
+  const Eigen::MatrixXd state_before = res.getState();
+
+  REQUIRE_THROWS_AS(res.advance(Eigen::MatrixXd::Random(1, 4)), std::invalid_argument);
+  REQUIRE_THROWS_AS(res.advance(Eigen::MatrixXd::Random(1, 2)), std::invalid_argument);
+  // A rejected input leaves the state untouched.
+  REQUIRE(res.getState() == state_before);
+  REQUIRE_NOTHROW(res.advance(Eigen::MatrixXd::Random(1, 3)));
+}
+
+TEST_CASE("RandomSparseReservoir - rejects non-finite hyperparameters", "[RandomSparseReservoir]") {
+  const double bad = GENERATE(std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::infinity(),
+                              -std::numeric_limits<double>::infinity());
+  REQUIRE_THROWS_AS(RandomSparseReservoir(10, bad, 0.5, 0.5, 1.0), std::invalid_argument);
+  REQUIRE_THROWS_AS(RandomSparseReservoir(10, 0.9, bad, 0.5, 1.0), std::invalid_argument);
+  REQUIRE_THROWS_AS(RandomSparseReservoir(10, 0.9, 0.5, bad, 1.0), std::invalid_argument);
+  REQUIRE_THROWS_AS(RandomSparseReservoir(10, 0.9, 0.5, 0.5, bad), std::invalid_argument);
+}
+
+TEST_CASE("RandomSparseReservoir - configuration getters and input width", "[RandomSparseReservoir]") {
+  RandomSparseReservoir res(10, 0.9, 0.5, 0.25, 2.0, true, 7);
+  REQUIRE(res.getNNeurons() == 10);
+  REQUIRE(res.getSpectralRadius() == 0.9);
+  REQUIRE(res.getSparsity() == 0.5);
+  REQUIRE(res.getLeakRate() == 0.25);
+  REQUIRE(res.getInputScaling() == 2.0);
+  REQUIRE(res.getIncludeBias());
+  REQUIRE(res.getSeed() == 7U);
+
+  REQUIRE(res.getInputDim() == 0);
+  res.advance(Eigen::MatrixXd::Random(1, 3));
+  REQUIRE(res.getInputDim() == 3);
+  res.resetState();
+  REQUIRE(res.getInputDim() == 3);
 }

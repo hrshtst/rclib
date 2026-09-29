@@ -83,3 +83,15 @@ TEST_CASE("NvarReservoir - State Reset", "[NvarReservoir]") {
   res.resetState();
   REQUIRE(res.getState().isZero(0));
 }
+
+TEST_CASE("NvarReservoir - configuration getters and input width", "[NvarReservoir]") {
+  NvarReservoir res(3, 2);
+  REQUIRE(res.getNumLags() == 3);
+  REQUIRE(res.getPolynomialOrder() == 2);
+
+  REQUIRE(res.getInputDim() == 0);
+  res.advance(Eigen::MatrixXd::Random(1, 2));
+  REQUIRE(res.getInputDim() == 2);
+  res.resetState();
+  REQUIRE(res.getInputDim() == 2);
+}

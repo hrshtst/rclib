@@ -2,6 +2,8 @@
 
 #include <Eigen/Dense>
 #include <catch2/catch_all.hpp>
+#include <limits>
+#include <stdexcept>
 
 TEST_CASE("RlsReadout - fit and predict", "[RlsReadout]") {
   int n_samples = 100;
@@ -57,4 +59,33 @@ TEST_CASE("RlsReadout - partialFit", "[RlsReadout]") {
   Eigen::MatrixXd predictions2 = readout.predict(state2);
   REQUIRE(predictions2.rows() == 1);
   REQUIRE(predictions2.cols() == n_targets);
+}
+
+TEST_CASE("RlsReadout - rejects non-finite hyperparameters", "[RlsReadout]") {
+  const double bad = GENERATE(std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::infinity(),
+                              -std::numeric_limits<double>::infinity());
+  REQUIRE_THROWS_AS(RlsReadout(bad, 1.0), std::invalid_argument);
+  REQUIRE_THROWS_AS(RlsReadout(0.99, bad), std::invalid_argument);
+}
+
+TEST_CASE("RlsReadout - configuration getters and input width", "[RlsReadout]") {
+  RlsReadout readout(0.95, 2.0, true, RlsReadout::RANK_K_UPDATE);
+  REQUIRE(readout.getLambda() == 0.95);
+  REQUIRE(readout.getDelta() == 2.0);
+  REQUIRE(readout.getIncludeBias());
+  REQUIRE(readout.getSolver() == RlsReadout::RANK_K_UPDATE);
+
+  REQUIRE(readout.getInputDim() == 0);
+  readout.partialFit(Eigen::MatrixXd::Random(3, 5), Eigen::MatrixXd::Random(3, 1));
+  REQUIRE(readout.getInputDim() == 5);
+
+  // A failed fit leaves the readout unfitted even though the previous weights
+  // are still allocated; getInputDim must follow the initialized flag.
+  REQUIRE_THROWS(readout.fit(Eigen::MatrixXd(0, 5), Eigen::MatrixXd(0, 1)));
+  REQUIRE(readout.getInputDim() == 0);
+  REQUIRE_THROWS(readout.predict(Eigen::MatrixXd::Random(1, 5)));
+
+  // The next update starts afresh and may use a different width.
+  readout.partialFit(Eigen::MatrixXd::Random(1, 4), Eigen::MatrixXd::Random(1, 1));
+  REQUIRE(readout.getInputDim() == 4);
 }

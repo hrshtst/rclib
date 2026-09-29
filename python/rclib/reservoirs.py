@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+import math
+
 # Upper bound on the NVAR polynomial order, mirroring NvarReservoir::max_polynomial_order
 # in the C++ core. Bounds monomial-generation recursion depth.
 MAX_POLYNOMIAL_ORDER = 32
@@ -38,8 +40,9 @@ class RandomSparse:
         if n_neurons <= 0:
             msg = "n_neurons must be positive."
             raise ValueError(msg)
-        if spectral_radius < 0:
-            msg = "spectral_radius must be non-negative."
+        # Chained range checks reject NaN on their own; one-sided bounds also need isfinite.
+        if not math.isfinite(spectral_radius) or spectral_radius < 0:
+            msg = "spectral_radius must be finite and non-negative."
             raise ValueError(msg)
         if not 0 <= sparsity <= 1:
             msg = "sparsity must be in [0, 1]."
@@ -47,8 +50,8 @@ class RandomSparse:
         if not 0 < leak_rate <= 1:
             msg = "leak_rate must be in (0, 1]."
             raise ValueError(msg)
-        if input_scaling < 0:
-            msg = "input_scaling must be non-negative."
+        if not math.isfinite(input_scaling) or input_scaling < 0:
+            msg = "input_scaling must be finite and non-negative."
             raise ValueError(msg)
 
         self.n_neurons = n_neurons

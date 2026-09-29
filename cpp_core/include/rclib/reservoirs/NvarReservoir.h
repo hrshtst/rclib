@@ -3,7 +3,11 @@
 #include "rclib/Reservoir.h"
 
 #include <Eigen/Dense>
+#include <memory>
 #include <vector>
+
+class BinaryReader;
+class BinaryWriter;
 
 class NvarReservoir : public Reservoir {
 public:
@@ -13,6 +17,19 @@ public:
   void resetState() override;
   const Eigen::MatrixXd &getState() const override;
   int getOutputDim(int input_dim) const override;
+  int getInputDim() const override { return initialized ? input_dim : 0; }
+
+  int getNumLags() const { return num_lags; }
+  int getPolynomialOrder() const { return polynomial_order; }
+
+  /// Writes the hyperparameters and the full state (weights and current activations)
+  /// in the model file format; the type tag is written by Model. Throws SerializationError.
+  void save(BinaryWriter &writer) const;
+  /// Reads a payload written by save(). Throws SerializationError on invalid input.
+  static std::shared_ptr<NvarReservoir> load(BinaryReader &reader);
+  /// Checks the hyperparameters and that the stored matrices have consistent shapes.
+  /// Saving and loading both run it. Throws SerializationError.
+  void checkConsistency() const;
 
 private:
   void initialize(int input_dim);

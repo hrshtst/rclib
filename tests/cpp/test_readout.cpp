@@ -2,6 +2,8 @@
 
 #include <Eigen/Dense>
 #include <catch2/catch_all.hpp>
+#include <limits>
+#include <stdexcept>
 
 TEST_CASE("RidgeReadout - fit and predict", "[RidgeReadout]") {
   int n_samples = 100;
@@ -152,4 +154,28 @@ TEST_CASE("RidgeReadout - fitted weights are readable", "[RidgeReadout]") {
     copy.setZero();
     REQUIRE(inspected.predict(states) == before);
   }
+}
+
+TEST_CASE("RidgeReadout - rejects non-finite hyperparameters", "[RidgeReadout]") {
+  const double bad = GENERATE(std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::infinity(),
+                              -std::numeric_limits<double>::infinity());
+  REQUIRE_THROWS_AS(RidgeReadout(bad), std::invalid_argument);
+  REQUIRE_THROWS_AS(RidgeReadout(1e-6, true, RidgeReadout::AUTO, bad), std::invalid_argument);
+}
+
+TEST_CASE("RidgeReadout - configuration getters and input width", "[RidgeReadout]") {
+  const bool include_bias = GENERATE(true, false);
+  RidgeReadout readout(0.5, include_bias, RidgeReadout::CHOLESKY, 1e-7);
+  REQUIRE(readout.getAlpha() == 0.5);
+  REQUIRE(readout.getIncludeBias() == include_bias);
+  REQUIRE(readout.getSolver() == RidgeReadout::CHOLESKY);
+  REQUIRE(readout.getTolerance() == 1e-7);
+
+  REQUIRE(readout.getInputDim() == 0);
+  readout.fit(Eigen::MatrixXd::Random(20, 7), Eigen::MatrixXd::Random(20, 2));
+  REQUIRE(readout.getInputDim() == 7);
+
+  // fit validates its arguments before touching the fitted weights.
+  REQUIRE_THROWS(readout.fit(Eigen::MatrixXd::Random(20, 4), Eigen::MatrixXd::Random(10, 2)));
+  REQUIRE(readout.getInputDim() == 7);
 }
