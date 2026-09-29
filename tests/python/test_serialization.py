@@ -288,6 +288,37 @@ def test_deepcopy_is_independent() -> None:
     assert not np.array_equal(duplicate.predict(series), before)
 
 
+class _TaggedESN(ESN):
+    """An ESN subclass with state of its own, as users might define."""
+
+    def __init__(self, tag: str) -> None:
+        super().__init__()
+        self.tag = tag
+
+
+def _pickle_round_trip(esn: ESN) -> ESN:
+    return pickle.loads(pickle.dumps(esn))  # noqa: S301 - data pickled by this test
+
+
+@pytest.mark.parametrize("duplicate", [copy.deepcopy, _pickle_round_trip], ids=["deepcopy", "pickle"])
+def test_copies_keep_instance_state_and_subclass(duplicate: Callable[[ESN], ESN]) -> None:
+    """Attributes added by users or subclasses, and the subclass itself, survive copying."""
+    original = _TaggedESN("baseline")
+    original.add_reservoir(reservoirs.RandomSparse(n_neurons=20, spectral_radius=0.9, seed=3))
+    original.set_readout(readouts.Ridge(alpha=1e-4, include_bias=True))
+    series = _signal(41)
+    original.fit(series[:-1], series[1:], washout_len=5)
+    original.training_metadata = {"dataset": "example"}
+
+    restored = duplicate(original)
+    assert type(restored) is _TaggedESN
+    assert restored.tag == "baseline"
+    assert restored.training_metadata == {"dataset": "example"}
+    assert restored.training_metadata is not original.training_metadata
+    assert _configs(restored) == _configs(original)
+    np.testing.assert_array_equal(restored.predict(series), original.predict(series))
+
+
 def test_pickling_an_unsavable_model_raises() -> None:
     """Pickling a model that cannot be saved raises SerializationError."""
     with pytest.raises(rclib.SerializationError):

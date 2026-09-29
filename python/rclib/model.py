@@ -384,13 +384,19 @@ class ESN:
             raise _rclib.SerializationError(msg) from err
         return esn
 
-    def __getstate__(self) -> dict[str, bytes]:
-        """Support pickle and copy.deepcopy by storing the model in the model file format.
+    def __getstate__(self) -> dict[str, Any]:
+        """Support pickle and copy.deepcopy.
 
+        Every instance attribute is kept, including ones added by users or
+        subclasses; the C++ model is stored as bytes in the model file format.
         Unpickling can run arbitrary code, so only unpickle data you trust.
         """
-        return {"model": self._cpp_model.dumps()}
+        state = self.__dict__.copy()
+        state["_cpp_model"] = self._cpp_model.dumps()
+        return state
 
-    def __setstate__(self, state: dict[str, bytes]) -> None:
+    def __setstate__(self, state: dict[str, Any]) -> None:
         """Restore a model pickled by __getstate__."""
-        self.__dict__.update(ESN._from_cpp_model(_rclib.Model.loads(state["model"])).__dict__)
+        cpp_model = _rclib.Model.loads(state["_cpp_model"])  # before touching self, in case it fails
+        self.__dict__.update(state)
+        self._cpp_model = cpp_model
