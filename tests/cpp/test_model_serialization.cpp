@@ -7,17 +7,30 @@
 #include "rclib/reservoirs/RandomSparseReservoir.h"
 
 #include <Eigen/Dense>
+#include <algorithm>
 #include <catch2/catch_all.hpp>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <functional>
 #include <limits>
 #include <memory>
+#include <random>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <system_error>
 #include <vector>
+
+#if defined(__unix__) || defined(__APPLE__)
+#  include <csignal>
+#  include <sys/resource.h>
+#  include <sys/wait.h>
+#  include <unistd.h>
+#  define RCLIB_TEST_HAS_FORK 1
+#endif
 
 using Catch::Matchers::ContainsSubstring;
 using Catch::Matchers::MessageMatches;
@@ -96,6 +109,49 @@ std::string craftModel(const std::function<void(BinaryWriter &)> &body) {
   writer.writeHeader();
   body(writer);
   return buffer.str();
+}
+
+// A fresh directory under the system temporary directory, removed with its contents.
+class TemporaryDirectory {
+public:
+  TemporaryDirectory() {
+    std::random_device random;
+    path = std::filesystem::temp_directory_path() /
+           ("rclib_test_" + std::to_string(random()) + "_" + std::to_string(random()));
+    std::filesystem::create_directory(path);
+  }
+  ~TemporaryDirectory() {
+    std::error_code ignored;
+    std::filesystem::remove_all(path, ignored);
+  }
+  TemporaryDirectory(const TemporaryDirectory &) = delete;
+  TemporaryDirectory &operator=(const TemporaryDirectory &) = delete;
+
+  std::filesystem::path path;
+};
+
+std::string readFile(const std::filesystem::path &path) {
+  std::ifstream file(path, std::ios::binary);
+  std::ostringstream contents;
+  contents << file.rdbuf();
+  return contents.str();
+}
+
+// Sorted file names in a directory, to check that no temporary file is left behind.
+std::vector<std::string> directoryEntries(const std::filesystem::path &directory) {
+  std::vector<std::string> names;
+  for (const auto &entry : std::filesystem::directory_iterator(directory)) {
+    names.push_back(entry.path().filename().string());
+  }
+  std::sort(names.begin(), names.end());
+  return names;
+}
+
+Model makeFittedModel(Topology topology) {
+  Model model = makeModel(topology, ReadoutKind::Ridge);
+  const Eigen::MatrixXd series = signal(41, 0.0);
+  model.fit(series.topRows(40), series.bottomRows(40), 5);
+  return model;
 }
 
 class MinimalReservoir : public Reservoir {
@@ -374,3 +430,131 @@ TEST_CASE("Model serialization - feature width sums are overflow-checked", "[ser
   REQUIRE_THROWS_AS(sumFeatureWidths({int32_max}), SerializationError);
   REQUIRE_THROWS_AS(sumFeatureWidths({int32_max / 2 + 1, int32_max / 2 + 1}), SerializationError);
 }
+
+TEST_CASE("Model serialization - files round-trip and are replaced", "[serialization][Model]") {
+  TemporaryDirectory directory;
+  const std::string path = (directory.path / "model.rclib").string();
+
+  const Model first = makeFittedModel(Topology::SerialMixed);
+  first.save(path);
+  REQUIRE(readFile(path) == saveToBytes(first));
+  const Eigen::MatrixXd probe = signal(15, 1.0);
+  Model restored = Model::load(path);
+  Model first_copy = loadFromBytes(saveToBytes(first));
+  REQUIRE(sameBits(restored.predict(probe), first_copy.predict(probe)));
+
+  // Saving again replaces the file in place.
+  const Model second = makeFittedModel(Topology::ParallelMixed);
+  second.save(path);
+  REQUIRE(readFile(path) == saveToBytes(second));
+  REQUIRE(directoryEntries(directory.path) == std::vector<std::string>{"model.rclib"});
+}
+
+TEST_CASE("Model serialization - file errors", "[serialization][Model]") {
+  TemporaryDirectory directory;
+
+  SECTION("Loading a missing file") {
+    REQUIRE_THROWS_MATCHES(Model::load((directory.path / "missing.rclib").string()), SerializationError,
+                           MessageMatches(ContainsSubstring("cannot open")));
+  }
+  SECTION("Loading a truncated file") {
+    const std::string bytes = saveToBytes(makeFittedModel(Topology::RandomSparse));
+    const auto path = directory.path / "truncated.rclib";
+    std::ofstream(path, std::ios::binary) << bytes.substr(0, bytes.size() / 2);
+    REQUIRE_THROWS_AS(Model::load(path.string()), SerializationError);
+  }
+  SECTION("Saving into a missing directory") {
+    const auto path = directory.path / "missing" / "model.rclib";
+    REQUIRE_THROWS_MATCHES(makeFittedModel(Topology::RandomSparse).save(path.string()), SerializationError,
+                           MessageMatches(ContainsSubstring("cannot create")));
+    REQUIRE(directoryEntries(directory.path).empty());
+  }
+}
+
+TEST_CASE("Model serialization - a rejected save keeps the existing file", "[serialization][Model]") {
+  TemporaryDirectory directory;
+  const std::string path = (directory.path / "model.rclib").string();
+  makeFittedModel(Topology::RandomSparse).save(path);
+  const std::string checkpoint = readFile(path);
+
+  Model model;
+  SECTION("No readout") { model.addReservoir(std::make_shared<NvarReservoir>(2)); }
+  SECTION("The same reservoir object twice") {
+    auto reservoir = std::make_shared<RandomSparseReservoir>(5, 0.9);
+    model.addReservoir(reservoir);
+    model.addReservoir(reservoir);
+    model.setReadout(std::make_shared<RidgeReadout>());
+  }
+  SECTION("A reservoir type other than the built-in ones") {
+    model.addReservoir(std::make_shared<MinimalReservoir>());
+    model.setReadout(std::make_shared<RidgeReadout>());
+  }
+  SECTION("An independently fitted readout of the wrong width") {
+    auto reservoir = std::make_shared<RandomSparseReservoir>(5, 0.9);
+    reservoir->advance(Eigen::MatrixXd::Ones(1, 1));
+    model.addReservoir(reservoir);
+    auto readout = std::make_shared<RidgeReadout>();
+    readout->fit(Eigen::MatrixXd::Random(10, 7), Eigen::MatrixXd::Random(10, 1));
+    model.setReadout(readout);
+  }
+
+  REQUIRE_THROWS_AS(model.save(path), SerializationError);
+  REQUIRE(readFile(path) == checkpoint);
+  REQUIRE(directoryEntries(directory.path) == std::vector<std::string>{"model.rclib"});
+}
+
+TEST_CASE("Model serialization - a failed rename keeps the destination", "[serialization][Model]") {
+  // The destination is a non-empty directory, so the final rename fails after the
+  // temporary file has been written; the temporary file must be cleaned up.
+  TemporaryDirectory directory;
+  const auto destination = directory.path / "model.rclib";
+  std::filesystem::create_directory(destination);
+  std::ofstream(destination / "keep.txt") << "keep";
+
+  REQUIRE_THROWS_MATCHES(makeFittedModel(Topology::RandomSparse).save(destination.string()), SerializationError,
+                         MessageMatches(ContainsSubstring("cannot replace")));
+  REQUIRE(std::filesystem::is_directory(destination));
+  REQUIRE(directoryEntries(destination) == std::vector<std::string>{"keep.txt"});
+  REQUIRE(directoryEntries(directory.path) == std::vector<std::string>{"model.rclib"});
+}
+
+#ifdef RCLIB_TEST_HAS_FORK
+TEST_CASE("Model serialization - a failed write keeps the existing file", "[serialization][Model]") {
+  TemporaryDirectory directory;
+  const std::string path = (directory.path / "model.rclib").string();
+  makeFittedModel(Topology::RandomSparse).save(path);
+  const std::string checkpoint = readFile(path);
+  const Model replacement = makeFittedModel(Topology::ParallelMixed);
+
+  // The file-size limit and the SIGXFSZ disposition are process-wide, so they are
+  // only changed in a child process, which reports through its exit code.
+  const pid_t child = fork();
+  REQUIRE(child >= 0);
+  if (child == 0) {
+    int code = 3;                  // could not set the limit
+    std::signal(SIGXFSZ, SIG_IGN); // writes past the limit then fail with EFBIG
+    rlimit limit{};
+    if (getrlimit(RLIMIT_FSIZE, &limit) == 0) {
+      limit.rlim_cur = 64;
+      if (setrlimit(RLIMIT_FSIZE, &limit) == 0) {
+        try {
+          replacement.save(path);
+          code = 1; // the save unexpectedly succeeded
+        } catch (const SerializationError &) {
+          code = 0;
+        } catch (...) {
+          code = 2; // wrong exception type
+        }
+      }
+    }
+    _exit(code);
+  }
+
+  int status = 0;
+  REQUIRE(waitpid(child, &status, 0) == child);
+  REQUIRE(WIFEXITED(status));
+  REQUIRE(WEXITSTATUS(status) == 0);
+  REQUIRE(readFile(path) == checkpoint);
+  REQUIRE(directoryEntries(directory.path) == std::vector<std::string>{"model.rclib"});
+}
+#endif

@@ -29,10 +29,16 @@ public:
   /// lacks a reservoir or readout, holds the same reservoir object twice, contains a
   /// component type other than the built-in ones, or is internally inconsistent.
   void save(std::ostream &os) const;
+  /// Saves to a file. The model is written to a new temporary file next to `path`,
+  /// which then replaces `path` in one step, so an existing file there is never left
+  /// damaged: after a failure it is unchanged and the temporary file is removed.
+  void save(const std::string &path) const;
   /// Loads a model written by save(). Reads from the current position of a
   /// seekable stream; the model must extend to the end of the stream. Throws
   /// SerializationError (or std::bad_alloc) on invalid input.
   static Model load(std::istream &is);
+  /// Loads a model file written by save(). Throws SerializationError on failure.
+  static Model load(const std::string &path);
 
 private:
   Eigen::MatrixXd collectStates(const Eigen::MatrixXd &inputs);

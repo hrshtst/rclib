@@ -6,12 +6,20 @@
 #include "rclib/reservoirs/NvarReservoir.h"
 #include "rclib/reservoirs/RandomSparseReservoir.h"
 
+#include <cerrno>
 #include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <istream>
 #include <memory>
 #include <ostream>
+#include <random>
 #include <set>
+#include <streambuf>
 #include <string>
+#include <system_error>
 #include <typeinfo>
 #include <vector>
 
@@ -121,6 +129,48 @@ void checkTopology(const std::vector<std::shared_ptr<Reservoir>> &reservoirs, bo
   }
 }
 
+// An output stream buffer over a C FILE, so the model streams straight into the
+// temporary file without being held in memory.
+class FileBuffer : public std::streambuf {
+public:
+  explicit FileBuffer(std::FILE *file) : file(file) {}
+
+protected:
+  std::streamsize xsputn(const char *data, std::streamsize size) override {
+    return static_cast<std::streamsize>(std::fwrite(data, 1, static_cast<std::size_t>(size), file));
+  }
+  int_type overflow(int_type ch) override {
+    if (traits_type::eq_int_type(ch, traits_type::eof())) {
+      return traits_type::not_eof(ch);
+    }
+    return std::fputc(ch, file) == EOF ? traits_type::eof() : ch;
+  }
+
+private:
+  std::FILE *file;
+};
+
+// Creates a file next to `path` under a random name that did not exist before.
+// fopen's "x" mode (C11) fails if anything is at that name, including a planted
+// symlink, so the save never writes through a path it does not own. Retries on
+// name collisions and throws for any other error.
+std::FILE *createTemporaryFile(const std::string &path, std::string &temporary_path) {
+  std::random_device random;
+  for (int attempt = 0; attempt < 16; ++attempt) {
+    char suffix[32];
+    std::snprintf(suffix, sizeof(suffix), ".%08x%08x.tmp", random(), random());
+    temporary_path = path + suffix;
+    errno = 0;
+    if (std::FILE *file = std::fopen(temporary_path.c_str(), "wbx")) {
+      return file;
+    }
+    if (errno != EEXIST) {
+      throw SerializationError("Model: cannot create '" + temporary_path + "': " + std::strerror(errno) + ".");
+    }
+  }
+  throw SerializationError("Model: cannot create a unique temporary file next to '" + path + "'.");
+}
+
 // Checks shared by save and load, so that everything save() accepts load() accepts.
 void checkModel(const std::vector<std::shared_ptr<Reservoir>> &reservoirs, const std::string &connection_type,
                 const std::shared_ptr<Readout> &readout) {
@@ -134,19 +184,25 @@ void checkModel(const std::vector<std::shared_ptr<Reservoir>> &reservoirs, const
   checkTopology(reservoirs, connection_type == "parallel", *readout);
 }
 
+// Everything save() checks before writing: the shared checks plus the save-only ones.
+void checkSavable(const std::vector<std::shared_ptr<Reservoir>> &reservoirs, const std::string &connection_type,
+                  const std::shared_ptr<Readout> &readout) {
+  checkModel(reservoirs, connection_type, readout);
+  // The format stores each reservoir by value; a shared one would load as two
+  // independent objects and change how the model evolves.
+  std::set<const Reservoir *> seen;
+  for (const auto &reservoir : reservoirs) {
+    if (!seen.insert(reservoir.get()).second) {
+      throw SerializationError("Model: cannot save a model that holds the same reservoir object more than once.");
+    }
+  }
+}
+
 } // namespace
 
 void Model::save(std::ostream &os) const {
   translateSerializationErrors("Model", [&] {
-    checkModel(reservoirs, connection_type, readout);
-    // The format stores each reservoir by value; a shared one would load as two
-    // independent objects and change how the model evolves.
-    std::set<const Reservoir *> seen;
-    for (const auto &reservoir : reservoirs) {
-      if (!seen.insert(reservoir.get()).second) {
-        throw SerializationError("Model: cannot save a model that holds the same reservoir object more than once.");
-      }
-    }
+    checkSavable(reservoirs, connection_type, readout);
 
     BinaryWriter writer(os);
     writer.writeHeader();
@@ -189,5 +245,51 @@ Model Model::load(std::istream &is) {
 
     checkModel(model.reservoirs, model.connection_type, model.readout);
     return model;
+  });
+}
+
+void Model::save(const std::string &path) const {
+  translateSerializationErrors("Model", [&] {
+    checkSavable(reservoirs, connection_type, readout); // before touching the filesystem
+
+    std::string temporary_path;
+    std::FILE *file = createTemporaryFile(path, temporary_path);
+    try {
+      FileBuffer buffer(file);
+      std::ostream os(&buffer);
+      save(os);
+      const bool flushed = std::fflush(file) == 0 && std::ferror(file) == 0;
+      const bool closed = std::fclose(file) == 0;
+      file = nullptr;
+      if (!flushed || !closed) {
+        throw SerializationError("Model: failed to write '" + temporary_path + "'.");
+      }
+      std::error_code error;
+      std::filesystem::rename(temporary_path, path, error);
+      if (error) {
+        throw SerializationError("Model: cannot replace '" + path + "': " + error.message() + ".");
+      }
+    } catch (...) {
+      // Cleanup never throws, so the original error is the one reported, and it
+      // only removes the file this call created.
+      if (file != nullptr) {
+        std::fclose(file);
+      }
+      std::error_code ignored;
+      std::filesystem::remove(temporary_path, ignored);
+      throw;
+    }
+  });
+}
+
+Model Model::load(const std::string &path) {
+  return translateSerializationErrors("Model", [&] {
+    errno = 0;
+    std::ifstream file(path, std::ios::binary);
+    if (!file) {
+      throw SerializationError("Model: cannot open '" + path + "'" +
+                               (errno != 0 ? std::string(": ") + std::strerror(errno) : std::string()) + ".");
+    }
+    return load(file);
   });
 }
