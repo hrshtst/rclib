@@ -14,7 +14,9 @@ This report details the optimizations applied to the **Ridge Readout** (Ridge Re
 In Reservoir Computing, we often deal with state matrices $X$ of size $T \times N$, where $T$ is the number of time steps and $N$ is the number of neurons.
 
 The standard **Primal** solution to Ridge Regression involves solving the normal equations:
+
 $$(X^T X + \alpha I) W_{out} = X^T Y$$
+
 This has a computational complexity of **$O(N^3)$** due to the $N \times N$ matrix inversion/decomposition. When $N$ is large (e.g., 20,000 neurons), this becomes the primary bottleneck of the ESN training phase.
 
 ## Optimization Details
@@ -25,6 +27,7 @@ For extremely large reservoirs, even the $O(N^2)$ memory requirement for storing
 
 **Mechanism:**
 Instead of computing $A = X^T X + \alpha I$, we define a linear operator that computes the product $Av$ without ever materializing $A$:
+
 $$Av = X^T(Xv) + \alpha v$$
 
 *   **Memory Efficiency:** Reduces memory footprint from $O(N^2)$ to $O(NT)$.
@@ -37,8 +40,11 @@ When $N > T$, it is mathematically superior to solve the **Dual problem**, which
 
 **Mathematical Formulation:**
 Instead of the primal weights, we solve for dual variables $\beta$:
+
 $$(X X^T + \alpha I) \beta = Y$$
+
 The final weights are then recovered via:
+
 $$W_{out} = X^T \beta$$
 
 **Computational Gain:**
