@@ -1,4 +1,7 @@
 #include "rclib/Serialization.h"
+#include "rclib/readouts/LmsReadout.h"
+#include "rclib/readouts/RidgeReadout.h"
+#include "rclib/readouts/RlsReadout.h"
 #include "rclib/reservoirs/NvarReservoir.h"
 #include "rclib/reservoirs/RandomSparseReservoir.h"
 
@@ -166,6 +169,86 @@ struct NvarPayload {
     return buffer.str();
   }
 };
+
+// Readout payloads built field by field, for crafting invalid input. Booleans and
+// enum codes are raw bytes so that out-of-range encodings can be written.
+struct RidgePayload {
+  double alpha = 1e-3;
+  std::uint8_t include_bias = 1;
+  std::uint8_t solver = 1; // CHOLESKY
+  double tolerance = 1e-6;
+  std::uint8_t effective_solver = 1;
+  std::uint8_t fitted = 1;
+  Eigen::MatrixXd W_out = Eigen::MatrixXd::Ones(3, 2);
+
+  std::string bytes() const {
+    std::stringstream buffer;
+    BinaryWriter writer(buffer);
+    writer.writeDouble(alpha);
+    writer.writeU8(include_bias);
+    writer.writeU8(solver);
+    writer.writeDouble(tolerance);
+    writer.writeU8(effective_solver);
+    writer.writeU8(fitted);
+    if (fitted != 0) {
+      writer.writeMatrix(W_out);
+    }
+    return buffer.str();
+  }
+};
+
+struct RlsPayload {
+  double lambda = 0.99;
+  double delta = 1.0;
+  std::uint8_t include_bias = 1;
+  std::uint8_t solver = 0; // RANK1_UPDATE
+  std::uint8_t initialized = 1;
+  Eigen::MatrixXd W_out = Eigen::MatrixXd::Ones(3, 2);
+  Eigen::MatrixXd P = Eigen::MatrixXd::Identity(3, 3);
+
+  std::string bytes() const {
+    std::stringstream buffer;
+    BinaryWriter writer(buffer);
+    writer.writeDouble(lambda);
+    writer.writeDouble(delta);
+    writer.writeU8(include_bias);
+    writer.writeU8(solver);
+    writer.writeU8(initialized);
+    if (initialized != 0) {
+      writer.writeMatrix(W_out);
+      writer.writeMatrix(P);
+    }
+    return buffer.str();
+  }
+};
+
+struct LmsPayload {
+  double learning_rate = 0.01;
+  std::uint8_t include_bias = 1;
+  std::uint8_t initialized = 1;
+  Eigen::MatrixXd W_out = Eigen::MatrixXd::Ones(3, 2);
+
+  std::string bytes() const {
+    std::stringstream buffer;
+    BinaryWriter writer(buffer);
+    writer.writeDouble(learning_rate);
+    writer.writeU8(include_bias);
+    writer.writeU8(initialized);
+    if (initialized != 0) {
+      writer.writeMatrix(W_out);
+    }
+    return buffer.str();
+  }
+};
+
+// Every strict prefix of `bytes` must be rejected by Component::load.
+template <typename Component> void requireTruncationsRejected(const std::string &bytes) {
+  for (std::size_t size = 0; size < bytes.size(); ++size) {
+    std::istringstream input(bytes.substr(0, size));
+    BinaryReader reader(input);
+    REQUIRE_THROWS_AS(Component::load(reader), SerializationError);
+  }
+}
 
 // A stream buffer that serves `data` but cannot seek, like a pipe.
 class NonSeekableBuffer : public std::streambuf {
@@ -532,16 +615,150 @@ TEST_CASE("Reservoirs - truncated payloads are rejected", "[serialization]") {
   random_sparse.advance(Eigen::MatrixXd::Random(1, 2));
   nvar.advance(Eigen::MatrixXd::Random(1, 2));
 
-  const std::string random_sparse_bytes = saveToBytes(random_sparse);
-  for (std::size_t size = 0; size < random_sparse_bytes.size(); ++size) {
-    std::istringstream input(random_sparse_bytes.substr(0, size));
-    BinaryReader reader(input);
-    REQUIRE_THROWS_AS(RandomSparseReservoir::load(reader), SerializationError);
+  requireTruncationsRejected<RandomSparseReservoir>(saveToBytes(random_sparse));
+  requireTruncationsRejected<NvarReservoir>(saveToBytes(nvar));
+}
+
+TEST_CASE("RidgeReadout - serialization round-trips", "[serialization][RidgeReadout]") {
+  const auto solver = GENERATE(RidgeReadout::AUTO, RidgeReadout::CHOLESKY, RidgeReadout::DUAL_CHOLESKY,
+                               RidgeReadout::CONJUGATE_GRADIENT, RidgeReadout::CONJUGATE_GRADIENT_IMPLICIT);
+  const bool include_bias = GENERATE(true, false);
+  RidgeReadout original(1e-3, include_bias, solver, 1e-9);
+  const Eigen::MatrixXd states = Eigen::MatrixXd::Random(30, 6);
+  const Eigen::MatrixXd targets = Eigen::MatrixXd::Random(30, 2);
+
+  SECTION("Unfitted") {}
+  SECTION("Fitted") { original.fit(states, targets); }
+
+  const std::string bytes = saveToBytes(original);
+  const auto restored = loadFromBytes<RidgeReadout>(bytes);
+  REQUIRE(saveToBytes(*restored) == bytes);
+
+  REQUIRE(restored->getAlpha() == original.getAlpha());
+  REQUIRE(restored->getIncludeBias() == original.getIncludeBias());
+  REQUIRE(restored->getSolver() == original.getSolver());
+  REQUIRE(restored->getEffectiveSolver() == original.getEffectiveSolver());
+  REQUIRE(restored->getTolerance() == original.getTolerance());
+  REQUIRE(restored->getInputDim() == original.getInputDim());
+  if (original.getInputDim() == 0) {
+    REQUIRE_THROWS(restored->predict(states));
+  } else {
+    REQUIRE(sameBits(restored->getWeights(), original.getWeights()));
+    REQUIRE(sameBits(restored->predict(states), original.predict(states)));
   }
-  const std::string nvar_bytes = saveToBytes(nvar);
-  for (std::size_t size = 0; size < nvar_bytes.size(); ++size) {
-    std::istringstream input(nvar_bytes.substr(0, size));
-    BinaryReader reader(input);
-    REQUIRE_THROWS_AS(NvarReservoir::load(reader), SerializationError);
+}
+
+TEST_CASE("RlsReadout - serialization round-trips and continues identically", "[serialization][RlsReadout]") {
+  // The rank-k (Woodbury) update only runs for lambda == 1 and batches of more than one row.
+  const auto config =
+      GENERATE(std::make_pair(0.99, RlsReadout::RANK1_UPDATE), std::make_pair(1.0, RlsReadout::RANK_K_UPDATE));
+  RlsReadout original(config.first, 0.5, true, config.second);
+  const Eigen::MatrixXd states = Eigen::MatrixXd::Random(12, 4);
+  const Eigen::MatrixXd targets = Eigen::MatrixXd::Random(12, 2);
+
+  SECTION("Unfitted") {}
+  SECTION("Fitted") { original.partialFit(states.topRows(4), targets.topRows(4)); }
+  SECTION("Unfitted by a failed fit that left stale weights") {
+    original.partialFit(states.topRows(4), targets.topRows(4));
+    REQUIRE_THROWS(original.fit(Eigen::MatrixXd(0, 4), Eigen::MatrixXd(0, 2)));
   }
+
+  const std::string bytes = saveToBytes(original);
+  const auto restored = loadFromBytes<RlsReadout>(bytes);
+  REQUIRE(saveToBytes(*restored) == bytes);
+  REQUIRE(restored->getLambda() == original.getLambda());
+  REQUIRE(restored->getDelta() == original.getDelta());
+  REQUIRE(restored->getIncludeBias() == original.getIncludeBias());
+  REQUIRE(restored->getSolver() == original.getSolver());
+  REQUIRE(restored->getInputDim() == original.getInputDim());
+
+  // The same later updates, in two-row batches, keep both readouts bit-identical.
+  for (Eigen::Index start = 4; start < 12; start += 2) {
+    original.partialFit(states.middleRows(start, 2), targets.middleRows(start, 2));
+    restored->partialFit(states.middleRows(start, 2), targets.middleRows(start, 2));
+  }
+  REQUIRE(sameBits(restored->predict(states), original.predict(states)));
+}
+
+TEST_CASE("LmsReadout - serialization round-trips and continues identically", "[serialization][LmsReadout]") {
+  LmsReadout original(0.05, true);
+  const Eigen::MatrixXd states = Eigen::MatrixXd::Random(12, 4);
+  const Eigen::MatrixXd targets = Eigen::MatrixXd::Random(12, 2);
+
+  SECTION("Unfitted") {}
+  SECTION("Fitted") { original.partialFit(states.topRows(4), targets.topRows(4)); }
+  SECTION("Unfitted by an empty fit that left stale weights") {
+    original.partialFit(states.topRows(4), targets.topRows(4));
+    original.fit(Eigen::MatrixXd(0, 4), Eigen::MatrixXd(0, 2));
+  }
+
+  const std::string bytes = saveToBytes(original);
+  const auto restored = loadFromBytes<LmsReadout>(bytes);
+  REQUIRE(saveToBytes(*restored) == bytes);
+  REQUIRE(restored->getLearningRate() == original.getLearningRate());
+  REQUIRE(restored->getIncludeBias() == original.getIncludeBias());
+  REQUIRE(restored->getInputDim() == original.getInputDim());
+
+  for (Eigen::Index start = 4; start < 12; start += 2) {
+    original.partialFit(states.middleRows(start, 2), targets.middleRows(start, 2));
+    restored->partialFit(states.middleRows(start, 2), targets.middleRows(start, 2));
+  }
+  REQUIRE(sameBits(restored->predict(states), original.predict(states)));
+}
+
+TEST_CASE("RidgeReadout - invalid payloads are rejected", "[serialization][RidgeReadout]") {
+  RidgePayload payload;
+  REQUIRE_NOTHROW(loadFromBytes<RidgeReadout>(payload.bytes()));
+
+  SECTION("NaN alpha") { payload.alpha = nan_value; }
+  SECTION("Infinite tolerance") { payload.tolerance = inf_value; }
+  SECTION("include_bias byte other than 0 or 1") { payload.include_bias = 2; }
+  SECTION("Unknown solver code") { payload.solver = 5; }
+  SECTION("Unknown effective solver code") { payload.effective_solver = 99; }
+  SECTION("Effective solver differs from an explicit solver") { payload.effective_solver = 2; }
+  SECTION("Fitted without weights") { payload.W_out = Eigen::MatrixXd(0, 0); }
+  SECTION("Weights without room for the bias row") { payload.W_out = Eigen::MatrixXd::Ones(1, 2); }
+
+  REQUIRE_THROWS_AS(loadFromBytes<RidgeReadout>(payload.bytes()), SerializationError);
+}
+
+TEST_CASE("RlsReadout - invalid payloads are rejected", "[serialization][RlsReadout]") {
+  RlsPayload payload;
+  REQUIRE_NOTHROW(loadFromBytes<RlsReadout>(payload.bytes()));
+
+  SECTION("NaN lambda") { payload.lambda = nan_value; }
+  SECTION("Non-positive delta") { payload.delta = 0.0; }
+  SECTION("Unknown solver code") { payload.solver = 2; }
+  SECTION("initialized byte other than 0 or 1") { payload.initialized = 2; }
+  SECTION("Weights without output columns") { payload.W_out = Eigen::MatrixXd(3, 0); }
+  SECTION("Non-square P") { payload.P = Eigen::MatrixXd::Identity(3, 2); }
+  SECTION("P of the wrong size") { payload.P = Eigen::MatrixXd::Identity(2, 2); }
+
+  REQUIRE_THROWS_AS(loadFromBytes<RlsReadout>(payload.bytes()), SerializationError);
+}
+
+TEST_CASE("LmsReadout - invalid payloads are rejected", "[serialization][LmsReadout]") {
+  LmsPayload payload;
+  REQUIRE_NOTHROW(loadFromBytes<LmsReadout>(payload.bytes()));
+
+  SECTION("NaN learning_rate") { payload.learning_rate = nan_value; }
+  SECTION("Weights without room for the bias row") { payload.W_out = Eigen::MatrixXd::Ones(1, 2); }
+  SECTION("Weights without output columns") { payload.W_out = Eigen::MatrixXd(3, 0); }
+
+  REQUIRE_THROWS_AS(loadFromBytes<LmsReadout>(payload.bytes()), SerializationError);
+}
+
+TEST_CASE("Readouts - truncated payloads are rejected", "[serialization]") {
+  const Eigen::MatrixXd states = Eigen::MatrixXd::Random(6, 3);
+  const Eigen::MatrixXd targets = Eigen::MatrixXd::Random(6, 2);
+  RidgeReadout ridge(1e-3, true);
+  RlsReadout rls(0.99, 1.0, true);
+  LmsReadout lms(0.01, true);
+  ridge.fit(states, targets);
+  rls.fit(states, targets);
+  lms.fit(states, targets);
+
+  requireTruncationsRejected<RidgeReadout>(saveToBytes(ridge));
+  requireTruncationsRejected<RlsReadout>(saveToBytes(rls));
+  requireTruncationsRejected<LmsReadout>(saveToBytes(lms));
 }

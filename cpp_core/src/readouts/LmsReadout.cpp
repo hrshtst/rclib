@@ -1,6 +1,9 @@
 #include "rclib/readouts/LmsReadout.h"
 
+#include "rclib/Serialization.h"
+
 #include <cmath>
+#include <memory>
 #include <stdexcept>
 
 LmsReadout::LmsReadout(double learning_rate, bool include_bias)
@@ -78,4 +81,40 @@ Eigen::MatrixXd LmsReadout::predict(const Eigen::MatrixXd &states) {
     X.col(X.cols() - 1) = Eigen::VectorXd::Ones(X.rows());
   }
   return X * W_out;
+}
+
+void LmsReadout::checkConsistency() const {
+  translateSerializationErrors("LmsReadout", [&] {
+    // The hyperparameters were validated by the constructor; load() constructs through it.
+    if (initialized && (W_out.rows() < 1 + (include_bias ? 1 : 0) || W_out.cols() < 1)) {
+      throw SerializationError("LmsReadout: W_out has too few rows or columns.");
+    }
+  });
+}
+
+void LmsReadout::save(BinaryWriter &writer) const {
+  translateSerializationErrors("LmsReadout", [&] {
+    checkConsistency();
+    writer.writeDouble(learning_rate);
+    writer.writeBool(include_bias);
+    // Stale weights left by an emptied or failed fit() are not part of the state.
+    writer.writeBool(initialized);
+    if (initialized) {
+      writer.writeMatrix(W_out);
+    }
+  });
+}
+
+std::shared_ptr<LmsReadout> LmsReadout::load(BinaryReader &reader) {
+  return translateSerializationErrors("LmsReadout", [&] {
+    const double learning_rate = reader.readDouble();
+    const bool include_bias = reader.readBool();
+    auto readout = std::make_shared<LmsReadout>(learning_rate, include_bias); // validates
+    if (reader.readBool()) {
+      readout->W_out = reader.readMatrix();
+      readout->initialized = true;
+    }
+    readout->checkConsistency();
+    return readout;
+  });
 }

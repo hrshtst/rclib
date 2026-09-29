@@ -1,11 +1,53 @@
 #include "rclib/readouts/RidgeReadout.h"
 
+#include "rclib/Serialization.h"
 #include "rclib/readouts/RidgeLinearOperator.h"
 
 #include <Eigen/Dense>
 #include <Eigen/IterativeLinearSolvers>
 #include <cmath>
+#include <cstdint>
+#include <memory>
 #include <stdexcept>
+#include <string>
+
+namespace {
+
+// Stable wire codes: the file format must not depend on the enum's declaration order.
+std::uint8_t solverToWire(RidgeReadout::Solver solver) {
+  switch (solver) {
+    case RidgeReadout::AUTO:
+      return 0;
+    case RidgeReadout::CHOLESKY:
+      return 1;
+    case RidgeReadout::DUAL_CHOLESKY:
+      return 2;
+    case RidgeReadout::CONJUGATE_GRADIENT:
+      return 3;
+    case RidgeReadout::CONJUGATE_GRADIENT_IMPLICIT:
+      return 4;
+  }
+  throw SerializationError("RidgeReadout: unknown solver value " + std::to_string(static_cast<int>(solver)) + ".");
+}
+
+RidgeReadout::Solver solverFromWire(std::uint8_t code) {
+  switch (code) {
+    case 0:
+      return RidgeReadout::AUTO;
+    case 1:
+      return RidgeReadout::CHOLESKY;
+    case 2:
+      return RidgeReadout::DUAL_CHOLESKY;
+    case 3:
+      return RidgeReadout::CONJUGATE_GRADIENT;
+    case 4:
+      return RidgeReadout::CONJUGATE_GRADIENT_IMPLICIT;
+    default:
+      throw SerializationError("RidgeReadout: unknown solver code " + std::to_string(code) + ".");
+  }
+}
+
+} // namespace
 
 RidgeReadout::RidgeReadout(double alpha, bool include_bias, Solver solver, double tolerance)
     : alpha(alpha), include_bias(include_bias), solver(solver), effective_solver(solver), tolerance(tolerance) {
@@ -246,4 +288,53 @@ Eigen::MatrixXd RidgeReadout::predict(const Eigen::MatrixXd &states) {
   } else {
     return states * W_out;
   }
+}
+
+void RidgeReadout::checkConsistency() const {
+  translateSerializationErrors("RidgeReadout", [&] {
+    // The hyperparameters were validated by the constructor; load() constructs through it.
+    solverToWire(solver);
+    solverToWire(effective_solver);
+    if (solver != AUTO && effective_solver != solver) {
+      throw SerializationError("RidgeReadout: effective_solver must equal an explicitly chosen solver.");
+    }
+    if (W_out.size() != 0 && W_out.rows() < 1 + (include_bias ? 1 : 0)) {
+      throw SerializationError("RidgeReadout: W_out has too few rows for include_bias.");
+    }
+  });
+}
+
+void RidgeReadout::save(BinaryWriter &writer) const {
+  translateSerializationErrors("RidgeReadout", [&] {
+    checkConsistency();
+    writer.writeDouble(alpha);
+    writer.writeBool(include_bias);
+    writer.writeU8(solverToWire(solver));
+    writer.writeDouble(tolerance);
+    writer.writeU8(solverToWire(effective_solver));
+    const bool fitted = W_out.size() != 0;
+    writer.writeBool(fitted);
+    if (fitted) {
+      writer.writeMatrix(W_out);
+    }
+  });
+}
+
+std::shared_ptr<RidgeReadout> RidgeReadout::load(BinaryReader &reader) {
+  return translateSerializationErrors("RidgeReadout", [&] {
+    const double alpha = reader.readDouble();
+    const bool include_bias = reader.readBool();
+    const Solver solver = solverFromWire(reader.readU8());
+    const double tolerance = reader.readDouble();
+    auto readout = std::make_shared<RidgeReadout>(alpha, include_bias, solver, tolerance); // validates
+    readout->effective_solver = solverFromWire(reader.readU8());
+    if (reader.readBool()) {
+      readout->W_out = reader.readMatrix();
+      if (readout->W_out.size() == 0) {
+        throw SerializationError("RidgeReadout: a fitted readout must have non-empty weights.");
+      }
+    }
+    readout->checkConsistency();
+    return readout;
+  });
 }

@@ -3,6 +3,10 @@
 #include "rclib/Readout.h"
 
 #include <Eigen/Dense>
+#include <memory>
+
+class BinaryReader;
+class BinaryWriter;
 
 class RlsReadout : public Readout {
 public:
@@ -22,6 +26,15 @@ public:
   double getDelta() const { return delta; }
   bool getIncludeBias() const { return include_bias; }
   Solver getSolver() const { return solver; }
+
+  /// Writes the hyperparameters and the fitted state in the model file format;
+  /// the type tag is written by Model. Throws SerializationError.
+  void save(BinaryWriter &writer) const;
+  /// Reads a payload written by save(). Throws SerializationError on invalid input.
+  static std::shared_ptr<RlsReadout> load(BinaryReader &reader);
+  /// Checks that the stored matrices have consistent shapes. Saving and loading
+  /// both run it. Throws SerializationError.
+  void checkConsistency() const;
 
 private:
   double lambda;
