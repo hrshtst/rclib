@@ -3,6 +3,7 @@
 #ifdef RCLIB_USE_OPENMP
 #  include <omp.h>
 #endif
+#include <exception>
 #include <stdexcept>
 
 void Model::addReservoir(std::shared_ptr<Reservoir> res, std::string connection_type) {
@@ -176,16 +177,28 @@ Eigen::MatrixXd Model::collectStates(const Eigen::MatrixXd &inputs) {
   }
 
   std::vector<Eigen::MatrixXd> reservoir_outputs(reservoirs.size());
+  // An exception escaping an OpenMP region calls std::terminate, so each worker
+  // stores its exception and the lowest-index one is rethrown after the region.
+  std::vector<std::exception_ptr> errors(reservoirs.size());
 #ifdef RCLIB_USE_OPENMP
 #  pragma omp parallel for
 #endif
   for (int r = 0; r < static_cast<int>(reservoirs.size()); ++r) {
-    auto &res = reservoirs[static_cast<size_t>(r)];
-    Eigen::MatrixXd res_states(inputs.rows(), res->getOutputDim(static_cast<int>(inputs.cols())));
-    for (int i = 0; i < inputs.rows(); ++i) {
-      res_states.row(i) = res->advance(inputs.row(i));
+    try {
+      auto &res = reservoirs[static_cast<size_t>(r)];
+      Eigen::MatrixXd res_states(inputs.rows(), res->getOutputDim(static_cast<int>(inputs.cols())));
+      for (int i = 0; i < inputs.rows(); ++i) {
+        res_states.row(i) = res->advance(inputs.row(i));
+      }
+      reservoir_outputs[static_cast<size_t>(r)] = res_states;
+    } catch (...) {
+      errors[static_cast<size_t>(r)] = std::current_exception();
     }
-    reservoir_outputs[static_cast<size_t>(r)] = res_states;
+  }
+  for (const auto &error : errors) {
+    if (error) {
+      std::rethrow_exception(error);
+    }
   }
 
   int total_cols = 0;
