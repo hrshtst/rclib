@@ -28,11 +28,14 @@ model.fitSequences({x_episode1, x_episode2, x_episode3}, {y_episode1, y_episode2
 With a single sequence, `fit_sequences([x], [y])` gives the same readout as
 `fit(x, y)`. Pass a list even then: a single 2-D array is rejected. Every
 sequence must be longer than `washout_len`, and all sequences must have the same
-input width and the same target width. These checks run before the model
-changes, and their errors name the sequence index. Afterwards the reservoirs
-hold their states at the end of the last sequence: `predict` resets them first
-by default, while `predict_online` and `predict_generative` continue from there,
-so prime them with the sequence you want to continue.
+input width and the same target width. When retraining a model, the input width
+must also match the one its reservoirs were locked to by earlier input. These
+checks run before the model changes, and their errors name the sequence index;
+`fit` checks the locked width before it resets the reservoirs in the same way.
+Afterwards the reservoirs hold their states at the end of the last sequence:
+`predict` resets them first by default, while `predict_online` and
+`predict_generative` continue from there, so prime them with the sequence you
+want to continue.
 
 ## Online Learning
 
