@@ -19,7 +19,9 @@ Where:
 The initial transient is usually discarded with a washout period before the
 readout is fit. In `rclib`, `model.fit(..., washout_len=k)` advances the
 reservoir over the full input sequence and trains only on rows `k:` of the
-collected state matrix and target matrix.
+collected state matrix and target matrix. `model.fit_sequences(...)` does the
+same for each of several sequences, starting each from a reset reservoir, and
+fits one readout on the stacked rows of all of them.
 
 `RandomSparse` optionally adds a fixed random bias vector inside the reservoir
 update. Readouts also have their own `include_bias` option, which appends a

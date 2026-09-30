@@ -1,5 +1,39 @@
 # Advanced Usage
 
+## Training on Several Sequences
+
+Data often comes as several independent sequences, such as episodes or
+demonstrations. Concatenating them and calling `fit` would carry the reservoir
+state from the end of one sequence into the start of the next and discard the
+washout only once, so the readout would learn from transitions that never
+happen. `fit_sequences` treats each sequence separately: every sequence starts
+from reset reservoirs and drops its own first `washout_len` samples, and one
+readout is fitted on the remaining states of all sequences stacked together.
+
+```python
+# One (n_samples, n_inputs) input array and one (n_samples, n_outputs) target
+# array per episode; the lengths may differ.
+inputs = [x_episode1, x_episode2, x_episode3]
+targets = [y_episode1, y_episode2, y_episode3]
+
+# Each episode warms up the reset reservoirs for 50 samples before its states count.
+model.fit_sequences(inputs, targets, washout_len=50)
+y_pred = model.predict(x_test)
+```
+
+```cpp
+model.fitSequences({x_episode1, x_episode2, x_episode3}, {y_episode1, y_episode2, y_episode3}, 50);
+```
+
+With a single sequence, `fit_sequences([x], [y])` gives the same readout as
+`fit(x, y)`. Pass a list even then: a single 2-D array is rejected. Every
+sequence must be longer than `washout_len`, and all sequences must have the same
+input width and the same target width. These checks run before the model
+changes, and their errors name the sequence index. Afterwards the reservoirs
+hold their states at the end of the last sequence: `predict` resets them first
+by default, while `predict_online` and `predict_generative` continue from there,
+so prime them with the sequence you want to continue.
+
 ## Online Learning
 
 For real-time applications where data arrives sequentially, use `partial_fit` with an RLS or LMS readout. `rclib` supports **mini-batch** updates for both, providing significant speedups when processing multiple samples at once.

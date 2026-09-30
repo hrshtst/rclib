@@ -48,3 +48,13 @@ model.add_reservoir(res1)
 # model.add_reservoir(res2)
 model.set_readout(readout)
 ```
+
+## Training
+
+`model.fit(x, y, washout_len=k)` resets the reservoirs, runs them through the
+whole input sequence and fits the readout on all but the first `k` states. For
+several independent sequences, such as episodes, use
+`model.fit_sequences([x1, x2], [y1, y2], washout_len=k)`: each sequence starts
+from reset reservoirs and loses its own washout before one readout is fitted on
+all of them. See
+[Training on Several Sequences](advanced_usage.md#training-on-several-sequences).
