@@ -47,6 +47,57 @@ generating 200 and then 100 steps gives the same outputs and final reservoir
 states as generating 300 steps at once. The readout's output width must match the
 model's input width, since each output becomes the next input.
 
+## Spectral Radius Scaling
+
+`RandomSparse` draws a sparse random matrix $\mathbf{W}_{res}$ from its `seed` and
+scales it so that its spectral radius, the largest eigenvalue modulus, equals
+`spectral_radius`. `spectral_radius_method` chooses how the spectral radius of
+the unscaled matrix is found:
+
+| Method | Accuracy | Cost | Best For |
+| :--- | :--- | :--- | :--- |
+| `power_iteration` (Default) | Within 0.1% up to 300 neurons, 0.25% at 1000 | 1000 sparse matrix-vector products | Any size |
+| `dense` | Exact up to rounding | $O(n^3)$ time, $O(n^2)$ memory | Small reservoirs |
+
+```python
+res = reservoirs.RandomSparse(n_neurons=200, spectral_radius=0.95, seed=0, spectral_radius_method="dense")
+```
+
+### How the default works
+
+Plain power iteration multiplies a start vector by $\mathbf{W}_{res}$ over and
+over, normalizing it each time, and reads the spectral radius off the norm of
+the last step. That converges when one real eigenvalue is clearly larger in
+modulus than all others, as for many symmetric matrices. The eigenvalues of a
+non-symmetric random matrix instead fill a disk, so the largest ones are often a
+complex-conjugate pair or several eigenvalues of nearly equal modulus. The
+iterate then keeps rotating among them and the norm of the last step oscillates
+instead of converging. Measured over 50 seeds at sparsity 0.1, plain power
+iteration with 100 steps missed the requested radius by up to 11% for 100
+neurons, 6% for 300 and 4% for 1000, and more steps did not fix it.
+
+`rclib` therefore averages. It runs 1000 steps from a start vector drawn from a
+generator seeded by `seed`, and returns the geometric mean of the per-step growth
+$\lVert \mathbf{W}_{res} \mathbf{b}_k \rVert / \lVert \mathbf{b}_k \rVert$ over the
+last 500. The first 500 steps let the dominant eigenvalues take over, and
+averaging over many steps cancels their oscillation. Over the same 50 seeds the
+scaled matrix missed the requested radius by at most 0.08% up to 300 neurons and
+0.25% at 1000. Since the start vector depends only on `seed`, reservoirs built
+with the same parameters get the same weights, whatever else the program does.
+
+Each step is one sparse matrix-vector product, so the cost grows with the number
+of non-zero weights, `sparsity * n_neurons**2`. Single-threaded on the
+development machine at sparsity 0.1, the estimate took about 0.4 ms for 100
+neurons, 3 ms for 300, 27 ms for 1000 and 2 s for 10,000. The `dense` method took
+about 1.4 ms for 100 neurons, 30 ms for 300 and 1.2 s for 1000, growing as
+$n^3$.
+
+> **Note:** rclib 0.2.0 and earlier used plain power iteration from a start
+> vector drawn from the global `std::rand()` state, so only the first reservoir
+> built in a process was reproducible. Since the averaged estimate, the same
+> `seed` gives a slightly differently scaled $\mathbf{W}_{res}$ than in those
+> versions. Saved models keep the weights they were saved with.
+
 ## Ridge Regression Solver Selection
 
 `rclib` provides multiple strategies for batch training. While the `auto` mode is recommended, you can explicitly set the solver based on your specific needs.
@@ -111,6 +162,10 @@ C++). Examples are a model without a readout, a component whose widths do not
 match its neighbours, a custom reservoir or readout type, the same reservoir
 object added twice (C++ only), and a corrupted or truncated file. Running out of
 memory raises `MemoryError` (`std::bad_alloc` in C++) instead.
+
+> **Compatibility:** Files written by rclib 0.2.0 still load; their `RandomSparse`
+> reservoirs report `spectral_radius_method="power_iteration"`. Files written by
+> later versions use model format version 2 and cannot be read by rclib 0.2.0.
 
 > **Security:** Only load files from sources you trust. Unlike `pickle`, the
 > format contains no executable code, but it is parsed by native code. Loading a

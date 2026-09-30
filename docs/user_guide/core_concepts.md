@@ -13,8 +13,16 @@ res = reservoirs.RandomSparse(
     input_scaling=1.0,  # Scaling of input weights
     include_bias=False,  # Add bias neuron to reservoir
     seed=42,  # Random seed for reproducibility
+    spectral_radius_method="power_iteration",  # or "dense": exact, O(n^3) time, small reservoirs only
 )
 ```
+
+`spectral_radius_method` chooses how the spectral radius of the random weight
+matrix is found before the matrix is scaled to `spectral_radius`. The default
+`"power_iteration"` scales to within a fraction of a percent at any size;
+`"dense"` is exact but costs $O(n^3)$ time and $O(n^2)$ memory in `n_neurons`,
+so use it for small reservoirs. See
+[Spectral Radius Scaling](advanced_usage.md#spectral-radius-scaling).
 
 ## Configuring Readouts
 

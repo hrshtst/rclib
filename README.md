@@ -154,7 +154,9 @@ model.save("model.rclib");
 Model restored = Model::load("model.rclib");
 ```
 
-Only load files from sources you trust. See
+Only load files from sources you trust. Files written by rclib 0.2.0 still load,
+but files written by later versions use model format version 2, which rclib 0.2.0
+cannot read. See
 [Saving and Loading Models](docs/user_guide/advanced_usage.md#saving-and-loading-models)
 for what is stored, error handling and portability.
 
