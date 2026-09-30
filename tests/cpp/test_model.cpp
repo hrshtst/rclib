@@ -218,11 +218,13 @@ Model cloneModel(const Model &model) {
 }
 
 // An untrained model: 0 = RandomSparse, 1 = serial RandomSparse -> NVAR, 2 = parallel
-// RandomSparse + NVAR. Every call builds identical reservoirs.
+// RandomSparse + NVAR, 3 = NVAR. Every call builds identical reservoirs.
 Model makeModel(int topology) {
   Model model;
   if (topology == 0) {
     model.addReservoir(std::make_shared<RandomSparseReservoir>(30, 0.9, 0.3, 0.5, 1.0, true, 7));
+  } else if (topology == 3) {
+    model.addReservoir(std::make_shared<NvarReservoir>(2, 2));
   } else if (topology == 1) {
     model.addReservoir(std::make_shared<RandomSparseReservoir>(8, 0.9, 0.5, 0.5, 1.0, true, 7));
     model.addReservoir(std::make_shared<NvarReservoir>(2, 2));
@@ -500,5 +502,59 @@ TEST_CASE("Model - fitSequences rejects invalid sequences and changes nothing", 
   }
   REQUIRE_THROWS_WITH(model.fitSequences(inputs, targets, washout_len), Catch::Matchers::StartsWith(message));
   REQUIRE(readoutWeights(model) == weights_before);
+  REQUIRE(reservoirStates(model) == states_before);
+}
+
+TEST_CASE("Model - retraining with another input width is rejected before any reset", "[Model]") {
+  const int topology = GENERATE(0, 1, 2, 3); // RandomSparse, serial -> NVAR, parallel, NVAR
+  const bool sequences = GENERATE(false, true);
+  CAPTURE(topology, sequences);
+  Model model = makeModel(topology);
+  model.fit(sine(20, 0.0), sine(20, 0.3));
+  model.predictOnline(sine(3, 1.0)); // states away from the reset ones
+  const Eigen::MatrixXd weights_before = readoutWeights(model);
+  const std::vector<Eigen::MatrixXd> states_before = reservoirStates(model);
+  const Eigen::MatrixXd next_input = sine(4, 1.0).bottomRows(1);
+  const Eigen::MatrixXd expected_next = cloneModel(model).predictOnline(next_input);
+
+  const Eigen::MatrixXd wider = Eigen::MatrixXd::Ones(10, 2);
+  const Eigen::MatrixXd targets = sine(10, 0.3);
+  // CHECK, not REQUIRE: the state checks below still run when the call throws something else.
+  if (sequences) {
+    CHECK_THROWS_MATCHES(model.fitSequences({wider}, {targets}), std::invalid_argument,
+                         Catch::Matchers::MessageMatches(Catch::Matchers::Equals(
+                             "sequence 0: inputs have 2 columns, but the reservoirs expect 1.")));
+  } else {
+    CHECK_THROWS_MATCHES(model.fit(wider, targets), std::invalid_argument,
+                         Catch::Matchers::MessageMatches(
+                             Catch::Matchers::Equals("inputs have 2 columns, but the reservoirs expect 1.")));
+  }
+
+  REQUIRE(reservoirStates(model) == states_before);
+  REQUIRE(readoutWeights(model) == weights_before);
+  REQUIRE(model.predictOnline(next_input) == expected_next);
+}
+
+TEST_CASE("Model - a serial reservoir locked to another width than it receives is rejected before any reset",
+          "[Model]") {
+  const bool sequences = GENERATE(false, true);
+  CAPTURE(sequences);
+  // NVAR locked to 3 columns behind a RandomSparse reservoir that outputs 8.
+  auto nvar = std::make_shared<NvarReservoir>(2, 1);
+  nvar->advance(Eigen::MatrixXd::Ones(1, 3));
+  Model model;
+  model.addReservoir(std::make_shared<RandomSparseReservoir>(8, 0.9, 0.5, 0.5, 1.0, true, 7));
+  model.addReservoir(nvar);
+  model.setReadout(std::make_shared<RidgeReadout>(1e-4));
+  const std::vector<Eigen::MatrixXd> states_before = reservoirStates(model);
+
+  const std::string message = "reservoir 1 would receive 8 columns, but it expects 3.";
+  if (sequences) {
+    CHECK_THROWS_MATCHES(model.fitSequences({sine(10, 0.0)}, {sine(10, 0.3)}), std::invalid_argument,
+                         Catch::Matchers::MessageMatches(Catch::Matchers::Equals("sequence 0: " + message)));
+  } else {
+    CHECK_THROWS_MATCHES(model.fit(sine(10, 0.0), sine(10, 0.3)), std::invalid_argument,
+                         Catch::Matchers::MessageMatches(Catch::Matchers::Equals(message)));
+  }
   REQUIRE(reservoirStates(model) == states_before);
 }

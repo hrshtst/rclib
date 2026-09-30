@@ -250,8 +250,10 @@ class ESN:
         ValueError
             If a single 2-D array is passed instead of a sequence of arrays, if there
             are no sequences or unequal numbers of input and target sequences, or if a
-            sequence is empty, its inputs and targets differ in length, or its width
-            differs from the first sequence's. Messages name the sequence index.
+            sequence is empty, its inputs and targets differ in length, its width
+            differs from the first sequence's, or its input width differs from the one
+            the reservoirs are locked to by earlier input. Messages name the sequence
+            index.
         IndexError
             If ``washout_len`` is negative or not shorter than a sequence.
         RuntimeError

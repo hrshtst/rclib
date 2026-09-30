@@ -420,3 +420,41 @@ def test_fit_sequences_requires_a_configured_model() -> None:
     model.add_reservoir(reservoirs.Nvar(num_lags=2))
     with pytest.raises(RuntimeError, match="not fully configured"):
         model.fit_sequences([_sine(10, 0.0)], [_sine(10, 0.3)])
+
+
+def _width_model(topology: str) -> ESN:
+    """An untrained RandomSparse, NVAR, serial RandomSparse -> NVAR or parallel RandomSparse + NVAR model."""
+    model = ESN(connection_type="parallel" if topology == "parallel" else "serial")
+    if topology in {"random_sparse", "serial", "parallel"}:
+        model.add_reservoir(reservoirs.RandomSparse(n_neurons=8, spectral_radius=0.9, include_bias=True, seed=7))
+    if topology in {"nvar", "serial", "parallel"}:
+        model.add_reservoir(reservoirs.Nvar(num_lags=2, polynomial_order=2))
+    model.set_readout(readouts.Ridge(alpha=1e-4, include_bias=True))
+    return model
+
+
+@pytest.mark.parametrize("method", ["fit", "fit_sequences"])
+@pytest.mark.parametrize("topology", ["random_sparse", "nvar", "serial", "parallel"])
+def test_retraining_with_another_input_width_changes_nothing(topology: str, method: str) -> None:
+    """Input wider than the reservoirs are locked to is rejected before any reservoir is reset."""
+    model = _width_model(topology)
+    model.fit(_sine(20, 0.0), _sine(20, 0.3))
+    model.predict_online(_sine(3, 1.0))  # states away from the reset ones
+    twin = copy.deepcopy(model)
+    n_reservoirs = model._cpp_model.getNumReservoirs()  # noqa: SLF001
+    states = [model.get_reservoir(i).getState() for i in range(n_reservoirs)]
+
+    wider, targets = np.ones((10, 2)), _sine(10, 0.3)
+    if method == "fit":
+        with pytest.raises(ValueError, match=r"^inputs have 2 columns, but the reservoirs expect 1\.$"):
+            model.fit(wider, targets)
+    else:
+        with pytest.raises(ValueError, match=r"^sequence 0: inputs have 2 columns, but the reservoirs expect 1\.$"):
+            model.fit_sequences([wider], [targets])
+
+    for i in range(n_reservoirs):
+        np.testing.assert_array_equal(model.get_reservoir(i).getState(), states[i])
+    next_input = _sine(4, 1.0)[-1:]
+    np.testing.assert_array_equal(model.predict_online(next_input), twin.predict_online(next_input))
+    probe = _sine(10, 2.0)  # predict resets first, so this compares the readouts
+    np.testing.assert_array_equal(model.predict(probe), twin.predict(probe))

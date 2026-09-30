@@ -54,6 +54,7 @@ void Model::fit(const Eigen::MatrixXd &inputs, const Eigen::MatrixXd &targets, i
     throw std::runtime_error("Model is not fully configured. Add at least one reservoir and a readout.");
   }
   checkSequence(inputs, targets, washout_len, "");
+  checkInputWidth(inputs.cols(), "");
 
   const Eigen::MatrixXd fit_states = collectStatesAfterWashout(inputs, washout_len);
   readout->fit(fit_states, targets.bottomRows(targets.rows() - washout_len));
@@ -84,6 +85,7 @@ void Model::fitSequences(const std::vector<Eigen::MatrixXd> &inputs, const std::
     if (targets[i].cols() != targets[0].cols()) {
       throw std::invalid_argument(context + "targets must have as many columns as sequence 0.");
     }
+    checkInputWidth(inputs[i].cols(), context); // only sequence 0 can fail, as all share its width
     fit_rows += inputs[i].rows() - washout_len;
   }
 
@@ -266,6 +268,27 @@ Eigen::MatrixXd Model::collectStates(const Eigen::MatrixXd &inputs) {
     current_col += static_cast<int>(mat.cols());
   }
   return all_states;
+}
+
+void Model::checkInputWidth(Eigen::Index input_width, const std::string &context) const {
+  // A reservoir reports 0 from getInputDim() until its first input locks the width. In a
+  // serial model each reservoir receives the previous one's output; 0 means not known.
+  const bool serial = connection_type == "serial";
+  int width = static_cast<int>(input_width);
+  for (size_t r = 0; r < reservoirs.size(); ++r) {
+    const int locked = reservoirs[r]->getInputDim();
+    if (width > 0 && locked > 0 && width != locked) {
+      if (!serial || r == 0) {
+        throw std::invalid_argument(context + "inputs have " + std::to_string(width) +
+                                    " columns, but the reservoirs expect " + std::to_string(locked) + ".");
+      }
+      throw std::invalid_argument(context + "reservoir " + std::to_string(r) + " would receive " +
+                                  std::to_string(width) + " columns, but it expects " + std::to_string(locked) + ".");
+    }
+    if (serial) {
+      width = width > 0 ? reservoirs[r]->getOutputDim(width) : 0;
+    }
+  }
 }
 
 Eigen::MatrixXd Model::collectStatesAfterWashout(const Eigen::MatrixXd &inputs, int washout_len) {
