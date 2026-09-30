@@ -1,9 +1,13 @@
 #define CATCH_CONFIG_MAIN // This tells Catch to provide a main() - only do this in one cpp file
+#include "rclib/Serialization.h"
 #include "rclib/reservoirs/RandomSparseReservoir.h"
 
 #include <Eigen/Dense>
+#include <Eigen/Eigenvalues>
+#include <Eigen/Sparse>
 #include <catch2/catch_all.hpp>
 #include <limits>
+#include <sstream>
 #include <stdexcept>
 
 class MinimalReservoir : public Reservoir {
@@ -128,4 +132,61 @@ TEST_CASE("RandomSparseReservoir - configuration getters and input width", "[Ran
   REQUIRE(res.getInputDim() == 3);
   res.resetState();
   REQUIRE(res.getInputDim() == 3);
+}
+
+namespace {
+
+// The scaled W_res, read back from the reservoir's payload, where it follows i32 n_neurons, four f64
+// hyperparameters, bool include_bias and u32 seed (docs/development/model_file_format.md).
+Eigen::SparseMatrix<double> reservoirWeights(const RandomSparseReservoir &res) {
+  std::stringstream buffer;
+  BinaryWriter writer(buffer);
+  res.save(writer);
+  BinaryReader reader(buffer);
+  reader.readInt();
+  for (int i = 0; i < 4; ++i) {
+    reader.readDouble();
+  }
+  reader.readBool();
+  reader.readUInt();
+  return reader.readSparse();
+}
+
+double denseSpectralRadius(const Eigen::SparseMatrix<double> &matrix) {
+  const Eigen::EigenSolver<Eigen::MatrixXd> solver(Eigen::MatrixXd(matrix), /*computeEigenvectors=*/false);
+  return solver.eigenvalues().cwiseAbs().maxCoeff();
+}
+
+} // namespace
+
+TEST_CASE("RandomSparseReservoir - W_res has the requested spectral radius", "[RandomSparseReservoir]") {
+  // Most of these matrices have a complex dominant pair or near ties in modulus, where the norm after
+  // plain power iteration missed the target by up to 6% at these seeds.
+  const int n_neurons = GENERATE(100, 300);
+  const unsigned int seed = GENERATE(range(0U, 5U));
+  const double spectral_radius = 0.9;
+
+  RandomSparseReservoir res(n_neurons, spectral_radius, 0.1, 0.5, 1.0, true, seed);
+  CAPTURE(n_neurons, seed);
+  REQUIRE_THAT(denseSpectralRadius(reservoirWeights(res)), Catch::Matchers::WithinRel(spectral_radius, 1e-2));
+}
+
+TEST_CASE("RandomSparseReservoir - W_res without nonzero eigenvalues is left unscaled", "[RandomSparseReservoir]") {
+  Eigen::SparseMatrix<double> W_res;
+
+  SECTION("Empty W_res") {
+    W_res = reservoirWeights(RandomSparseReservoir(10, 0.9, 0.0, 0.5, 1.0, true, 1));
+    REQUIRE(W_res.nonZeros() == 0);
+  }
+
+  SECTION("Nilpotent W_res, where the power iterate collapses to zero") {
+    // A single off-diagonal entry: W_res * W_res = 0.
+    W_res = reservoirWeights(RandomSparseReservoir(10, 0.9, 0.01, 0.5, 1.0, true, 1));
+    REQUIRE(W_res.nonZeros() == 1);
+    REQUIRE(Eigen::MatrixXd(W_res * W_res).isZero(0));
+  }
+
+  // Unscaled entries keep their draws from [-1, 1].
+  REQUIRE(Eigen::MatrixXd(W_res).allFinite());
+  REQUIRE(Eigen::MatrixXd(W_res).cwiseAbs().maxCoeff() <= 1.0);
 }

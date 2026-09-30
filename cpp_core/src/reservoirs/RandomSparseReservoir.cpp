@@ -36,22 +36,32 @@ Eigen::SparseMatrix<double> generate_sparse_random_matrix(int size, double spars
   return mat;
 }
 
-// Function to find the largest eigenvalue of a sparse matrix using power iteration.
+// Function to find the spectral radius (largest eigenvalue modulus) of a sparse matrix using power iteration.
+// Random sparse matrices often have a complex-conjugate dominant pair or near ties in modulus, where the norm
+// after the last step does not converge. The geometric mean of the per-step growth ||A b_k|| over the second
+// half of the iterations does: the first half lets the dominant eigenvalues take over.
 // The start vector is drawn from gen, not Eigen's Random(), which reads the global std::rand() state.
-double largest_eigenvalue(const Eigen::SparseMatrix<double> &mat, std::mt19937 &gen, int iterations = 100) {
+double largest_eigenvalue(const Eigen::SparseMatrix<double> &mat, std::mt19937 &gen, int iterations = 1000) {
   if (mat.rows() == 0) {
     return 0.0;
   }
   std::uniform_real_distribution<> dis(-1.0, 1.0);
   Eigen::VectorXd b_k = Eigen::VectorXd::NullaryExpr(mat.rows(), [&]() { return dis(gen); });
+  b_k.normalize(); // leaves a zero vector unchanged
+  const int burn_in = iterations / 2;
+  double log_growth_sum = 0.0;
   for (int i = 0; i < iterations; ++i) {
     Eigen::VectorXd b_k1 = mat * b_k;
-    if (b_k1.norm() < 1e-9) {
-      return 0.0; // Matrix is likely zero
+    const double growth = b_k1.norm();
+    if (growth < 1e-9) {
+      return 0.0; // Matrix is likely zero or the iterate collapsed; also keeps log() away from zero
     }
-    b_k = b_k1.normalized();
+    if (i >= burn_in) {
+      log_growth_sum += std::log(growth);
+    }
+    b_k = b_k1 / growth;
   }
-  return (mat * b_k).norm();
+  return std::exp(log_growth_sum / (iterations - burn_in));
 }
 
 RandomSparseReservoir::RandomSparseReservoir(int n_neurons, double spectral_radius, double sparsity, double leak_rate,
