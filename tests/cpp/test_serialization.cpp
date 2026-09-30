@@ -119,11 +119,13 @@ struct RandomSparsePayload {
   double input_scaling = 1.0;
   bool include_bias = false;
   std::uint32_t seed = 1;
+  std::uint8_t spectral_radius_method = 0;
   Eigen::SparseMatrix<double> W_res = sparseIdentity(3, 3);
   Eigen::MatrixXd bias = Eigen::MatrixXd::Zero(1, 3);
   Eigen::MatrixXd state = Eigen::MatrixXd::Zero(1, 3);
   bool w_in_initialized = true;
   Eigen::MatrixXd W_in = Eigen::MatrixXd::Ones(2, 3);
+  std::uint32_t format_version = serialization_format_version; // version 1 has no spectral_radius_method
 
   std::string bytes() const {
     std::stringstream buffer;
@@ -135,6 +137,9 @@ struct RandomSparsePayload {
     writer.writeDouble(input_scaling);
     writer.writeBool(include_bias);
     writer.writeUInt(seed);
+    if (format_version >= 2) {
+      writer.writeU8(spectral_radius_method);
+    }
     writer.writeSparse(W_res);
     writer.writeMatrix(bias);
     writer.writeMatrix(state);
@@ -352,9 +357,20 @@ TEST_CASE("Serialization - header", "[serialization]") {
     std::stringstream buffer;
     BinaryWriter(buffer).writeHeader();
     BinaryReader reader(buffer);
-    REQUIRE(reader.formatVersion() == 0);
     reader.readHeader();
     REQUIRE(reader.formatVersion() == serialization_format_version);
+  }
+
+  SECTION("Earlier versions") {
+    const std::uint32_t version = GENERATE(range(1U, serialization_format_version));
+    bytes = "RCLIBMDL";
+    appendRaw(bytes, version);
+    std::istringstream input(bytes);
+    BinaryReader reader(input);
+    // Before a header, the reader expects a bare payload in the current format.
+    REQUIRE(reader.formatVersion() == serialization_format_version);
+    reader.readHeader();
+    REQUIRE(reader.formatVersion() == version);
   }
 
   SECTION("Bad magic bytes") {
@@ -515,7 +531,8 @@ TEST_CASE("Serialization - translateSerializationErrors", "[serialization]") {
 }
 
 TEST_CASE("RandomSparseReservoir - serialization round-trips", "[serialization][RandomSparseReservoir]") {
-  RandomSparseReservoir original(20, 0.9, 0.3, 0.5, 0.8, true, 123);
+  const auto method = GENERATE(RandomSparseReservoir::POWER_ITERATION, RandomSparseReservoir::DENSE);
+  RandomSparseReservoir original(20, 0.9, 0.3, 0.5, 0.8, true, 123, method);
   const Eigen::MatrixXd inputs = Eigen::MatrixXd::Random(6, 3);
 
   SECTION("Before the first input (W_in not generated yet)") {}
@@ -536,6 +553,7 @@ TEST_CASE("RandomSparseReservoir - serialization round-trips", "[serialization][
   REQUIRE(restored->getInputScaling() == original.getInputScaling());
   REQUIRE(restored->getIncludeBias() == original.getIncludeBias());
   REQUIRE(restored->getSeed() == original.getSeed());
+  REQUIRE(restored->getSpectralRadiusMethod() == method);
   REQUIRE(restored->getInputDim() == original.getInputDim());
   REQUIRE(sameBits(restored->getState(), original.getState()));
 
@@ -577,6 +595,7 @@ TEST_CASE("RandomSparseReservoir - invalid payloads are rejected", "[serializati
   SECTION("Non-positive n_neurons") { payload.n_neurons = 0; }
   SECTION("NaN leak_rate") { payload.leak_rate = nan_value; }
   SECTION("Infinite spectral_radius") { payload.spectral_radius = inf_value; }
+  SECTION("Unknown spectral_radius_method code") { payload.spectral_radius_method = 2; }
   SECTION("Non-square W_res") { payload.W_res = sparseIdentity(3, 4); }
   SECTION("W_res of the wrong size") { payload.W_res = sparseIdentity(4, 4); }
   SECTION("bias that is not a row vector") { payload.bias = Eigen::MatrixXd::Zero(3, 1); }
@@ -587,6 +606,29 @@ TEST_CASE("RandomSparseReservoir - invalid payloads are rejected", "[serializati
 
   REQUIRE_THROWS_MATCHES(loadFromBytes<RandomSparseReservoir>(payload.bytes()), SerializationError,
                          MessageMatches(StartsWith("RandomSparseReservoir: ")));
+}
+
+TEST_CASE("RandomSparseReservoir - spectral_radius_method is read from version 2 on",
+          "[serialization][RandomSparseReservoir]") {
+  RandomSparsePayload payload;
+  RandomSparseReservoir::SpectralRadiusMethod expected = RandomSparseReservoir::POWER_ITERATION;
+  SECTION("Version 1 has no code and loads as POWER_ITERATION") { payload.format_version = 1; }
+  SECTION("Version 2 with POWER_ITERATION") { payload.format_version = 2; }
+  SECTION("Version 2 with DENSE") {
+    payload.format_version = 2;
+    payload.spectral_radius_method = 1;
+    expected = RandomSparseReservoir::DENSE;
+  }
+
+  std::string bytes = "RCLIBMDL";
+  appendRaw(bytes, payload.format_version);
+  bytes += payload.bytes();
+  std::istringstream input(bytes);
+  BinaryReader reader(input);
+  reader.readHeader();
+  const auto restored = RandomSparseReservoir::load(reader);
+  REQUIRE(reader.remainingBytes() == 0);
+  REQUIRE(restored->getSpectralRadiusMethod() == expected);
 }
 
 TEST_CASE("NvarReservoir - invalid payloads are rejected", "[serialization][NvarReservoir]") {

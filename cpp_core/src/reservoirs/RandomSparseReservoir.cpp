@@ -3,12 +3,14 @@
 #include "rclib/Serialization.h"
 
 #include <Eigen/Dense>
+#include <Eigen/Eigenvalues>
 #include <Eigen/Sparse>
 #include <cmath>
 #include <cstdint>
 #include <memory>
 #include <random>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 #ifdef RCLIB_USE_OPENMP
@@ -64,10 +66,53 @@ double largest_eigenvalue(const Eigen::SparseMatrix<double> &mat, std::mt19937 &
   return std::exp(log_growth_sum / (iterations - burn_in));
 }
 
+// Function to find the exact spectral radius of a sparse matrix from the eigenvalues of its dense copy.
+// Costs O(n^3) time and O(n^2) memory.
+double dense_spectral_radius(const Eigen::SparseMatrix<double> &mat) {
+  if (mat.rows() == 0) {
+    return 0.0;
+  }
+  const Eigen::EigenSolver<Eigen::MatrixXd> solver(Eigen::MatrixXd(mat), /*computeEigenvectors=*/false);
+  if (solver.info() != Eigen::Success) {
+    throw std::runtime_error("RandomSparseReservoir: the dense eigenvalue solver did not converge.");
+  }
+  return solver.eigenvalues().cwiseAbs().maxCoeff();
+}
+
+namespace {
+
+// Stable wire codes: the file format must not depend on the enum's declaration order.
+std::uint8_t methodToWire(RandomSparseReservoir::SpectralRadiusMethod method) {
+  switch (method) {
+    case RandomSparseReservoir::POWER_ITERATION:
+      return 0;
+    case RandomSparseReservoir::DENSE:
+      return 1;
+  }
+  throw SerializationError("RandomSparseReservoir: unknown spectral_radius_method value " +
+                           std::to_string(static_cast<int>(method)) + ".");
+}
+
+RandomSparseReservoir::SpectralRadiusMethod methodFromWire(std::uint8_t code) {
+  switch (code) {
+    case 0:
+      return RandomSparseReservoir::POWER_ITERATION;
+    case 1:
+      return RandomSparseReservoir::DENSE;
+    default:
+      throw SerializationError("RandomSparseReservoir: unknown spectral_radius_method code " + std::to_string(code) +
+                               ".");
+  }
+}
+
+} // namespace
+
 RandomSparseReservoir::RandomSparseReservoir(int n_neurons, double spectral_radius, double sparsity, double leak_rate,
-                                             double input_scaling, bool include_bias, unsigned int seed)
+                                             double input_scaling, bool include_bias, unsigned int seed,
+                                             SpectralRadiusMethod spectral_radius_method)
     : n_neurons(n_neurons), spectral_radius(spectral_radius), sparsity(sparsity), leak_rate(leak_rate),
-      input_scaling(input_scaling), include_bias(include_bias), W_in_initialized(false) {
+      input_scaling(input_scaling), include_bias(include_bias), spectral_radius_method(spectral_radius_method),
+      W_in_initialized(false) {
   validateParameters();
 
   state = Eigen::MatrixXd::Zero(1, n_neurons);
@@ -76,9 +121,14 @@ RandomSparseReservoir::RandomSparseReservoir(int n_neurons, double spectral_radi
   W_res = generate_sparse_random_matrix(n_neurons, sparsity, gen);
 
   if (spectral_radius > 0) {
-    // A generator of its own: the start vector depends only on the seed, and W_res and bias keep their draws from gen.
-    std::mt19937 power_iteration_gen(seed + 2);
-    double max_eigenvalue = largest_eigenvalue(W_res, power_iteration_gen);
+    double max_eigenvalue = 0.0;
+    if (spectral_radius_method == DENSE) {
+      max_eigenvalue = dense_spectral_radius(W_res);
+    } else {
+      // Its own generator: the start vector depends only on the seed, and W_res and bias keep their draws from gen.
+      std::mt19937 power_iteration_gen(seed + 2);
+      max_eigenvalue = largest_eigenvalue(W_res, power_iteration_gen);
+    }
     if (max_eigenvalue > 1e-9) {
       W_res = W_res * (spectral_radius / max_eigenvalue);
     }
@@ -113,6 +163,9 @@ void RandomSparseReservoir::validateParameters() const {
   }
   if (!std::isfinite(input_scaling) || input_scaling < 0.0) {
     throw std::invalid_argument("input_scaling must be finite and non-negative.");
+  }
+  if (spectral_radius_method != POWER_ITERATION && spectral_radius_method != DENSE) {
+    throw std::invalid_argument("spectral_radius_method must be POWER_ITERATION or DENSE.");
   }
 }
 
@@ -209,6 +262,7 @@ void RandomSparseReservoir::save(BinaryWriter &writer) const {
     writer.writeDouble(input_scaling);
     writer.writeBool(include_bias);
     writer.writeUInt(seed);
+    writer.writeU8(methodToWire(spectral_radius_method));
     writer.writeSparse(W_res);
     writer.writeMatrix(bias);
     writer.writeMatrix(state);
@@ -231,6 +285,8 @@ std::shared_ptr<RandomSparseReservoir> RandomSparseReservoir::load(BinaryReader 
     res->input_scaling = reader.readDouble();
     res->include_bias = reader.readBool();
     res->seed = reader.readUInt();
+    // Version 1 files predate the option; they were all built by power iteration.
+    res->spectral_radius_method = reader.formatVersion() >= 2 ? methodFromWire(reader.readU8()) : POWER_ITERATION;
     res->W_res = reader.readSparse();
     const Eigen::MatrixXd bias = reader.readMatrix();
     if (bias.rows() != 1) { // checked before assigning into a row vector

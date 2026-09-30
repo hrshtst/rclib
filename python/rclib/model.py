@@ -19,7 +19,7 @@ from . import (
 if TYPE_CHECKING:
     from numpy.typing import ArrayLike
 
-# Solver names of the Python configs mapped to the C++ enums, and back.
+# Solver and method names of the Python configs mapped to the C++ enums, and back.
 _RIDGE_SOLVERS = {
     "auto": _rclib.RidgeReadout.Solver.AUTO,
     "cholesky": _rclib.RidgeReadout.Solver.CHOLESKY,
@@ -31,8 +31,13 @@ _RLS_SOLVERS = {
     "rank1_update": _rclib.RlsReadout.Solver.RANK1_UPDATE,
     "rank_k_update": _rclib.RlsReadout.Solver.RANK_K_UPDATE,
 }
+_SPECTRAL_RADIUS_METHODS = {
+    "power_iteration": _rclib.RandomSparseReservoir.SpectralRadiusMethod.POWER_ITERATION,
+    "dense": _rclib.RandomSparseReservoir.SpectralRadiusMethod.DENSE,
+}
 _RIDGE_SOLVER_NAMES = {solver: name for name, solver in _RIDGE_SOLVERS.items()}
 _RLS_SOLVER_NAMES = {solver: name for name, solver in _RLS_SOLVERS.items()}
+_SPECTRAL_RADIUS_METHOD_NAMES = {method: name for name, method in _SPECTRAL_RADIUS_METHODS.items()}
 
 
 def _reservoir_config_from_cpp(cpp_reservoir: Any) -> reservoirs.RandomSparse | reservoirs.Nvar:  # noqa: ANN401
@@ -46,6 +51,7 @@ def _reservoir_config_from_cpp(cpp_reservoir: Any) -> reservoirs.RandomSparse | 
             input_scaling=cpp_reservoir.getInputScaling(),
             include_bias=cpp_reservoir.getIncludeBias(),
             seed=cpp_reservoir.getSeed(),
+            spectral_radius_method=_SPECTRAL_RADIUS_METHOD_NAMES[cpp_reservoir.getSpectralRadiusMethod()],
         )
     if isinstance(cpp_reservoir, _rclib.NvarReservoir):
         return reservoirs.Nvar(num_lags=cpp_reservoir.getNumLags(), polynomial_order=cpp_reservoir.getPolynomialOrder())
@@ -108,11 +114,16 @@ class ESN:
         ------
         TypeError
             If the reservoir type is unsupported.
+        ValueError
+            If a RandomSparse reservoir has an unsupported spectral_radius_method.
         """
         # Store the Python reservoir object's parameters
         self._reservoirs_params.append(reservoir)
         # Create and add the C++ reservoir to the C++ model
         if isinstance(reservoir, reservoirs.RandomSparse):
+            if reservoir.spectral_radius_method not in _SPECTRAL_RADIUS_METHODS:
+                msg = f"Unsupported spectral_radius_method: {reservoir.spectral_radius_method}"
+                raise ValueError(msg)
             cpp_res = _rclib.RandomSparseReservoir(
                 reservoir.n_neurons,
                 reservoir.spectral_radius,
@@ -121,6 +132,7 @@ class ESN:
                 reservoir.input_scaling,
                 reservoir.include_bias,
                 reservoir.seed,
+                _SPECTRAL_RADIUS_METHODS[reservoir.spectral_radius_method],
             )
             self._cpp_model.addReservoir(cpp_res, self.connection_type)
         elif isinstance(reservoir, reservoirs.Nvar):

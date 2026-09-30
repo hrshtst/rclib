@@ -10,6 +10,7 @@ import math
 import numpy as np
 import pytest
 from rclib import _rclib, reservoirs  # Import the C++ bindings
+from rclib.model import ESN
 
 
 def test_random_sparse_reservoir_init() -> None:
@@ -192,11 +193,26 @@ def test_random_sparse_rejects_non_finite(name: str, bad: float) -> None:
         _rclib.RandomSparseReservoir(10, *args)
 
 
+def test_random_sparse_rejects_unknown_spectral_radius_method() -> None:
+    """Unknown spectral_radius_method names are rejected by the config class and by ESN.add_reservoir."""
+    with pytest.raises(ValueError, match="spectral_radius_method"):
+        reservoirs.RandomSparse(10, 0.9, spectral_radius_method="arnoldi")
+
+    config = reservoirs.RandomSparse(10, 0.9)
+    config.spectral_radius_method = "arnoldi"
+    with pytest.raises(ValueError, match="spectral_radius_method"):
+        ESN().add_reservoir(config)
+
+
 def test_reservoir_getters_and_input_dim() -> None:
     """Configuration getters return constructor values; getInputDim follows the first input."""
+    methods = _rclib.RandomSparseReservoir.SpectralRadiusMethod
     res = _rclib.RandomSparseReservoir(10, 0.9, 0.5, 0.25, 2.0, include_bias=True, seed=7)
     assert (res.getNNeurons(), res.getSpectralRadius(), res.getSparsity()) == (10, 0.9, 0.5)
     assert (res.getLeakRate(), res.getInputScaling(), res.getIncludeBias(), res.getSeed()) == (0.25, 2.0, True, 7)
+    assert res.getSpectralRadiusMethod() == methods.POWER_ITERATION
+    dense = _rclib.RandomSparseReservoir(10, 0.9, 0.5, 0.25, 2.0, spectral_radius_method=methods.DENSE)
+    assert dense.getSpectralRadiusMethod() == methods.DENSE
     assert res.getInputDim() == 0
     x = np.ones((1, 3))
     res.advance(x)

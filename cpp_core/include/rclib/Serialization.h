@@ -17,7 +17,8 @@ public:
 };
 
 /// Version written by BinaryWriter::writeHeader; BinaryReader accepts versions 1..this.
-constexpr std::uint32_t serialization_format_version = 1;
+/// Version 2 added RandomSparseReservoir's spectral_radius_method.
+constexpr std::uint32_t serialization_format_version = 2;
 
 /// Longest string a model file may contain. Strings only hold component type tags.
 constexpr std::uint32_t serialization_max_string_length = 64;
@@ -79,7 +80,9 @@ public:
 
   /// Checks the magic bytes and rejects unknown format versions.
   void readHeader();
-  /// The version read by readHeader (0 before it is called).
+  /// The version read by readHeader. Before it is called, the current version: component
+  /// payloads written without a header are in the current format. Loaders read fields added
+  /// in a later version only when formatVersion() is at least that version.
   std::uint32_t formatVersion() const { return format_version; }
   /// Bytes left in the input after what has been read so far.
   std::uint64_t remainingBytes() const { return remaining; }
@@ -100,5 +103,5 @@ private:
 
   std::istream &is;
   std::uint64_t remaining;
-  std::uint32_t format_version = 0;
+  std::uint32_t format_version = serialization_format_version;
 };

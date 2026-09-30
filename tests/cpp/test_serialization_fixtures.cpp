@@ -1,4 +1,4 @@
-// Loads the frozen fixtures of model format version 1 (tests/data/serialization/v1,
+// Loads the frozen fixtures of model format versions 1 and 2 (tests/data/serialization/v<N>,
 // see generate.py there) to check that files written by earlier builds keep
 // loading with the same configuration and results.
 
@@ -22,13 +22,17 @@
 
 namespace {
 
-const std::filesystem::path fixture_directory = std::filesystem::path(RCLIB_TEST_DATA_DIR) / "serialization" / "v1";
+std::filesystem::path fixtureDirectory(int version) {
+  return std::filesystem::path(RCLIB_TEST_DATA_DIR) / "serialization" / ("v" + std::to_string(version));
+}
 
-std::string fixturePath(const std::string &name) { return (fixture_directory / (name + ".rclib")).string(); }
+std::string fixturePath(int version, const std::string &name) {
+  return (fixtureDirectory(version) / (name + ".rclib")).string();
+}
 
 // Parses "<name> <values...>" lines into one-column arrays, skipping '#' comments.
-std::map<std::string, Eigen::MatrixXd> readExpected(const std::string &name) {
-  std::ifstream file(fixture_directory / (name + ".expected.txt"));
+std::map<std::string, Eigen::MatrixXd> readExpected(int version, const std::string &name) {
+  std::ifstream file(fixtureDirectory(version) / (name + ".expected.txt"));
   REQUIRE(file);
   std::map<std::string, Eigen::MatrixXd> arrays;
   std::string line;
@@ -61,15 +65,23 @@ void requireClose(const Eigen::MatrixXd &actual, const Eigen::MatrixXd &expected
   }
 }
 
-// Re-saving a loaded fixture must reproduce the file byte for byte, which pins the
-// writer to format version 1 as well as the reader.
-void requireResavesIdentically(const Model &model, const std::string &name) {
-  std::ifstream file(fixturePath(name), std::ios::binary);
+// Loads a fixture. Re-saving a fixture of the current format version must reproduce
+// the file byte for byte, which pins the writer to that version as well as the reader.
+// The writer only writes the current version, so an older fixture is re-saved and
+// reloaded instead; the checks that follow then show that its configuration and
+// results survive the conversion.
+Model loadFixture(int version, const std::string &name) {
+  Model model = Model::load(fixturePath(version, name));
+  std::stringstream saved;
+  model.save(saved);
+  if (version != static_cast<int>(serialization_format_version)) {
+    return Model::load(saved);
+  }
+  std::ifstream file(fixturePath(version, name), std::ios::binary);
   std::ostringstream fixture_bytes;
   fixture_bytes << file.rdbuf();
-  std::ostringstream saved;
-  model.save(saved);
   REQUIRE(saved.str() == fixture_bytes.str());
+  return model;
 }
 
 template <typename T, typename Base> std::shared_ptr<T> as(const std::shared_ptr<Base> &component) {
@@ -79,8 +91,8 @@ template <typename T, typename Base> std::shared_ptr<T> as(const std::shared_ptr
 }
 
 // The expected results follow the sequence documented in generate.py.
-void requireExpectedResults(Model &model, const std::string &name, bool online_readout) {
-  const auto expected = readExpected(name);
+void requireExpectedResults(Model &model, int version, const std::string &name, bool online_readout) {
+  const auto expected = readExpected(version, name);
   requireClose(model.predictOnline(expected.at("input_online")), expected.at("online"));
   requireClose(model.predict(expected.at("input_predict")), expected.at("predict"));
   if (online_readout) {
@@ -91,9 +103,10 @@ void requireExpectedResults(Model &model, const std::string &name, bool online_r
 
 } // namespace
 
-TEST_CASE("Serialization fixtures v1 - serial RandomSparse -> NVAR with Ridge", "[serialization][fixtures]") {
-  Model model = Model::load(fixturePath("serial_rs_nvar_ridge"));
-  requireResavesIdentically(model, "serial_rs_nvar_ridge");
+TEST_CASE("Serialization fixtures - serial RandomSparse -> NVAR with Ridge", "[serialization][fixtures]") {
+  const int version = GENERATE(1, 2);
+  CAPTURE(version);
+  Model model = loadFixture(version, "serial_rs_nvar_ridge");
   REQUIRE(model.getConnectionType() == "serial");
   REQUIRE(model.getNumReservoirs() == 2);
 
@@ -105,6 +118,7 @@ TEST_CASE("Serialization fixtures v1 - serial RandomSparse -> NVAR with Ridge", 
   REQUIRE(random_sparse->getInputScaling() == 1.0);
   REQUIRE(random_sparse->getIncludeBias());
   REQUIRE(random_sparse->getSeed() == 1U);
+  REQUIRE(random_sparse->getSpectralRadiusMethod() == RandomSparseReservoir::POWER_ITERATION);
   REQUIRE(random_sparse->getInputDim() == 1);
   const auto nvar = as<NvarReservoir>(model.getReservoir(1));
   REQUIRE(nvar->getNumLags() == 2);
@@ -118,12 +132,13 @@ TEST_CASE("Serialization fixtures v1 - serial RandomSparse -> NVAR with Ridge", 
   REQUIRE(ridge->getTolerance() == 1e-10);
   REQUIRE(ridge->getInputDim() == 152);
 
-  requireExpectedResults(model, "serial_rs_nvar_ridge", false);
+  requireExpectedResults(model, version, "serial_rs_nvar_ridge", false);
 }
 
-TEST_CASE("Serialization fixtures v1 - parallel RandomSparse + NVAR with rank-k RLS", "[serialization][fixtures]") {
-  Model model = Model::load(fixturePath("parallel_rs_nvar_rls"));
-  requireResavesIdentically(model, "parallel_rs_nvar_rls");
+TEST_CASE("Serialization fixtures - parallel RandomSparse + NVAR with rank-k RLS", "[serialization][fixtures]") {
+  const int version = GENERATE(1, 2);
+  CAPTURE(version);
+  Model model = loadFixture(version, "parallel_rs_nvar_rls");
   REQUIRE(model.getConnectionType() == "parallel");
   REQUIRE(model.getNumReservoirs() == 2);
 
@@ -135,6 +150,7 @@ TEST_CASE("Serialization fixtures v1 - parallel RandomSparse + NVAR with rank-k 
   REQUIRE(random_sparse->getInputScaling() == 0.5);
   REQUIRE_FALSE(random_sparse->getIncludeBias());
   REQUIRE(random_sparse->getSeed() == 2U);
+  REQUIRE(random_sparse->getSpectralRadiusMethod() == RandomSparseReservoir::POWER_ITERATION);
   const auto nvar = as<NvarReservoir>(model.getReservoir(1));
   REQUIRE(nvar->getNumLags() == 2);
   REQUIRE(nvar->getPolynomialOrder() == 1);
@@ -145,34 +161,38 @@ TEST_CASE("Serialization fixtures v1 - parallel RandomSparse + NVAR with rank-k 
   REQUIRE(rls->getSolver() == RlsReadout::RANK_K_UPDATE);
   REQUIRE(rls->getInputDim() == 10);
 
-  requireExpectedResults(model, "parallel_rs_nvar_rls", true);
+  requireExpectedResults(model, version, "parallel_rs_nvar_rls", true);
 }
 
-TEST_CASE("Serialization fixtures v1 - serial RandomSparse with LMS", "[serialization][fixtures]") {
-  Model model = Model::load(fixturePath("serial_rs_lms"));
-  requireResavesIdentically(model, "serial_rs_lms");
+TEST_CASE("Serialization fixtures - serial RandomSparse with LMS", "[serialization][fixtures]") {
+  const int version = GENERATE(1, 2);
+  CAPTURE(version);
+  Model model = loadFixture(version, "serial_rs_lms");
   REQUIRE(model.getConnectionType() == "serial");
   REQUIRE(model.getNumReservoirs() == 1);
 
   const auto random_sparse = as<RandomSparseReservoir>(model.getReservoir(0));
   REQUIRE(random_sparse->getNNeurons() == 8);
   REQUIRE(random_sparse->getSeed() == 3U);
+  REQUIRE(random_sparse->getSpectralRadiusMethod() == RandomSparseReservoir::POWER_ITERATION);
   const auto lms = as<LmsReadout>(model.getReadout());
   REQUIRE(lms->getLearningRate() == 0.05);
   REQUIRE(lms->getIncludeBias());
   REQUIRE(lms->getInputDim() == 8);
 
-  requireExpectedResults(model, "serial_rs_lms", true);
+  requireExpectedResults(model, version, "serial_rs_lms", true);
 }
 
-TEST_CASE("Serialization fixtures v1 - uninitialized reservoir and unfitted Ridge", "[serialization][fixtures]") {
-  Model model = Model::load(fixturePath("unfitted_ridge"));
-  requireResavesIdentically(model, "unfitted_ridge");
+TEST_CASE("Serialization fixtures - uninitialized reservoir and unfitted Ridge", "[serialization][fixtures]") {
+  const int version = GENERATE(1, 2);
+  CAPTURE(version);
+  Model model = loadFixture(version, "unfitted_ridge");
   REQUIRE(model.getNumReservoirs() == 1);
 
   const auto random_sparse = as<RandomSparseReservoir>(model.getReservoir(0));
   REQUIRE(random_sparse->getNNeurons() == 6);
   REQUIRE(random_sparse->getSeed() == 4U);
+  REQUIRE(random_sparse->getSpectralRadiusMethod() == RandomSparseReservoir::POWER_ITERATION);
   REQUIRE(random_sparse->getInputDim() == 0);
   const auto ridge = as<RidgeReadout>(model.getReadout());
   REQUIRE(ridge->getAlpha() == 0.5);
@@ -181,4 +201,30 @@ TEST_CASE("Serialization fixtures v1 - uninitialized reservoir and unfitted Ridg
   REQUIRE(ridge->getInputDim() == 0);
 
   REQUIRE_THROWS_WITH(model.predict(Eigen::MatrixXd::Ones(3, 1)), Catch::Matchers::ContainsSubstring("must be fit"));
+}
+
+TEST_CASE("Serialization fixtures v2 - serial RandomSparse scaled by the dense method with Ridge",
+          "[serialization][fixtures]") {
+  Model model = loadFixture(2, "serial_rs_dense_ridge");
+  REQUIRE(model.getConnectionType() == "serial");
+  REQUIRE(model.getNumReservoirs() == 1);
+
+  const auto random_sparse = as<RandomSparseReservoir>(model.getReservoir(0));
+  REQUIRE(random_sparse->getNNeurons() == 8);
+  REQUIRE(random_sparse->getSpectralRadius() == 0.9);
+  REQUIRE(random_sparse->getSparsity() == 0.5);
+  REQUIRE(random_sparse->getLeakRate() == 0.5);
+  REQUIRE(random_sparse->getInputScaling() == 1.0);
+  REQUIRE(random_sparse->getIncludeBias());
+  REQUIRE(random_sparse->getSeed() == 5U);
+  REQUIRE(random_sparse->getSpectralRadiusMethod() == RandomSparseReservoir::DENSE);
+  REQUIRE(random_sparse->getInputDim() == 1);
+  const auto ridge = as<RidgeReadout>(model.getReadout());
+  REQUIRE(ridge->getAlpha() == 1e-3);
+  REQUIRE(ridge->getIncludeBias());
+  REQUIRE(ridge->getSolver() == RidgeReadout::AUTO);
+  REQUIRE(ridge->getEffectiveSolver() == RidgeReadout::CHOLESKY);
+  REQUIRE(ridge->getInputDim() == 8);
+
+  requireExpectedResults(model, 2, "serial_rs_dense_ridge", false);
 }

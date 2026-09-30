@@ -25,6 +25,7 @@ class RandomSparse:
         *,
         include_bias: bool = False,
         seed: int = 42,
+        spectral_radius_method: str = "power_iteration",
     ) -> None:
         """Initialize the Random Sparse Reservoir.
 
@@ -36,6 +37,12 @@ class RandomSparse:
             input_scaling: Scaling factor for the input weights.
             include_bias: Whether to include a bias term.
             seed: Random seed for weights initialization.
+            spectral_radius_method: How the spectral radius of the random weight matrix is
+                found before it is scaled to ``spectral_radius``. "power_iteration" (default)
+                estimates it by seeded power iteration, typically to within 0.3%. "dense"
+                computes it exactly from all eigenvalues of the matrix, which costs
+                O(n_neurons^3) time and O(n_neurons^2) memory, so it is meant for small
+                reservoirs.
         """
         if n_neurons <= 0:
             msg = "n_neurons must be positive."
@@ -53,6 +60,9 @@ class RandomSparse:
         if not math.isfinite(input_scaling) or input_scaling < 0:
             msg = "input_scaling must be finite and non-negative."
             raise ValueError(msg)
+        if spectral_radius_method not in {"power_iteration", "dense"}:
+            msg = "spectral_radius_method must be 'power_iteration' or 'dense'."
+            raise ValueError(msg)
 
         self.n_neurons = n_neurons
         self.spectral_radius = spectral_radius
@@ -61,6 +71,7 @@ class RandomSparse:
         self.input_scaling = input_scaling
         self.include_bias = include_bias
         self.seed = seed
+        self.spectral_radius_method = spectral_radius_method
 
 
 class Nvar:

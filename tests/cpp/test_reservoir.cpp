@@ -117,6 +117,11 @@ TEST_CASE("RandomSparseReservoir - rejects non-finite hyperparameters", "[Random
   REQUIRE_THROWS_AS(RandomSparseReservoir(10, 0.9, 0.5, 0.5, bad), std::invalid_argument);
 }
 
+TEST_CASE("RandomSparseReservoir - rejects an unknown spectral_radius_method", "[RandomSparseReservoir]") {
+  const auto unknown = static_cast<RandomSparseReservoir::SpectralRadiusMethod>(2);
+  REQUIRE_THROWS_AS(RandomSparseReservoir(10, 0.9, 0.5, 0.5, 1.0, false, 42, unknown), std::invalid_argument);
+}
+
 TEST_CASE("RandomSparseReservoir - configuration getters and input width", "[RandomSparseReservoir]") {
   RandomSparseReservoir res(10, 0.9, 0.5, 0.25, 2.0, true, 7);
   REQUIRE(res.getNNeurons() == 10);
@@ -126,6 +131,10 @@ TEST_CASE("RandomSparseReservoir - configuration getters and input width", "[Ran
   REQUIRE(res.getInputScaling() == 2.0);
   REQUIRE(res.getIncludeBias());
   REQUIRE(res.getSeed() == 7U);
+  REQUIRE(res.getSpectralRadiusMethod() == RandomSparseReservoir::POWER_ITERATION);
+  REQUIRE(
+      RandomSparseReservoir(10, 0.9, 0.5, 0.25, 2.0, true, 7, RandomSparseReservoir::DENSE).getSpectralRadiusMethod() ==
+      RandomSparseReservoir::DENSE);
 
   REQUIRE(res.getInputDim() == 0);
   res.advance(Eigen::MatrixXd::Random(1, 3));
@@ -137,7 +146,8 @@ TEST_CASE("RandomSparseReservoir - configuration getters and input width", "[Ran
 namespace {
 
 // The scaled W_res, read back from the reservoir's payload, where it follows i32 n_neurons, four f64
-// hyperparameters, bool include_bias and u32 seed (docs/development/model_file_format.md).
+// hyperparameters, bool include_bias, u32 seed and u8 spectral_radius_method
+// (docs/development/model_file_format.md).
 Eigen::SparseMatrix<double> reservoirWeights(const RandomSparseReservoir &res) {
   std::stringstream buffer;
   BinaryWriter writer(buffer);
@@ -149,6 +159,7 @@ Eigen::SparseMatrix<double> reservoirWeights(const RandomSparseReservoir &res) {
   }
   reader.readBool();
   reader.readUInt();
+  reader.readU8();
   return reader.readSparse();
 }
 
@@ -171,17 +182,29 @@ TEST_CASE("RandomSparseReservoir - W_res has the requested spectral radius", "[R
   REQUIRE_THAT(denseSpectralRadius(reservoirWeights(res)), Catch::Matchers::WithinRel(spectral_radius, 1e-2));
 }
 
+TEST_CASE("RandomSparseReservoir - DENSE gives W_res the requested spectral radius exactly",
+          "[RandomSparseReservoir]") {
+  const int n_neurons = GENERATE(100, 300);
+  const unsigned int seed = GENERATE(range(0U, 5U));
+  const double spectral_radius = 0.9;
+
+  RandomSparseReservoir res(n_neurons, spectral_radius, 0.1, 0.5, 1.0, true, seed, RandomSparseReservoir::DENSE);
+  CAPTURE(n_neurons, seed);
+  REQUIRE_THAT(denseSpectralRadius(reservoirWeights(res)), Catch::Matchers::WithinRel(spectral_radius, 1e-10));
+}
+
 TEST_CASE("RandomSparseReservoir - W_res without nonzero eigenvalues is left unscaled", "[RandomSparseReservoir]") {
+  const auto method = GENERATE(RandomSparseReservoir::POWER_ITERATION, RandomSparseReservoir::DENSE);
   Eigen::SparseMatrix<double> W_res;
 
   SECTION("Empty W_res") {
-    W_res = reservoirWeights(RandomSparseReservoir(10, 0.9, 0.0, 0.5, 1.0, true, 1));
+    W_res = reservoirWeights(RandomSparseReservoir(10, 0.9, 0.0, 0.5, 1.0, true, 1, method));
     REQUIRE(W_res.nonZeros() == 0);
   }
 
   SECTION("Nilpotent W_res, where the power iterate collapses to zero") {
     // A single off-diagonal entry: W_res * W_res = 0.
-    W_res = reservoirWeights(RandomSparseReservoir(10, 0.9, 0.01, 0.5, 1.0, true, 1));
+    W_res = reservoirWeights(RandomSparseReservoir(10, 0.9, 0.01, 0.5, 1.0, true, 1, method));
     REQUIRE(W_res.nonZeros() == 1);
     REQUIRE(Eigen::MatrixXd(W_res * W_res).isZero(0));
   }

@@ -30,17 +30,28 @@ PYBIND11_MODULE(_rclib, m) {
       .def("getInputDim", &Reservoir::getInputDim);
 
   // Bind RandomSparseReservoir
-  py::class_<RandomSparseReservoir, Reservoir, std::shared_ptr<RandomSparseReservoir>>(m, "RandomSparseReservoir")
-      .def(py::init<int, double, double, double, double, bool, unsigned int>(), py::arg("n_neurons"),
-           py::arg("spectral_radius"), py::arg("sparsity"), py::arg("leak_rate"), py::arg("input_scaling"),
-           py::arg("include_bias") = false, py::arg("seed") = 42)
+  py::class_<RandomSparseReservoir, Reservoir, std::shared_ptr<RandomSparseReservoir>> random_sparse(
+      m, "RandomSparseReservoir");
+
+  py::enum_<RandomSparseReservoir::SpectralRadiusMethod>(random_sparse, "SpectralRadiusMethod")
+      .value("POWER_ITERATION", RandomSparseReservoir::SpectralRadiusMethod::POWER_ITERATION)
+      .value("DENSE", RandomSparseReservoir::SpectralRadiusMethod::DENSE)
+      .export_values();
+
+  random_sparse
+      .def(py::init<int, double, double, double, double, bool, unsigned int,
+                    RandomSparseReservoir::SpectralRadiusMethod>(),
+           py::arg("n_neurons"), py::arg("spectral_radius"), py::arg("sparsity"), py::arg("leak_rate"),
+           py::arg("input_scaling"), py::arg("include_bias") = false, py::arg("seed") = 42,
+           py::arg("spectral_radius_method") = RandomSparseReservoir::SpectralRadiusMethod::POWER_ITERATION)
       .def("getNNeurons", &RandomSparseReservoir::getNNeurons)
       .def("getSpectralRadius", &RandomSparseReservoir::getSpectralRadius)
       .def("getSparsity", &RandomSparseReservoir::getSparsity)
       .def("getLeakRate", &RandomSparseReservoir::getLeakRate)
       .def("getInputScaling", &RandomSparseReservoir::getInputScaling)
       .def("getIncludeBias", &RandomSparseReservoir::getIncludeBias)
-      .def("getSeed", &RandomSparseReservoir::getSeed);
+      .def("getSeed", &RandomSparseReservoir::getSeed)
+      .def("getSpectralRadiusMethod", &RandomSparseReservoir::getSpectralRadiusMethod);
 
   // Bind NvarReservoir
   py::class_<NvarReservoir, Reservoir, std::shared_ptr<NvarReservoir>>(m, "NvarReservoir")
