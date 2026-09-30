@@ -36,12 +36,14 @@ Eigen::SparseMatrix<double> generate_sparse_random_matrix(int size, double spars
   return mat;
 }
 
-// Function to find the largest eigenvalue of a sparse matrix using power iteration
-double largest_eigenvalue(const Eigen::SparseMatrix<double> &mat, int iterations = 100) {
+// Function to find the largest eigenvalue of a sparse matrix using power iteration.
+// The start vector is drawn from gen, not Eigen's Random(), which reads the global std::rand() state.
+double largest_eigenvalue(const Eigen::SparseMatrix<double> &mat, std::mt19937 &gen, int iterations = 100) {
   if (mat.rows() == 0) {
     return 0.0;
   }
-  Eigen::VectorXd b_k = Eigen::VectorXd::Random(mat.rows());
+  std::uniform_real_distribution<> dis(-1.0, 1.0);
+  Eigen::VectorXd b_k = Eigen::VectorXd::NullaryExpr(mat.rows(), [&]() { return dis(gen); });
   for (int i = 0; i < iterations; ++i) {
     Eigen::VectorXd b_k1 = mat * b_k;
     if (b_k1.norm() < 1e-9) {
@@ -64,7 +66,9 @@ RandomSparseReservoir::RandomSparseReservoir(int n_neurons, double spectral_radi
   W_res = generate_sparse_random_matrix(n_neurons, sparsity, gen);
 
   if (spectral_radius > 0) {
-    double max_eigenvalue = largest_eigenvalue(W_res);
+    // A generator of its own: the start vector depends only on the seed, and W_res and bias keep their draws from gen.
+    std::mt19937 power_iteration_gen(seed + 2);
+    double max_eigenvalue = largest_eigenvalue(W_res, power_iteration_gen);
     if (max_eigenvalue > 1e-9) {
       W_res = W_res * (spectral_radius / max_eigenvalue);
     }
@@ -208,8 +212,7 @@ void RandomSparseReservoir::save(BinaryWriter &writer) const {
 
 std::shared_ptr<RandomSparseReservoir> RandomSparseReservoir::load(BinaryReader &reader) {
   return translateSerializationErrors("RandomSparseReservoir", [&] {
-    // The private constructor skips generating W_res, which would be discarded anyway
-    // and would consume the global std::rand() state through power iteration.
+    // The private constructor skips generating W_res, which would be discarded anyway.
     std::shared_ptr<RandomSparseReservoir> res(new RandomSparseReservoir());
     res->n_neurons = reader.readInt();
     res->spectral_radius = reader.readDouble();

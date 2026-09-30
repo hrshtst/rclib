@@ -205,8 +205,7 @@ Eigen::MatrixXd sine(int rows, double phase) {
   return values;
 }
 
-// An independent copy with bit-identical parameters and states. Constructing a second
-// reservoir from the same seed is not enough: power iteration draws from std::rand().
+// An independent copy with bit-identical parameters and states.
 Model cloneModel(const Model &model) {
   std::stringstream buffer;
   model.save(buffer);

@@ -6,7 +6,8 @@
 from __future__ import annotations
 
 import numpy as np
-from rclib import reservoirs
+from rclib import readouts, reservoirs
+from rclib.model import ESN
 
 
 def test_random_sparse_reservoir_seed_consistency() -> None:
@@ -72,3 +73,34 @@ def test_random_sparse_reservoir_seed_consistency() -> None:
 
     # States should be different
     assert not np.array_equal(state1, state3)
+
+
+def _fitted_esn(x: np.ndarray, y: np.ndarray) -> ESN:
+    """Build an ESN whose reservoir is fully determined by its seed and fit it."""
+    model = ESN()
+    model.add_reservoir(
+        reservoirs.RandomSparse(
+            n_neurons=300,
+            spectral_radius=0.5,
+            sparsity=0.1,
+            leak_rate=0.3,
+            input_scaling=1.0,
+            include_bias=True,
+            seed=0,
+        )
+    )
+    model.set_readout(readouts.Ridge(alpha=1.0, include_bias=True))
+    model.fit(x, y)
+    return model
+
+
+def test_esn_same_configuration_predicts_identically() -> None:
+    """Verify that ESNs built one after another in a process from the same configuration predict identically."""
+    series = np.sin(0.3 * np.arange(201)).reshape(-1, 1)
+    x, y = series[:-1], series[1:]
+
+    model1 = _fitted_esn(x, y)
+    model2 = _fitted_esn(x, y)
+
+    np.testing.assert_array_equal(model1.predict(x), model2.predict(x))
+    np.testing.assert_array_equal(model1.predict_generative(x[-10:], 50), model2.predict_generative(x[-10:], 50))
