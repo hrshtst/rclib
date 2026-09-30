@@ -9,7 +9,7 @@ import copy
 
 import numpy as np
 import pytest
-from rclib import readouts, reservoirs
+from rclib import _rclib, readouts, reservoirs
 from rclib.model import ESN
 
 
@@ -289,3 +289,134 @@ def test_predict_generative_rejects_outputs_that_cannot_be_fed_back(n_steps: int
     prime = np.sin(0.3 * np.arange(10)).reshape(-1, 1)
     with pytest.raises(ValueError, match="input dimension changed"):
         model.predict_generative(prime, n_steps)
+
+
+def _sequence_model() -> ESN:
+    """An untrained serial RandomSparse -> NVAR model; every call builds identical reservoirs."""
+    model = ESN()
+    model.add_reservoir(reservoirs.RandomSparse(n_neurons=8, spectral_radius=0.9, include_bias=True, seed=7))
+    model.add_reservoir(reservoirs.Nvar(num_lags=2, polynomial_order=2))
+    model.set_readout(readouts.Ridge(alpha=1e-4, include_bias=True))
+    return model
+
+
+def _sine(n_samples: int, phase: float) -> np.ndarray:
+    return np.sin(0.3 * np.arange(n_samples) + phase).reshape(-1, 1)
+
+
+def _episodes(phase_offset: float) -> list[np.ndarray]:
+    return [_sine(20, phase_offset), _sine(25, 1.0 + phase_offset), _sine(15, 2.0 + phase_offset)]
+
+
+def _reference_states(model: ESN, x: np.ndarray) -> np.ndarray:
+    """States of a serial model for x from reset reservoirs, collected with the reservoir API."""
+    states = x
+    for i in range(model._cpp_model.getNumReservoirs()):  # noqa: SLF001
+        reservoir = model.get_reservoir(i)
+        reservoir.resetState()
+        states = np.vstack([reservoir.advance(row.reshape(1, -1)) for row in states])
+    return states
+
+
+@pytest.mark.parametrize("washout_len", [0, 5])
+def test_fit_sequences_with_one_sequence_equals_fit(washout_len: int) -> None:
+    """A single sequence gives bit-identical predictions to fit."""
+    x, y = _sine(40, 0.0), _sine(40, 0.3)
+    single = _sequence_model()
+    single.fit(x, y, washout_len=washout_len)
+    sequences = _sequence_model()
+    sequences.fit_sequences([x], [y], washout_len=washout_len)
+
+    probe = _sine(10, 2.0)
+    np.testing.assert_array_equal(sequences.predict(probe), single.predict(probe))
+
+
+@pytest.mark.parametrize("washout_len", [0, 3])
+def test_fit_sequences_fits_one_readout_on_per_sequence_states(washout_len: int) -> None:
+    """The readout equals one fitted on the stacked states of each sequence from reset reservoirs."""
+    inputs, targets = _episodes(0.0), _episodes(0.3)
+    model = _sequence_model()
+    model.fit_sequences(inputs, targets, washout_len=washout_len)
+
+    states = np.vstack([_reference_states(model, x)[washout_len:] for x in inputs])
+    reference = _rclib.RidgeReadout(1e-4, True, _rclib.RidgeReadout.Solver.AUTO, 1e-10)  # noqa: FBT003
+    reference.fit(states, np.vstack([y[washout_len:] for y in targets]))
+    probe = _sine(10, 2.0)
+    expected = reference.predict(_reference_states(model, probe))
+    np.testing.assert_array_equal(model.predict(probe), expected)
+
+
+def test_fit_sequences_learns_nothing_across_sequence_boundaries() -> None:
+    """Reordering the sequences changes the predictions only by floating-point summation order."""
+    inputs, targets = _episodes(0.0), _episodes(0.3)
+    forward = _sequence_model()
+    forward.fit_sequences(inputs, targets, washout_len=3)
+    backward = _sequence_model()
+    backward.fit_sequences(inputs[::-1], targets[::-1], washout_len=3)
+
+    probe = _sine(30, 0.7)
+    np.testing.assert_allclose(backward.predict(probe), forward.predict(probe), rtol=1e-9, atol=1e-12)
+
+
+def test_fit_sequences_accepts_tuples() -> None:
+    """A tuple of arrays works like a list."""
+    inputs, targets = _episodes(0.0), _episodes(0.3)
+    from_list, from_tuple = _sequence_model(), _sequence_model()
+    from_list.fit_sequences(inputs, targets, washout_len=2)
+    from_tuple.fit_sequences(tuple(inputs), tuple(targets), washout_len=2)
+
+    probe = _sine(10, 2.0)
+    np.testing.assert_array_equal(from_tuple.predict(probe), from_list.predict(probe))
+
+
+@pytest.mark.parametrize(
+    ("inputs", "targets", "washout_len", "error", "match"),
+    [
+        ([], [], 0, ValueError, "inputs must hold at least one sequence"),
+        ([_sine(10, 0.0)], [_sine(10, 0.3), _sine(12, 1.3)], 0, ValueError, "as many sequences as inputs"),
+        ([_sine(10, 0.0), np.empty((0, 1))], [_sine(10, 0.3), np.empty((0, 1))], 0, ValueError, "sequence 1: inputs"),
+        ([_sine(10, 0.0), _sine(12, 1.0)], [_sine(10, 0.3), _sine(11, 1.3)], 0, ValueError, "sequence 1: targets"),
+        ([_sine(10, 0.0), _sine(12, 1.0)], [_sine(10, 0.3), np.empty((12, 0))], 0, ValueError, "sequence 1: targets"),
+        ([_sine(10, 0.0)], [_sine(10, 0.3)], -1, IndexError, "washout_len must be non-negative"),
+        ([_sine(10, 0.0), _sine(2, 1.0)], [_sine(10, 0.3), _sine(2, 1.3)], 2, IndexError, "sequence 1: washout_len"),
+        ([_sine(10, 0.0), np.ones((12, 2))], [_sine(10, 0.3), _sine(12, 1.3)], 0, ValueError, "sequence 1: inputs"),
+        ([_sine(10, 0.0), _sine(12, 1.0)], [_sine(10, 0.3), np.ones((12, 2))], 0, ValueError, "sequence 1: targets"),
+    ],
+)
+def test_fit_sequences_rejects_invalid_sequences(
+    inputs: list[np.ndarray],
+    targets: list[np.ndarray],
+    washout_len: int,
+    error: type[Exception],
+    match: str,
+) -> None:
+    """Invalid sequences raise before anything changes, naming the sequence where it applies."""
+    model, untouched = _sequence_model(), _sequence_model()
+    for fitted in (model, untouched):
+        fitted.fit(_sine(20, 0.0), _sine(20, 0.3))
+
+    with pytest.raises(error, match=match):
+        model.fit_sequences(inputs, targets, washout_len=washout_len)
+    for i in range(2):
+        np.testing.assert_array_equal(model.get_reservoir(i).getState(), untouched.get_reservoir(i).getState())
+    probe = _sine(10, 2.0)
+    np.testing.assert_array_equal(model.predict(probe), untouched.predict(probe))
+
+
+def test_fit_sequences_rejects_a_single_array() -> None:
+    """A single 2-D array, which would split into one-row sequences, is rejected."""
+    model = _sequence_model()
+    x, y = _sine(10, 0.0), _sine(10, 0.3)
+    # Type errors on purpose: these are the mistakes the check catches at run time.
+    with pytest.raises(ValueError, match="inputs must be a sequence of 2-D arrays"):
+        model.fit_sequences(x, [y])  # pyright: ignore[reportArgumentType]
+    with pytest.raises(ValueError, match="targets must be a sequence of 2-D arrays"):
+        model.fit_sequences([x], y)  # pyright: ignore[reportArgumentType]
+
+
+def test_fit_sequences_requires_a_configured_model() -> None:
+    """A model without a readout cannot be fitted."""
+    model = ESN()
+    model.add_reservoir(reservoirs.Nvar(num_lags=2))
+    with pytest.raises(RuntimeError, match="not fully configured"):
+        model.fit_sequences([_sine(10, 0.0)], [_sine(10, 0.3)])

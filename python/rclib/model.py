@@ -17,6 +17,8 @@ from . import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from numpy.typing import ArrayLike
 
 # Solver and method names of the Python configs mapped to the C++ enums, and back.
@@ -222,6 +224,51 @@ class ESN:
         self._update_readout()
         # Call the C++ model's fit method
         self._cpp_model.fit(x, y, washout_len)
+
+    def fit_sequences(self, inputs: Sequence[ArrayLike], targets: Sequence[ArrayLike], washout_len: int = 0) -> None:
+        """Fit the readout once on several independent sequences, such as episodes.
+
+        Each sequence starts from reset reservoirs and discards its own first
+        ``washout_len`` samples. The remaining reservoir states and targets of all
+        sequences are stacked and the readout is fitted once, so nothing carries over
+        from one sequence to the next. With a single sequence this equals :meth:`fit`.
+
+        Parameters
+        ----------
+        inputs : Sequence[ArrayLike]
+            Input data, one 2-D array of shape (n_samples_i, n_inputs) per sequence,
+            for example a list of arrays. Sequences may differ in length but not in
+            width.
+        targets : Sequence[ArrayLike]
+            Target data, one 2-D array of shape (n_samples_i, n_outputs) per sequence,
+            with as many rows as the matching input sequence.
+        washout_len : int, optional
+            Number of initial samples to discard from each sequence. Default is 0.
+
+        Raises
+        ------
+        ValueError
+            If a single 2-D array is passed instead of a sequence of arrays, if there
+            are no sequences or unequal numbers of input and target sequences, or if a
+            sequence is empty, its inputs and targets differ in length, or its width
+            differs from the first sequence's. Messages name the sequence index.
+        IndexError
+            If ``washout_len`` is negative or not shorter than a sequence.
+        RuntimeError
+            If the model has no reservoir or no readout.
+
+        Notes
+        -----
+        These checks run before the model changes. Afterwards the reservoirs hold
+        their states at the end of the last sequence.
+        """
+        # A single 2-D array would otherwise be split into one-row sequences.
+        for name, sequences in (("inputs", inputs), ("targets", targets)):
+            if isinstance(sequences, np.ndarray) and sequences.ndim == 2:  # noqa: PLR2004
+                msg = f"{name} must be a sequence of 2-D arrays, one per sequence, not a single 2-D array."
+                raise ValueError(msg)
+        self._update_readout()
+        self._cpp_model.fitSequences(inputs, targets, washout_len)
 
     def predict(self, x: ArrayLike, *, reset_state_before_predict: bool = True) -> np.ndarray:
         """Predict using the trained model.

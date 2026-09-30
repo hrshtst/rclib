@@ -5,6 +5,28 @@
 #endif
 #include <exception>
 #include <stdexcept>
+#include <string>
+
+namespace {
+
+// Checks one training sequence of fit() or fitSequences(); `context` prefixes the messages.
+void checkSequence(const Eigen::MatrixXd &inputs, const Eigen::MatrixXd &targets, int washout_len,
+                   const std::string &context) {
+  if (inputs.rows() == 0 || inputs.cols() == 0) {
+    throw std::invalid_argument(context + "inputs must be a non-empty 2D matrix.");
+  }
+  if (targets.rows() != inputs.rows()) {
+    throw std::invalid_argument(context + "targets must have the same number of rows as inputs.");
+  }
+  if (targets.cols() == 0) {
+    throw std::invalid_argument(context + "targets must have at least one column.");
+  }
+  if (washout_len < 0 || washout_len >= inputs.rows()) {
+    throw std::out_of_range(context + "washout_len must be non-negative and less than the number of input rows.");
+  }
+}
+
+} // namespace
 
 void Model::addReservoir(std::shared_ptr<Reservoir> res, std::string connection_type) {
   if (!res) {
@@ -31,28 +53,52 @@ void Model::fit(const Eigen::MatrixXd &inputs, const Eigen::MatrixXd &targets, i
   if (reservoirs.empty() || !readout) {
     throw std::runtime_error("Model is not fully configured. Add at least one reservoir and a readout.");
   }
-  if (inputs.rows() == 0 || inputs.cols() == 0) {
-    throw std::invalid_argument("inputs must be a non-empty 2D matrix.");
+  checkSequence(inputs, targets, washout_len, "");
+
+  const Eigen::MatrixXd fit_states = collectStatesAfterWashout(inputs, washout_len);
+  readout->fit(fit_states, targets.bottomRows(targets.rows() - washout_len));
+}
+
+void Model::fitSequences(const std::vector<Eigen::MatrixXd> &inputs, const std::vector<Eigen::MatrixXd> &targets,
+                         int washout_len) {
+  if (reservoirs.empty() || !readout) {
+    throw std::runtime_error("Model is not fully configured. Add at least one reservoir and a readout.");
   }
-  if (targets.rows() != inputs.rows()) {
-    throw std::invalid_argument("targets must have the same number of rows as inputs.");
+  if (inputs.empty()) {
+    throw std::invalid_argument("inputs must hold at least one sequence.");
   }
-  if (targets.cols() == 0) {
-    throw std::invalid_argument("targets must have at least one column.");
+  if (targets.size() != inputs.size()) {
+    throw std::invalid_argument("targets must hold as many sequences as inputs.");
+  }
+  if (washout_len < 0) {
+    throw std::out_of_range("washout_len must be non-negative.");
+  }
+  // Everything is checked before the reservoirs change.
+  Eigen::Index fit_rows = 0;
+  for (size_t i = 0; i < inputs.size(); ++i) {
+    const std::string context = "sequence " + std::to_string(i) + ": ";
+    checkSequence(inputs[i], targets[i], washout_len, context);
+    if (inputs[i].cols() != inputs[0].cols()) {
+      throw std::invalid_argument(context + "inputs must have as many columns as sequence 0.");
+    }
+    if (targets[i].cols() != targets[0].cols()) {
+      throw std::invalid_argument(context + "targets must have as many columns as sequence 0.");
+    }
+    fit_rows += inputs[i].rows() - washout_len;
   }
 
-  if (washout_len < 0 || washout_len >= inputs.rows()) {
-    throw std::out_of_range("washout_len must be non-negative and less than the number of input rows.");
+  Eigen::MatrixXd fit_states;
+  Eigen::MatrixXd fit_targets(fit_rows, targets[0].cols());
+  Eigen::Index row = 0;
+  for (size_t i = 0; i < inputs.size(); ++i) {
+    const Eigen::MatrixXd states = collectStatesAfterWashout(inputs[i], washout_len);
+    if (i == 0) {
+      fit_states.resize(fit_rows, states.cols());
+    }
+    fit_states.middleRows(row, states.rows()) = states;
+    fit_targets.middleRows(row, states.rows()) = targets[i].bottomRows(states.rows());
+    row += states.rows();
   }
-
-  resetReservoirs();
-
-  Eigen::MatrixXd all_states_full = collectStates(inputs);
-
-  // Apply washout period
-  Eigen::MatrixXd fit_states = all_states_full.bottomRows(all_states_full.rows() - washout_len);
-  Eigen::MatrixXd fit_targets = targets.bottomRows(targets.rows() - washout_len);
-
   readout->fit(fit_states, fit_targets);
 }
 
@@ -220,6 +266,12 @@ Eigen::MatrixXd Model::collectStates(const Eigen::MatrixXd &inputs) {
     current_col += static_cast<int>(mat.cols());
   }
   return all_states;
+}
+
+Eigen::MatrixXd Model::collectStatesAfterWashout(const Eigen::MatrixXd &inputs, int washout_len) {
+  resetReservoirs();
+  const Eigen::MatrixXd states = collectStates(inputs);
+  return states.bottomRows(states.rows() - washout_len);
 }
 
 Eigen::MatrixXd Model::collectCurrentStates() const {

@@ -116,6 +116,7 @@ PYBIND11_MODULE(_rclib, m) {
       .def("addReservoir", &Model::addReservoir)
       .def("setReadout", &Model::setReadout)
       .def("fit", &Model::fit, py::arg("inputs"), py::arg("targets"), py::arg("washout_len") = 0)
+      .def("fitSequences", &Model::fitSequences, py::arg("inputs"), py::arg("targets"), py::arg("washout_len") = 0)
       .def("partialFit", &Model::partialFit, py::arg("input"), py::arg("target"))
       .def("predict", &Model::predict, py::arg("inputs"), py::arg("reset_state_before_predict") = true)
       .def("getReservoir", &Model::getReservoir)

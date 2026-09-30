@@ -12,7 +12,19 @@ class Model {
 public:
   void addReservoir(std::shared_ptr<Reservoir> res, std::string connection_type = "serial");
   void setReadout(std::shared_ptr<Readout> readout);
+  /// Resets the reservoirs, runs them through `inputs`, drops the first `washout_len`
+  /// states and fits the readout on the rest.
   void fit(const Eigen::MatrixXd &inputs, const Eigen::MatrixXd &targets, int washout_len = 0);
+  /// Fits the readout once on several independent sequences, such as episodes. Each
+  /// sequence starts from reset reservoirs and loses its own first `washout_len` states;
+  /// the remaining states and targets of all sequences are stacked for a single
+  /// readout fit, so nothing carries over from one sequence to the next. With one
+  /// sequence this equals fit(). Every sequence is checked as fit() checks its input,
+  /// and all must share the input and target widths; these checks run before the
+  /// reservoirs change, and their errors name the sequence index. Afterwards the
+  /// reservoirs hold their states at the end of the last sequence.
+  void fitSequences(const std::vector<Eigen::MatrixXd> &inputs, const std::vector<Eigen::MatrixXd> &targets,
+                    int washout_len = 0);
   void partialFit(const Eigen::MatrixXd &input, const Eigen::MatrixXd &target);
   Eigen::MatrixXd predict(const Eigen::MatrixXd &inputs, bool reset_state_before_predict = true);
   Eigen::MatrixXd predictOnline(const Eigen::MatrixXd &input);
@@ -49,6 +61,8 @@ public:
 
 private:
   Eigen::MatrixXd collectStates(const Eigen::MatrixXd &inputs);
+  /// Resets the reservoirs, collects the states for `inputs` and drops the first `washout_len`.
+  Eigen::MatrixXd collectStatesAfterWashout(const Eigen::MatrixXd &inputs, int washout_len);
   Eigen::MatrixXd collectCurrentStates() const;
 
   std::vector<std::shared_ptr<Reservoir>> reservoirs;
