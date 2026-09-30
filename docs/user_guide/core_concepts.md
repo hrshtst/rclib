@@ -19,9 +19,11 @@ res = reservoirs.RandomSparse(
 
 `spectral_radius_method` chooses how the spectral radius of the random weight
 matrix is found before the matrix is scaled to `spectral_radius`. The default
-`"power_iteration"` scales to within a fraction of a percent at any size;
-`"dense"` is exact but costs $O(n^3)$ time and $O(n^2)$ memory in `n_neurons`,
-so use it for small reservoirs. See
+`"power_iteration"` estimates it. In measurements the scaled radius was
+usually within about 0.01% of the request and at worst 0.75% off, but these are
+observations, not bounds. `"dense"` is exact but costs $O(n^3)$ time and
+$O(n^2)$ memory in `n_neurons`, so use it for small reservoirs or when the radius
+must be exact. See
 [Spectral Radius Scaling](advanced_usage.md#spectral-radius-scaling).
 
 ## Configuring Readouts

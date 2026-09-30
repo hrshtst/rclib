@@ -54,10 +54,10 @@ scales it so that its spectral radius, the largest eigenvalue modulus, equals
 `spectral_radius`. `spectral_radius_method` chooses how the spectral radius of
 the unscaled matrix is found:
 
-| Method | Accuracy | Cost | Best For |
+| Method | Observed error of the scaled radius | Cost | Best For |
 | :--- | :--- | :--- | :--- |
-| `power_iteration` (Default) | Within 0.1% up to 300 neurons, 0.25% at 1000 | 1000 sparse matrix-vector products | Any size |
-| `dense` | Exact up to rounding | $O(n^3)$ time, $O(n^2)$ memory | Small reservoirs |
+| `power_iteration` (Default) | Mean about 0.01%, worst 0.75% (200 seeds per size, 20 to 1000 neurons; not a bound) | 1000 sparse matrix-vector products | Any size |
+| `dense` | Exact up to rounding | $O(n^3)$ time, $O(n^2)$ memory | Small reservoirs, or when the radius must be exact |
 
 ```python
 res = reservoirs.RandomSparse(n_neurons=200, spectral_radius=0.95, seed=0, spectral_radius_method="dense")
@@ -80,10 +80,17 @@ neurons, 6% for 300 and 4% for 1000, and more steps did not fix it.
 generator seeded by `seed`, and returns the geometric mean of the per-step growth
 $\lVert \mathbf{W}_{res} \mathbf{b}_k \rVert / \lVert \mathbf{b}_k \rVert$ over the
 last 500. The first 500 steps let the dominant eigenvalues take over, and
-averaging over many steps cancels their oscillation. Over the same 50 seeds the
-scaled matrix missed the requested radius by at most 0.08% up to 300 neurons and
-0.25% at 1000. Since the start vector depends only on `seed`, reservoirs built
-with the same parameters get the same weights, whatever else the program does.
+averaging over many steps cancels their oscillation. Since the start vector
+depends only on `seed`, reservoirs built with the same parameters get the same
+weights, whatever else the program does.
+
+The averaged estimate is still an estimate. Measured over 200 seeds for each of
+20, 30, 50, 100, 300 and 1000 neurons at sparsity 0.1 and a requested radius of
+0.9, the scaled matrix missed the requested radius by 0.01% to 0.02% on average.
+The worst seed missed by 0.75% (100 neurons); at 30 neurons, seed 113 missed by
+0.47%. These figures describe that sample and are not bounds: another size,
+sparsity or seed can miss by more. Use `spectral_radius_method="dense"` when the
+radius must be exact.
 
 Each step is one sparse matrix-vector product, so the cost grows with the number
 of non-zero weights, `sparsity * n_neurons**2`. Single-threaded on the
