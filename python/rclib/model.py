@@ -117,8 +117,6 @@ class ESN:
         ValueError
             If a RandomSparse reservoir has an unsupported spectral_radius_method.
         """
-        # Store the Python reservoir object's parameters
-        self._reservoirs_params.append(reservoir)
         # Create and add the C++ reservoir to the C++ model
         if isinstance(reservoir, reservoirs.RandomSparse):
             if reservoir.spectral_radius_method not in _SPECTRAL_RADIUS_METHODS:
@@ -142,6 +140,10 @@ class ESN:
         else:
             msg = "Unsupported reservoir type"
             raise TypeError(msg)
+
+        # Store the Python reservoir object's parameters only once the C++ model holds the
+        # reservoir, so a rejected reservoir leaves both sides unchanged.
+        self._reservoirs_params.append(reservoir)
 
         # Update readout in case it's using "auto" solver
         self._update_readout()

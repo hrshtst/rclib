@@ -9,7 +9,7 @@ import math
 
 import numpy as np
 import pytest
-from rclib import _rclib, reservoirs  # Import the C++ bindings
+from rclib import _rclib, readouts, reservoirs  # Import the C++ bindings
 from rclib.model import ESN
 
 
@@ -193,15 +193,49 @@ def test_random_sparse_rejects_non_finite(name: str, bad: float) -> None:
         _rclib.RandomSparseReservoir(10, *args)
 
 
+def _online_model() -> tuple[ESN, np.ndarray, np.ndarray]:
+    """A one-reservoir model that has already learned one sample online, with that sample."""
+    model = ESN()
+    model.add_reservoir(reservoirs.RandomSparse(n_neurons=10, spectral_radius=0.9))
+    model.set_readout(readouts.Rls(lambda_=0.99, delta=1.0, include_bias=True))
+    rng = np.random.default_rng(seed=42)
+    x = rng.random((1, 1))
+    y = rng.random((1, 1))
+    model.partial_fit(x, y)
+    return model, x, y
+
+
+def _assert_one_reservoir_and_still_learning(model: ESN, x: np.ndarray, y: np.ndarray) -> None:
+    assert len(model._reservoirs_params) == 1  # noqa: SLF001
+    assert model._cpp_model.getNumReservoirs() == 1  # noqa: SLF001
+    model.partial_fit(None, y)  # learns from the current reservoir state
+    model.partial_fit(x, y)
+
+
 def test_random_sparse_rejects_unknown_spectral_radius_method() -> None:
-    """Unknown spectral_radius_method names are rejected by the config class and by ESN.add_reservoir."""
+    """Unknown spectral_radius_method names are rejected by the config class and by ESN.add_reservoir.
+
+    A rejected reservoir leaves the model unchanged, so it keeps learning.
+    """
     with pytest.raises(ValueError, match="spectral_radius_method"):
         reservoirs.RandomSparse(10, 0.9, spectral_radius_method="arnoldi")
 
+    model, x, y = _online_model()
     config = reservoirs.RandomSparse(10, 0.9)
     config.spectral_radius_method = "arnoldi"
     with pytest.raises(ValueError, match="spectral_radius_method"):
-        ESN().add_reservoir(config)
+        model.add_reservoir(config)
+
+    _assert_one_reservoir_and_still_learning(model, x, y)
+
+
+def test_unsupported_reservoir_type_leaves_the_model_unchanged() -> None:
+    """ESN.add_reservoir rejects an unknown reservoir type without recording it."""
+    model, x, y = _online_model()
+    with pytest.raises(TypeError, match="Unsupported reservoir type"):
+        model.add_reservoir(object())
+
+    _assert_one_reservoir_and_still_learning(model, x, y)
 
 
 def test_reservoir_getters_and_input_dim() -> None:
