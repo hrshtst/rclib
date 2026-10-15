@@ -37,6 +37,18 @@ public:
   unsigned int getSeed() const { return seed; }
   SpectralRadiusMethod getSpectralRadiusMethod() const { return spectral_radius_method; }
 
+  // The weights, read-only. advance() computes, with the state and the input as row vectors,
+  //   state = (1 - leak_rate) * state + leak_rate * tanh(input * W_in + bias + state * W_res).
+
+  /// The recurrent weights W_res, (n_neurons, n_neurons), scaled to the spectral radius. The
+  /// entry (i, j) is the weight from neuron i to neuron j, as the state multiplies W_res from the left.
+  const Eigen::SparseMatrix<double> &getRecurrentWeights() const { return W_res; }
+  /// The input weights W_in, (input_dim, n_neurons), scaled by input_scaling. They are drawn at the
+  /// first advance(), which fixes the input width; throws before it.
+  const Eigen::MatrixXd &getInputWeights() const;
+  /// The bias, one entry per neuron; zero when include_bias is false.
+  const Eigen::RowVectorXd &getBias() const { return bias; }
+
   /// Writes the hyperparameters and the full state (weights and current activations)
   /// in the model file format; the type tag is written by Model. Throws SerializationError.
   void save(BinaryWriter &writer) const;

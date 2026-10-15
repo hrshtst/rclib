@@ -213,3 +213,42 @@ TEST_CASE("RandomSparseReservoir - W_res without nonzero eigenvalues is left uns
   REQUIRE(Eigen::MatrixXd(W_res).allFinite());
   REQUIRE(Eigen::MatrixXd(W_res).cwiseAbs().maxCoeff() <= 1.0);
 }
+
+TEST_CASE("RandomSparseReservoir - weights are readable", "[RandomSparseReservoir]") {
+  const double leak_rate = 0.25;
+  RandomSparseReservoir res(20, 0.9, 0.3, leak_rate, 2.0, true, 7, RandomSparseReservoir::DENSE);
+
+  SECTION("W_in is drawn at the first advance") {
+    REQUIRE_THROWS_AS(res.getInputWeights(), std::runtime_error);
+    res.advance(Eigen::MatrixXd::Random(1, 3));
+    REQUIRE(res.getInputWeights().rows() == 3);
+    REQUIRE(res.getInputWeights().cols() == 20);
+    REQUIRE(res.getInputWeights().cwiseAbs().maxCoeff() <= 2.0); // draws from [-1, 1] times input_scaling
+  }
+
+  SECTION("W_res is the scaled matrix the reservoir saves") {
+    const Eigen::SparseMatrix<double> &W_res = res.getRecurrentWeights();
+    REQUIRE(W_res.rows() == 20);
+    REQUIRE(W_res.cols() == 20);
+    REQUIRE(Eigen::MatrixXd(W_res) == Eigen::MatrixXd(reservoirWeights(res)));
+    REQUIRE_THAT(denseSpectralRadius(W_res), Catch::Matchers::WithinRel(0.9, 1e-10));
+  }
+
+  SECTION("The bias is zero without include_bias") {
+    REQUIRE(res.getBias().size() == 20);
+    REQUIRE(!res.getBias().isZero(0));
+    REQUIRE(RandomSparseReservoir(20, 0.9, 0.3, leak_rate, 2.0, false, 7).getBias().isZero(0));
+  }
+
+  SECTION("advance() is the update the weights give") {
+    Eigen::MatrixXd state = res.getState();
+    for (int step = 0; step < 3; ++step) {
+      const Eigen::MatrixXd input = Eigen::MatrixXd::Random(1, 3);
+      res.advance(input);
+      Eigen::MatrixXd pre = input * res.getInputWeights() + state * res.getRecurrentWeights();
+      pre += res.getBias();
+      state = (1.0 - leak_rate) * state.array() + leak_rate * pre.array().tanh();
+      REQUIRE((res.getState() - state).cwiseAbs().maxCoeff() < 1e-12);
+    }
+  }
+}

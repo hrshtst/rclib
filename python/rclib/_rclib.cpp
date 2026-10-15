@@ -51,7 +51,32 @@ PYBIND11_MODULE(_rclib, m) {
       .def("getInputScaling", &RandomSparseReservoir::getInputScaling)
       .def("getIncludeBias", &RandomSparseReservoir::getIncludeBias)
       .def("getSeed", &RandomSparseReservoir::getSeed)
-      .def("getSpectralRadiusMethod", &RandomSparseReservoir::getSpectralRadiusMethod);
+      .def("getSpectralRadiusMethod", &RandomSparseReservoir::getSpectralRadiusMethod)
+      // The nonzero entries as numpy arrays, so that the core needs no scipy: W[rows, cols] = values.
+      .def(
+          "getRecurrentWeights",
+          [](const RandomSparseReservoir &res) {
+            const Eigen::SparseMatrix<double> &weights = res.getRecurrentWeights();
+            Eigen::VectorXi rows(weights.nonZeros());
+            Eigen::VectorXi cols(weights.nonZeros());
+            Eigen::VectorXd values(weights.nonZeros());
+            Eigen::Index k = 0;
+            for (Eigen::Index j = 0; j < weights.outerSize(); ++j) {
+              for (Eigen::SparseMatrix<double>::InnerIterator it(weights, j); it; ++it, ++k) {
+                rows(k) = static_cast<int>(it.row());
+                cols(k) = static_cast<int>(it.col());
+                values(k) = it.value();
+              }
+            }
+            return py::make_tuple(rows, cols, values);
+          },
+          "The recurrent weights W_res as (rows, cols, values), copies of the nonzero entries: W[rows, cols] = "
+          "values gives the (n_neurons, n_neurons) matrix, applied as state @ W.")
+      .def("getInputWeights", &RandomSparseReservoir::getInputWeights, py::return_value_policy::copy,
+           "The input weights W_in as a copy, (input_dim, n_neurons), applied as input @ W_in; raises before the "
+           "first advance.")
+      .def("getBias", &RandomSparseReservoir::getBias, py::return_value_policy::copy,
+           "The bias as a copy, (n_neurons,); zero without include_bias.");
 
   // Bind NvarReservoir
   py::class_<NvarReservoir, Reservoir, std::shared_ptr<NvarReservoir>>(m, "NvarReservoir")

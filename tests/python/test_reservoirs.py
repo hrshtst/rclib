@@ -257,3 +257,41 @@ def test_reservoir_getters_and_input_dim() -> None:
     x = np.ones((1, 2))
     nvar.advance(x)
     assert nvar.getInputDim() == x.shape[1]
+
+
+def test_reservoir_weights_are_readable_copies() -> None:
+    """The weights rebuild advance() exactly; they are copies, and W_in exists only after the first advance."""
+    leak_rate = 0.25
+    methods = _rclib.RandomSparseReservoir.SpectralRadiusMethod
+    res = _rclib.RandomSparseReservoir(
+        20, 0.9, 0.3, leak_rate, 2.0, include_bias=True, seed=7, spectral_radius_method=methods.DENSE
+    )
+    with pytest.raises(RuntimeError, match="advance before getInputWeights"):
+        res.getInputWeights()
+
+    rows, cols, values = res.getRecurrentWeights()
+    w_res = np.zeros((20, 20))
+    w_res[rows, cols] = values
+    assert len(values) == np.count_nonzero(w_res)  # one entry per nonzero
+    assert np.isclose(np.abs(np.linalg.eigvals(w_res)).max(), 0.9, rtol=1e-10, atol=0.0)
+    bias = res.getBias()
+    assert bias.shape == (20,)
+    assert np.any(bias != 0)
+    assert not np.any(_rclib.RandomSparseReservoir(20, 0.9, 0.3, leak_rate, 2.0, seed=7).getBias())
+
+    rng = np.random.default_rng(seed=7)
+    state = np.zeros((1, 20))
+    for _ in range(3):
+        u = rng.uniform(-1.0, 1.0, (1, 3))
+        res.advance(u)
+        w_in = res.getInputWeights()
+        assert w_in.shape == (3, 20)
+        state = (1 - leak_rate) * state + leak_rate * np.tanh(u @ w_in + bias + state @ w_res)
+        assert np.allclose(res.getState(), state, atol=1e-12, rtol=0.0)
+
+    w_in[:] = 0.0  # changing the copies leaves the reservoir as it was
+    values[:] = 0.0
+    bias[:] = 0.0
+    assert np.any(res.getInputWeights() != 0)
+    assert np.any(res.getRecurrentWeights()[2] != 0)
+    assert np.any(res.getBias() != 0)

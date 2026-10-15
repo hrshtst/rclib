@@ -232,6 +232,13 @@ const Eigen::MatrixXd &RandomSparseReservoir::getState() const { return state; }
 
 int RandomSparseReservoir::getOutputDim(int /*input_dim*/) const { return n_neurons; }
 
+const Eigen::MatrixXd &RandomSparseReservoir::getInputWeights() const {
+  if (!W_in_initialized) {
+    throw std::runtime_error("RandomSparseReservoir draws W_in at the first advance; advance before getInputWeights.");
+  }
+  return W_in;
+}
+
 void RandomSparseReservoir::checkConsistency() const {
   translateSerializationErrors("RandomSparseReservoir", [&] {
     validateParameters();
