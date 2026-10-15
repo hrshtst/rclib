@@ -142,6 +142,40 @@ $n^3$.
 > `seed` gives a slightly differently scaled $\mathbf{W}_{res}$ than in those
 > versions. Saved models keep the weights they were saved with.
 
+## Reading the Weights
+
+A trained model can be studied outside `rclib`, for instance by evaluating its
+update at states the reservoirs have never been in, to find fixed points or
+linearize it along a run. A `RandomSparse` reservoir (the object `get_reservoir`
+returns) gives copies of its weights, and a fitted ridge readout (from
+`get_readout`) its weights, with the bias row last when it has one:
+
+```python
+reservoir = model.get_reservoir(0)
+n = reservoir.getNNeurons()
+rows, cols, values = reservoir.getRecurrentWeights()  # the nonzero entries of W_res
+w_res = np.zeros((n, n))
+w_res[rows, cols] = values
+w_in = reservoir.getInputWeights()  # (n_inputs, n); drawn at the first input, raises before it
+bias = reservoir.getBias()  # (n,); zero without include_bias
+leak_rate = reservoir.getLeakRate()
+w_out = model.get_readout().getWeights()  # (n + 1, n_outputs) with include_bias=True
+
+
+def advance(state, u):
+    """The state after the input u, as the reservoir computes it."""
+    return (1 - leak_rate) * state + leak_rate * np.tanh(u @ w_in + bias + state @ w_res)
+
+
+state = advance(reservoir.getState(), u)
+y = state @ w_out[:-1] + w_out[-1]  # model.predict_online(u) for a single reservoir
+```
+
+States and inputs are row vectors, so the entry `(i, j)` of `W_res` is the
+weight from neuron `i` to neuron `j`. `W_res` comes as its nonzero entries, so
+that a large reservoir need not be made dense; `scipy.sparse.coo_array((values,
+(rows, cols)), shape=(n, n))` builds the sparse matrix.
+
 ## Ridge Regression Solver Selection
 
 `rclib` provides multiple strategies for batch training. While the `auto` mode is recommended, you can explicitly set the solver based on your specific needs.
