@@ -458,3 +458,19 @@ def test_retraining_with_another_input_width_changes_nothing(topology: str, meth
     np.testing.assert_array_equal(model.predict_online(next_input), twin.predict_online(next_input))
     probe = _sine(10, 2.0)  # predict resets first, so this compares the readouts
     np.testing.assert_array_equal(model.predict(probe), twin.predict(probe))
+
+
+def test_get_readout_gives_the_fitted_weights() -> None:
+    """get_readout returns the C++ readout, whose weights map the reservoir state to the output."""
+    model = ESN()
+    model.add_reservoir(reservoirs.RandomSparse(n_neurons=30, spectral_radius=0.9, leak_rate=0.5, seed=3))
+    with pytest.raises(RuntimeError, match="Readout not set"):
+        model.get_readout()
+    model.set_readout(readouts.Ridge(alpha=1e-6, include_bias=True))
+    rng = np.random.default_rng(seed=3)
+    model.fit(rng.random((100, 2)), rng.random((100, 2)))
+
+    weights = model.get_readout().getWeights()
+    output = model.predict_online(rng.random((1, 2)))
+    state = model.get_reservoir(0).getState()
+    np.testing.assert_allclose(output, state @ weights[:-1] + weights[-1], atol=1e-12, rtol=0.0)

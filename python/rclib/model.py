@@ -353,6 +353,21 @@ class ESN:
         # Return the C++ reservoir object
         return self._cpp_model.getReservoir(index)
 
+    def get_readout(self) -> Any:  # noqa: ANN401
+        """Get the readout object, such as a fitted ridge readout to read its weights from.
+
+        Returns
+        -------
+        Any
+            The C++ readout object.
+
+        Raises
+        ------
+        RuntimeError
+            If no readout is set.
+        """
+        return self._cpp_model.getReadout()
+
     def reset_reservoirs(self) -> None:
         """Reset the states of all reservoirs."""
         # Call the C++ model's resetReservoirs method
