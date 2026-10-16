@@ -94,7 +94,8 @@ benchmark = [
 docs = [
   "mkdocs>=1.6.1",
   "mkdocs-material>=9.6.7",
-  "mkdocstrings[python]>=0.28.2",
+  # 1.0.7 passes `md` to pymdown-extensions' Highlight, which 12.2 requires.
+  "mkdocstrings[python]>=1.0.7",
   # Configured directly in mkdocs.yml (arithmatex, superfences), so declared and
   # locked explicitly rather than only arriving through mkdocs-material.
   "pymdown-extensions>=10.19.1",
