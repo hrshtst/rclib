@@ -6,6 +6,7 @@ build_user_omp/
 build_eigen_omp/
 build_scikit/
 build_nox/
+build_asan/
 
 # Python
 .venv/
