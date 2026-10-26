@@ -1,7 +1,7 @@
 # Model File Format
 
 `Model::save` / `ESN.save` write a binary file in the format described here
-(version 2). Integers and floats are little-endian and fixed-width; only
+(version 3). Integers and floats are little-endian and fixed-width; only
 little-endian hosts are supported.
 
 ## Versions
@@ -9,13 +9,15 @@ little-endian hosts are supported.
 | Version | Written by | Change |
 | :--- | :--- | :--- |
 | 1 | rclib 0.2.0 | Initial format. |
-| 2 | later versions | `RandomSparseReservoir` stores `spectral_radius_method`. |
+| 2 | rclib after 0.2.0 | `RandomSparseReservoir` stores `spectral_radius_method`. |
+| 3 | later versions | `RandomSparseReservoir` stores `bias_scaling`. |
 
 The writer always writes the current version. The reader accepts every version
 up to the current one and reads a field only in the versions that have it, so
-version 1 files still load; their `RandomSparseReservoir` reservoirs load with
-`spectral_radius_method` POWER_ITERATION, which is how they were built. rclib
-0.2.0 rejects version 2 files.
+older files still load. In version 1 files, `RandomSparseReservoir` reservoirs load
+with `spectral_radius_method` POWER_ITERATION, and in version 1 and 2 files with
+`bias_scaling` 1, which is how they were built. rclib 0.2.0 rejects version 2 and
+later files, and builds that write version 2 reject version 3 files.
 
 ## Primitives
 
@@ -33,7 +35,7 @@ against the bytes remaining in the input before allocating.
 ## Layout
 
 ```
-header      "RCLIBMDL" (8 bytes), u32 format_version = 2
+header      "RCLIBMDL" (8 bytes), u32 format_version = 3
 model       u8 connection (0 = serial, 1 = parallel), u32 n_reservoirs,
             n_reservoirs x (string type_tag, payload),
             string type_tag, payload                  (the readout)
@@ -45,11 +47,11 @@ The model must extend to the end of the input; trailing data is rejected.
 
 A field in brackets is present only when the flag just before it is true, so a
 component that is not initialized carries no leftover matrices. A field marked
-"v2+" is present from version 2 on.
+"v2+" is present from version 2 on, and one marked "v3+" from version 3 on.
 
 | Type tag | Payload |
 | :--- | :--- |
-| `RandomSparseReservoir` | `i32` n_neurons, `f64` spectral_radius, `f64` sparsity, `f64` leak_rate, `f64` input_scaling, `bool` include_bias, `u32` seed, `u8` spectral_radius_method (v2+), sparse W_res, dense bias (1 x n), dense state (1 x n), `bool` w_in_initialized, [dense W_in] |
+| `RandomSparseReservoir` | `i32` n_neurons, `f64` spectral_radius, `f64` sparsity, `f64` leak_rate, `f64` input_scaling, `bool` include_bias, `u32` seed, `u8` spectral_radius_method (v2+), `f64` bias_scaling (v3+), sparse W_res, dense bias (1 x n), dense state (1 x n), `bool` w_in_initialized, [dense W_in] |
 | `NvarReservoir` | `i32` num_lags, `i32` polynomial_order, `bool` initialized, [`i32` input_dim, dense state, dense past_inputs] |
 | `RidgeReadout` | `f64` alpha, `bool` include_bias, `u8` solver, `f64` tolerance, `u8` effective_solver, `bool` fitted, [dense W_out] |
 | `RlsReadout` | `f64` lambda, `f64` delta, `bool` include_bias, `u8` solver, `bool` initialized, [dense W_out, dense P] |

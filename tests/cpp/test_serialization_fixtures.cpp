@@ -1,4 +1,4 @@
-// Loads the frozen fixtures of model format versions 1 and 2 (tests/data/serialization/v<N>,
+// Loads the frozen fixtures of model format versions 1 to 3 (tests/data/serialization/v<N>,
 // see generate.py there) to check that files written by earlier builds keep
 // loading with the same configuration and results.
 
@@ -104,7 +104,7 @@ void requireExpectedResults(Model &model, int version, const std::string &name, 
 } // namespace
 
 TEST_CASE("Serialization fixtures - serial RandomSparse -> NVAR with Ridge", "[serialization][fixtures]") {
-  const int version = GENERATE(1, 2);
+  const int version = GENERATE(1, 2, 3);
   CAPTURE(version);
   Model model = loadFixture(version, "serial_rs_nvar_ridge");
   REQUIRE(model.getConnectionType() == "serial");
@@ -119,6 +119,7 @@ TEST_CASE("Serialization fixtures - serial RandomSparse -> NVAR with Ridge", "[s
   REQUIRE(random_sparse->getIncludeBias());
   REQUIRE(random_sparse->getSeed() == 1U);
   REQUIRE(random_sparse->getSpectralRadiusMethod() == RandomSparseReservoir::POWER_ITERATION);
+  REQUIRE(random_sparse->getBiasScaling() == 1.0);
   REQUIRE(random_sparse->getInputDim() == 1);
   const auto nvar = as<NvarReservoir>(model.getReservoir(1));
   REQUIRE(nvar->getNumLags() == 2);
@@ -136,7 +137,7 @@ TEST_CASE("Serialization fixtures - serial RandomSparse -> NVAR with Ridge", "[s
 }
 
 TEST_CASE("Serialization fixtures - parallel RandomSparse + NVAR with rank-k RLS", "[serialization][fixtures]") {
-  const int version = GENERATE(1, 2);
+  const int version = GENERATE(1, 2, 3);
   CAPTURE(version);
   Model model = loadFixture(version, "parallel_rs_nvar_rls");
   REQUIRE(model.getConnectionType() == "parallel");
@@ -151,6 +152,7 @@ TEST_CASE("Serialization fixtures - parallel RandomSparse + NVAR with rank-k RLS
   REQUIRE_FALSE(random_sparse->getIncludeBias());
   REQUIRE(random_sparse->getSeed() == 2U);
   REQUIRE(random_sparse->getSpectralRadiusMethod() == RandomSparseReservoir::POWER_ITERATION);
+  REQUIRE(random_sparse->getBiasScaling() == 1.0);
   const auto nvar = as<NvarReservoir>(model.getReservoir(1));
   REQUIRE(nvar->getNumLags() == 2);
   REQUIRE(nvar->getPolynomialOrder() == 1);
@@ -165,7 +167,7 @@ TEST_CASE("Serialization fixtures - parallel RandomSparse + NVAR with rank-k RLS
 }
 
 TEST_CASE("Serialization fixtures - serial RandomSparse with LMS", "[serialization][fixtures]") {
-  const int version = GENERATE(1, 2);
+  const int version = GENERATE(1, 2, 3);
   CAPTURE(version);
   Model model = loadFixture(version, "serial_rs_lms");
   REQUIRE(model.getConnectionType() == "serial");
@@ -175,6 +177,7 @@ TEST_CASE("Serialization fixtures - serial RandomSparse with LMS", "[serializati
   REQUIRE(random_sparse->getNNeurons() == 8);
   REQUIRE(random_sparse->getSeed() == 3U);
   REQUIRE(random_sparse->getSpectralRadiusMethod() == RandomSparseReservoir::POWER_ITERATION);
+  REQUIRE(random_sparse->getBiasScaling() == 1.0);
   const auto lms = as<LmsReadout>(model.getReadout());
   REQUIRE(lms->getLearningRate() == 0.05);
   REQUIRE(lms->getIncludeBias());
@@ -184,7 +187,7 @@ TEST_CASE("Serialization fixtures - serial RandomSparse with LMS", "[serializati
 }
 
 TEST_CASE("Serialization fixtures - uninitialized reservoir and unfitted Ridge", "[serialization][fixtures]") {
-  const int version = GENERATE(1, 2);
+  const int version = GENERATE(1, 2, 3);
   CAPTURE(version);
   Model model = loadFixture(version, "unfitted_ridge");
   REQUIRE(model.getNumReservoirs() == 1);
@@ -193,6 +196,7 @@ TEST_CASE("Serialization fixtures - uninitialized reservoir and unfitted Ridge",
   REQUIRE(random_sparse->getNNeurons() == 6);
   REQUIRE(random_sparse->getSeed() == 4U);
   REQUIRE(random_sparse->getSpectralRadiusMethod() == RandomSparseReservoir::POWER_ITERATION);
+  REQUIRE(random_sparse->getBiasScaling() == 1.0);
   REQUIRE(random_sparse->getInputDim() == 0);
   const auto ridge = as<RidgeReadout>(model.getReadout());
   REQUIRE(ridge->getAlpha() == 0.5);
@@ -203,9 +207,11 @@ TEST_CASE("Serialization fixtures - uninitialized reservoir and unfitted Ridge",
   REQUIRE_THROWS_WITH(model.predict(Eigen::MatrixXd::Ones(3, 1)), Catch::Matchers::ContainsSubstring("must be fit"));
 }
 
-TEST_CASE("Serialization fixtures v2 - serial RandomSparse scaled by the dense method with Ridge",
+TEST_CASE("Serialization fixtures v2+ - serial RandomSparse scaled by the dense method with Ridge",
           "[serialization][fixtures]") {
-  Model model = loadFixture(2, "serial_rs_dense_ridge");
+  const int version = GENERATE(2, 3);
+  CAPTURE(version);
+  Model model = loadFixture(version, "serial_rs_dense_ridge");
   REQUIRE(model.getConnectionType() == "serial");
   REQUIRE(model.getNumReservoirs() == 1);
 
@@ -218,6 +224,7 @@ TEST_CASE("Serialization fixtures v2 - serial RandomSparse scaled by the dense m
   REQUIRE(random_sparse->getIncludeBias());
   REQUIRE(random_sparse->getSeed() == 5U);
   REQUIRE(random_sparse->getSpectralRadiusMethod() == RandomSparseReservoir::DENSE);
+  REQUIRE(random_sparse->getBiasScaling() == 1.0);
   REQUIRE(random_sparse->getInputDim() == 1);
   const auto ridge = as<RidgeReadout>(model.getReadout());
   REQUIRE(ridge->getAlpha() == 1e-3);
@@ -226,5 +233,33 @@ TEST_CASE("Serialization fixtures v2 - serial RandomSparse scaled by the dense m
   REQUIRE(ridge->getEffectiveSolver() == RidgeReadout::CHOLESKY);
   REQUIRE(ridge->getInputDim() == 8);
 
-  requireExpectedResults(model, 2, "serial_rs_dense_ridge", false);
+  requireExpectedResults(model, version, "serial_rs_dense_ridge", false);
+}
+
+TEST_CASE("Serialization fixtures v3 - serial RandomSparse with a scaled bias with Ridge",
+          "[serialization][fixtures]") {
+  Model model = loadFixture(3, "serial_rs_bias_ridge");
+  REQUIRE(model.getConnectionType() == "serial");
+  REQUIRE(model.getNumReservoirs() == 1);
+
+  const auto random_sparse = as<RandomSparseReservoir>(model.getReservoir(0));
+  REQUIRE(random_sparse->getNNeurons() == 8);
+  REQUIRE(random_sparse->getSpectralRadius() == 0.9);
+  REQUIRE(random_sparse->getSparsity() == 0.5);
+  REQUIRE(random_sparse->getLeakRate() == 0.5);
+  REQUIRE(random_sparse->getInputScaling() == 1.0);
+  REQUIRE(random_sparse->getIncludeBias());
+  REQUIRE(random_sparse->getSeed() == 6U);
+  REQUIRE(random_sparse->getSpectralRadiusMethod() == RandomSparseReservoir::POWER_ITERATION);
+  REQUIRE(random_sparse->getBiasScaling() == 0.25);
+  REQUIRE(random_sparse->getBias().cwiseAbs().maxCoeff() <= 0.25);
+  REQUIRE(random_sparse->getInputDim() == 1);
+  const auto ridge = as<RidgeReadout>(model.getReadout());
+  REQUIRE(ridge->getAlpha() == 1e-3);
+  REQUIRE(ridge->getIncludeBias());
+  REQUIRE(ridge->getSolver() == RidgeReadout::AUTO);
+  REQUIRE(ridge->getEffectiveSolver() == RidgeReadout::CHOLESKY);
+  REQUIRE(ridge->getInputDim() == 8);
+
+  requireExpectedResults(model, 3, "serial_rs_bias_ridge", false);
 }

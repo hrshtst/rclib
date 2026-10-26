@@ -120,12 +120,14 @@ struct RandomSparsePayload {
   bool include_bias = false;
   std::uint32_t seed = 1;
   std::uint8_t spectral_radius_method = 0;
+  double bias_scaling = 1.0;
   Eigen::SparseMatrix<double> W_res = sparseIdentity(3, 3);
   Eigen::MatrixXd bias = Eigen::MatrixXd::Zero(1, 3);
   Eigen::MatrixXd state = Eigen::MatrixXd::Zero(1, 3);
   bool w_in_initialized = true;
   Eigen::MatrixXd W_in = Eigen::MatrixXd::Ones(2, 3);
-  std::uint32_t format_version = serialization_format_version; // version 1 has no spectral_radius_method
+  // Version 1 has no spectral_radius_method, and versions 1 and 2 no bias_scaling.
+  std::uint32_t format_version = serialization_format_version;
 
   std::string bytes() const {
     std::stringstream buffer;
@@ -139,6 +141,9 @@ struct RandomSparsePayload {
     writer.writeUInt(seed);
     if (format_version >= 2) {
       writer.writeU8(spectral_radius_method);
+    }
+    if (format_version >= 3) {
+      writer.writeDouble(bias_scaling);
     }
     writer.writeSparse(W_res);
     writer.writeMatrix(bias);
@@ -532,7 +537,8 @@ TEST_CASE("Serialization - translateSerializationErrors", "[serialization]") {
 
 TEST_CASE("RandomSparseReservoir - serialization round-trips", "[serialization][RandomSparseReservoir]") {
   const auto method = GENERATE(RandomSparseReservoir::POWER_ITERATION, RandomSparseReservoir::DENSE);
-  RandomSparseReservoir original(20, 0.9, 0.3, 0.5, 0.8, true, 123, method);
+  const double bias_scaling = GENERATE(1.0, 0.25);
+  RandomSparseReservoir original(20, 0.9, 0.3, 0.5, 0.8, true, 123, method, bias_scaling);
   const Eigen::MatrixXd inputs = Eigen::MatrixXd::Random(6, 3);
 
   SECTION("Before the first input (W_in not generated yet)") {}
@@ -554,6 +560,8 @@ TEST_CASE("RandomSparseReservoir - serialization round-trips", "[serialization][
   REQUIRE(restored->getIncludeBias() == original.getIncludeBias());
   REQUIRE(restored->getSeed() == original.getSeed());
   REQUIRE(restored->getSpectralRadiusMethod() == method);
+  REQUIRE(restored->getBiasScaling() == bias_scaling);
+  REQUIRE(sameBits(restored->getBias(), original.getBias()));
   REQUIRE(restored->getInputDim() == original.getInputDim());
   REQUIRE(sameBits(restored->getState(), original.getState()));
 
@@ -596,6 +604,8 @@ TEST_CASE("RandomSparseReservoir - invalid payloads are rejected", "[serializati
   SECTION("NaN leak_rate") { payload.leak_rate = nan_value; }
   SECTION("Infinite spectral_radius") { payload.spectral_radius = inf_value; }
   SECTION("Unknown spectral_radius_method code") { payload.spectral_radius_method = 2; }
+  SECTION("Negative bias_scaling") { payload.bias_scaling = -1.0; }
+  SECTION("NaN bias_scaling") { payload.bias_scaling = nan_value; }
   SECTION("Non-square W_res") { payload.W_res = sparseIdentity(3, 4); }
   SECTION("W_res of the wrong size") { payload.W_res = sparseIdentity(4, 4); }
   SECTION("bias that is not a row vector") { payload.bias = Eigen::MatrixXd::Zero(3, 1); }
@@ -629,6 +639,33 @@ TEST_CASE("RandomSparseReservoir - spectral_radius_method is read from version 2
   const auto restored = RandomSparseReservoir::load(reader);
   REQUIRE(reader.remainingBytes() == 0);
   REQUIRE(restored->getSpectralRadiusMethod() == expected);
+}
+
+TEST_CASE("RandomSparseReservoir - bias_scaling is read from version 3 on", "[serialization][RandomSparseReservoir]") {
+  RandomSparsePayload payload;
+  payload.include_bias = true;
+  payload.bias = Eigen::MatrixXd::Constant(1, 3, 0.5);
+  double expected = 1.0;
+  SECTION("Version 1 has no bias_scaling and loads as 1") { payload.format_version = 1; }
+  SECTION("Version 2 has no bias_scaling and loads as 1") { payload.format_version = 2; }
+  SECTION("Version 3 with 1") { payload.format_version = 3; }
+  SECTION("Version 3 with 0.25") {
+    payload.format_version = 3;
+    payload.bias_scaling = 0.25;
+    expected = 0.25;
+  }
+
+  std::string bytes = "RCLIBMDL";
+  appendRaw(bytes, payload.format_version);
+  bytes += payload.bytes();
+  std::istringstream input(bytes);
+  BinaryReader reader(input);
+  reader.readHeader();
+  const auto restored = RandomSparseReservoir::load(reader);
+  REQUIRE(reader.remainingBytes() == 0);
+  REQUIRE(restored->getBiasScaling() == expected);
+  // The bias is read as saved: it already carries its scaling.
+  REQUIRE(sameBits(Eigen::MatrixXd(restored->getBias()), payload.bias));
 }
 
 TEST_CASE("NvarReservoir - invalid payloads are rejected", "[serialization][NvarReservoir]") {

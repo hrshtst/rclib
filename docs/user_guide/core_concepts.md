@@ -11,11 +11,18 @@ res = reservoirs.RandomSparse(
     sparsity=0.1,  # Density of connections
     leak_rate=1.0,  # 1.0 = full update, < 1.0 = leaky integrator
     input_scaling=1.0,  # Scaling of input weights
-    include_bias=False,  # Add bias neuron to reservoir
+    include_bias=False,  # Add a random bias to each neuron
     seed=42,  # Random seed for reproducibility
     spectral_radius_method="power_iteration",  # or "dense": exact, O(n^3) time, small reservoirs only
+    bias_scaling=1.0,  # Range of the bias, [-bias_scaling, bias_scaling]
 )
 ```
+
+With `include_bias=True`, each neuron receives a constant bias drawn uniformly
+from $[-1, 1]$ and multiplied by `bias_scaling`, which sets the bias's range apart
+from `input_scaling`. The draws do not depend on `bias_scaling`: the same `seed`
+gives the same recurrent and input weights at every `bias_scaling`, and the
+default of 1 gives the unscaled bias.
 
 `spectral_radius_method` chooses how the spectral radius of the random weight
 matrix is found before the matrix is scaled to `spectral_radius`. The default

@@ -229,6 +229,45 @@ def test_random_sparse_rejects_unknown_spectral_radius_method() -> None:
     _assert_one_reservoir_and_still_learning(model, x, y)
 
 
+@pytest.mark.parametrize("bias_scaling", [-0.1, float("nan"), float("inf")])
+def test_random_sparse_rejects_an_invalid_bias_scaling(bias_scaling: float) -> None:
+    """A negative or non-finite bias_scaling is rejected by the config class and by the C++ reservoir."""
+    with pytest.raises(ValueError, match="bias_scaling"):
+        reservoirs.RandomSparse(10, 0.9, include_bias=True, bias_scaling=bias_scaling)
+    with pytest.raises(ValueError, match="bias_scaling"):
+        _rclib.RandomSparseReservoir(10, 0.9, 0.5, 0.5, 1.0, include_bias=True, bias_scaling=bias_scaling)
+
+
+def test_bias_scaling_scales_the_bias_alone() -> None:
+    """The bias is the unscaled draw times bias_scaling; the weights are the same at every bias_scaling."""
+
+    def build(bias_scaling: float, *, include_bias: bool = True) -> _rclib.RandomSparseReservoir:
+        res = _rclib.RandomSparseReservoir(
+            20, 0.9, 0.3, 0.5, 2.0, include_bias=include_bias, seed=7, bias_scaling=bias_scaling
+        )
+        res.advance(np.ones((1, 3)))  # draws W_in
+        return res
+
+    scaling = 0.3
+    unscaled, scaled, zero = build(1.0), build(scaling), build(0.0)
+    by_default = _rclib.RandomSparseReservoir(20, 0.9, 0.3, 0.5, 2.0, include_bias=True, seed=7)
+    np.testing.assert_array_equal(by_default.getBias(), unscaled.getBias())
+    assert 0 < np.abs(unscaled.getBias()).max() <= 1
+
+    np.testing.assert_array_equal(scaled.getBias(), unscaled.getBias() * scaling)
+    assert not np.any(zero.getBias())
+    for res in (scaled, zero):
+        for got, want in zip(res.getRecurrentWeights(), unscaled.getRecurrentWeights(), strict=True):
+            np.testing.assert_array_equal(got, want)
+        np.testing.assert_array_equal(res.getInputWeights(), unscaled.getInputWeights())
+    assert not np.any(build(scaling, include_bias=False).getBias())
+
+    esn = ESN()
+    esn.add_reservoir(reservoirs.RandomSparse(20, 0.9, 0.3, 0.5, 2.0, include_bias=True, seed=7, bias_scaling=scaling))
+    assert esn.get_reservoir(0).getBiasScaling() == scaling
+    np.testing.assert_array_equal(esn.get_reservoir(0).getBias(), scaled.getBias())
+
+
 def test_unsupported_reservoir_type_leaves_the_model_unchanged() -> None:
     """ESN.add_reservoir rejects an unknown reservoir type without recording it."""
     model, x, y = _online_model()
@@ -245,6 +284,8 @@ def test_reservoir_getters_and_input_dim() -> None:
     assert (res.getNNeurons(), res.getSpectralRadius(), res.getSparsity()) == (10, 0.9, 0.5)
     assert (res.getLeakRate(), res.getInputScaling(), res.getIncludeBias(), res.getSeed()) == (0.25, 2.0, True, 7)
     assert res.getSpectralRadiusMethod() == methods.POWER_ITERATION
+    scaled = _rclib.RandomSparseReservoir(10, 0.9, 0.5, 0.25, 2.0, bias_scaling=0.5)
+    assert (res.getBiasScaling(), scaled.getBiasScaling()) == (1.0, 0.5)
     dense = _rclib.RandomSparseReservoir(10, 0.9, 0.5, 0.25, 2.0, spectral_radius_method=methods.DENSE)
     assert dense.getSpectralRadiusMethod() == methods.DENSE
     assert res.getInputDim() == 0

@@ -115,6 +115,45 @@ TEST_CASE("RandomSparseReservoir - rejects non-finite hyperparameters", "[Random
   REQUIRE_THROWS_AS(RandomSparseReservoir(10, 0.9, bad, 0.5, 1.0), std::invalid_argument);
   REQUIRE_THROWS_AS(RandomSparseReservoir(10, 0.9, 0.5, bad, 1.0), std::invalid_argument);
   REQUIRE_THROWS_AS(RandomSparseReservoir(10, 0.9, 0.5, 0.5, bad), std::invalid_argument);
+  REQUIRE_THROWS_AS(
+      RandomSparseReservoir(10, 0.9, 0.5, 0.5, 1.0, true, 42, RandomSparseReservoir::POWER_ITERATION, bad),
+      std::invalid_argument);
+}
+
+TEST_CASE("RandomSparseReservoir - rejects a negative bias_scaling", "[RandomSparseReservoir]") {
+  REQUIRE_THROWS_AS(
+      RandomSparseReservoir(10, 0.9, 0.5, 0.5, 1.0, true, 42, RandomSparseReservoir::POWER_ITERATION, -0.1),
+      std::invalid_argument);
+}
+
+TEST_CASE("RandomSparseReservoir - bias_scaling scales the bias alone", "[RandomSparseReservoir]") {
+  const auto build = [](bool include_bias, double bias_scaling) {
+    RandomSparseReservoir res(20, 0.9, 0.3, 0.5, 2.0, include_bias, 7, RandomSparseReservoir::POWER_ITERATION,
+                              bias_scaling);
+    res.advance(Eigen::MatrixXd::Ones(1, 3)); // draws W_in
+    return res;
+  };
+  const RandomSparseReservoir unscaled = build(true, 1.0);
+  const RandomSparseReservoir scaled = build(true, 0.3);
+  const RandomSparseReservoir zero = build(true, 0.0);
+
+  // The default is 1, and leaves the draws as they are.
+  const RandomSparseReservoir by_default(20, 0.9, 0.3, 0.5, 2.0, true, 7);
+  REQUIRE(by_default.getBiasScaling() == 1.0);
+  REQUIRE(by_default.getBias() == unscaled.getBias());
+  REQUIRE(unscaled.getBias().cwiseAbs().maxCoeff() <= 1.0);
+  REQUIRE(unscaled.getBias().cwiseAbs().maxCoeff() > 0.0);
+
+  // The scaled bias is the unscaled one times bias_scaling; the weights do not change.
+  REQUIRE(scaled.getBias() == (unscaled.getBias() * 0.3).eval());
+  REQUIRE(zero.getBias().isZero(0.0));
+  for (const RandomSparseReservoir *res : {&scaled, &zero}) {
+    REQUIRE(Eigen::MatrixXd(res->getRecurrentWeights()) == Eigen::MatrixXd(unscaled.getRecurrentWeights()));
+    REQUIRE(res->getInputWeights() == unscaled.getInputWeights());
+  }
+
+  // Without include_bias, the bias is zero at any bias_scaling.
+  REQUIRE(build(false, 0.3).getBias().isZero(0.0));
 }
 
 TEST_CASE("RandomSparseReservoir - rejects an unknown spectral_radius_method", "[RandomSparseReservoir]") {
@@ -132,9 +171,12 @@ TEST_CASE("RandomSparseReservoir - configuration getters and input width", "[Ran
   REQUIRE(res.getIncludeBias());
   REQUIRE(res.getSeed() == 7U);
   REQUIRE(res.getSpectralRadiusMethod() == RandomSparseReservoir::POWER_ITERATION);
+  REQUIRE(res.getBiasScaling() == 1.0);
   REQUIRE(
       RandomSparseReservoir(10, 0.9, 0.5, 0.25, 2.0, true, 7, RandomSparseReservoir::DENSE).getSpectralRadiusMethod() ==
       RandomSparseReservoir::DENSE);
+  REQUIRE(RandomSparseReservoir(10, 0.9, 0.5, 0.25, 2.0, true, 7, RandomSparseReservoir::POWER_ITERATION, 0.5)
+              .getBiasScaling() == 0.5);
 
   REQUIRE(res.getInputDim() == 0);
   res.advance(Eigen::MatrixXd::Random(1, 3));
@@ -146,7 +188,7 @@ TEST_CASE("RandomSparseReservoir - configuration getters and input width", "[Ran
 namespace {
 
 // The scaled W_res, read back from the reservoir's payload, where it follows i32 n_neurons, four f64
-// hyperparameters, bool include_bias, u32 seed and u8 spectral_radius_method
+// hyperparameters, bool include_bias, u32 seed, u8 spectral_radius_method and f64 bias_scaling
 // (docs/development/model_file_format.md).
 Eigen::SparseMatrix<double> reservoirWeights(const RandomSparseReservoir &res) {
   std::stringstream buffer;
@@ -160,6 +202,7 @@ Eigen::SparseMatrix<double> reservoirWeights(const RandomSparseReservoir &res) {
   reader.readBool();
   reader.readUInt();
   reader.readU8();
+  reader.readDouble();
   return reader.readSparse();
 }
 

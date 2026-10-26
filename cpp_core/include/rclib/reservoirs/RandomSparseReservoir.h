@@ -18,9 +18,14 @@ public:
   /// any other int is well defined; the constructor rejects it.
   enum SpectralRadiusMethod : int { POWER_ITERATION, DENSE };
 
+  /// With include_bias, each neuron's bias is drawn uniformly from [-1, 1] and multiplied by
+  /// bias_scaling, so that bias_scaling sets its range, [-bias_scaling, bias_scaling], apart from
+  /// input_scaling. The draws do not depend on bias_scaling: the same seed gives the same W_res and
+  /// W_in at every bias_scaling, and a bias_scaling of 1 gives the bias of the unscaled draws.
+  /// Without include_bias, the bias is zero whatever bias_scaling is.
   RandomSparseReservoir(int n_neurons, double spectral_radius, double sparsity = 0.1, double leak_rate = 1.0,
                         double input_scaling = 1.0, bool include_bias = false, unsigned int seed = 42,
-                        SpectralRadiusMethod spectral_radius_method = POWER_ITERATION);
+                        SpectralRadiusMethod spectral_radius_method = POWER_ITERATION, double bias_scaling = 1.0);
 
   const Eigen::MatrixXd &advance(const Eigen::MatrixXd &input) override;
   void resetState() override;
@@ -36,6 +41,7 @@ public:
   bool getIncludeBias() const { return include_bias; }
   unsigned int getSeed() const { return seed; }
   SpectralRadiusMethod getSpectralRadiusMethod() const { return spectral_radius_method; }
+  double getBiasScaling() const { return bias_scaling; }
 
   // The weights, read-only. advance() computes, with the state and the input as row vectors,
   //   state = (1 - leak_rate) * state + leak_rate * tanh(input * W_in + bias + state * W_res).
@@ -46,7 +52,7 @@ public:
   /// The input weights W_in, (input_dim, n_neurons), scaled by input_scaling. They are drawn at the
   /// first advance(), which fixes the input width; throws before it.
   const Eigen::MatrixXd &getInputWeights() const;
-  /// The bias, one entry per neuron; zero when include_bias is false.
+  /// The bias, one entry per neuron, scaled by bias_scaling; zero when include_bias is false.
   const Eigen::RowVectorXd &getBias() const { return bias; }
 
   /// Writes the hyperparameters and the full state (weights and current activations)
@@ -71,6 +77,7 @@ private:
   bool include_bias;
   unsigned int seed;
   SpectralRadiusMethod spectral_radius_method;
+  double bias_scaling;
   bool W_in_initialized;
 
   Eigen::MatrixXd state;

@@ -109,10 +109,10 @@ RandomSparseReservoir::SpectralRadiusMethod methodFromWire(std::uint8_t code) {
 
 RandomSparseReservoir::RandomSparseReservoir(int n_neurons, double spectral_radius, double sparsity, double leak_rate,
                                              double input_scaling, bool include_bias, unsigned int seed,
-                                             SpectralRadiusMethod spectral_radius_method)
+                                             SpectralRadiusMethod spectral_radius_method, double bias_scaling)
     : n_neurons(n_neurons), spectral_radius(spectral_radius), sparsity(sparsity), leak_rate(leak_rate),
       input_scaling(input_scaling), include_bias(include_bias), spectral_radius_method(spectral_radius_method),
-      W_in_initialized(false) {
+      bias_scaling(bias_scaling), W_in_initialized(false) {
   validateParameters();
 
   state = Eigen::MatrixXd::Zero(1, n_neurons);
@@ -138,6 +138,8 @@ RandomSparseReservoir::RandomSparseReservoir(int n_neurons, double spectral_radi
   if (include_bias) {
     std::uniform_real_distribution<> dis(-1.0, 1.0);
     bias = Eigen::RowVectorXd::NullaryExpr(n_neurons, [&]() { return dis(gen); });
+    // Scaled after the draws, which a bias_scaling of 1 leaves bit for bit.
+    bias *= bias_scaling;
   } else {
     bias = Eigen::RowVectorXd::Zero(n_neurons);
   }
@@ -163,6 +165,9 @@ void RandomSparseReservoir::validateParameters() const {
   }
   if (!std::isfinite(input_scaling) || input_scaling < 0.0) {
     throw std::invalid_argument("input_scaling must be finite and non-negative.");
+  }
+  if (!std::isfinite(bias_scaling) || bias_scaling < 0.0) {
+    throw std::invalid_argument("bias_scaling must be finite and non-negative.");
   }
   if (spectral_radius_method != POWER_ITERATION && spectral_radius_method != DENSE) {
     throw std::invalid_argument("spectral_radius_method must be POWER_ITERATION or DENSE.");
@@ -270,6 +275,7 @@ void RandomSparseReservoir::save(BinaryWriter &writer) const {
     writer.writeBool(include_bias);
     writer.writeUInt(seed);
     writer.writeU8(methodToWire(spectral_radius_method));
+    writer.writeDouble(bias_scaling);
     writer.writeSparse(W_res);
     writer.writeMatrix(bias);
     writer.writeMatrix(state);
@@ -294,6 +300,8 @@ std::shared_ptr<RandomSparseReservoir> RandomSparseReservoir::load(BinaryReader 
     res->seed = reader.readUInt();
     // Version 1 files predate the option; they were all built by power iteration.
     res->spectral_radius_method = reader.formatVersion() >= 2 ? methodFromWire(reader.readU8()) : POWER_ITERATION;
+    // Files before version 3 predate the option; their bias was drawn unscaled.
+    res->bias_scaling = reader.formatVersion() >= 3 ? reader.readDouble() : 1.0;
     res->W_res = reader.readSparse();
     const Eigen::MatrixXd bias = reader.readMatrix();
     if (bias.rows() != 1) { // checked before assigning into a row vector

@@ -26,6 +26,7 @@ class RandomSparse:
         include_bias: bool = False,
         seed: int = 42,
         spectral_radius_method: str = "power_iteration",
+        bias_scaling: float = 1.0,
     ) -> None:
         """Initialize the Random Sparse Reservoir.
 
@@ -35,7 +36,8 @@ class RandomSparse:
             sparsity: Sparsity of the reservoir weight matrix (0.0 to 1.0).
             leak_rate: Leaking rate of the neurons.
             input_scaling: Scaling factor for the input weights.
-            include_bias: Whether to include a bias term.
+            include_bias: Whether to include a bias term: one constant input per neuron, drawn
+                uniformly from [-1, 1] and multiplied by ``bias_scaling``.
             seed: Random seed for weights initialization.
             spectral_radius_method: How the spectral radius of the random weight matrix is
                 found before it is scaled to ``spectral_radius``. "power_iteration" (default)
@@ -43,6 +45,10 @@ class RandomSparse:
                 computes it exactly from all eigenvalues of the matrix, which costs
                 O(n_neurons^3) time and O(n_neurons^2) memory, so it is meant for small
                 reservoirs.
+            bias_scaling: Scaling factor for the bias, set apart from ``input_scaling``: the bias
+                lies in [-bias_scaling, bias_scaling]. The draws do not depend on it, so the same
+                seed gives the same recurrent and input weights at every bias_scaling, and 1
+                (default) gives the unscaled bias. Without ``include_bias`` it has no effect.
         """
         if n_neurons <= 0:
             msg = "n_neurons must be positive."
@@ -63,6 +69,9 @@ class RandomSparse:
         if spectral_radius_method not in {"power_iteration", "dense"}:
             msg = "spectral_radius_method must be 'power_iteration' or 'dense'."
             raise ValueError(msg)
+        if not math.isfinite(bias_scaling) or bias_scaling < 0:
+            msg = "bias_scaling must be finite and non-negative."
+            raise ValueError(msg)
 
         self.n_neurons = n_neurons
         self.spectral_radius = spectral_radius
@@ -72,6 +81,7 @@ class RandomSparse:
         self.include_bias = include_bias
         self.seed = seed
         self.spectral_radius_method = spectral_radius_method
+        self.bias_scaling = bias_scaling
 
 
 class Nvar:

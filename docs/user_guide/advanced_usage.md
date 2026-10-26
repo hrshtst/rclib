@@ -242,8 +242,10 @@ object added twice (C++ only), and a corrupted or truncated file. Running out of
 memory raises `MemoryError` (`std::bad_alloc` in C++) instead.
 
 > **Compatibility:** Files written by rclib 0.2.0 still load; their `RandomSparse`
-> reservoirs report `spectral_radius_method="power_iteration"`. Files written by
-> later versions use model format version 2 and cannot be read by rclib 0.2.0.
+> reservoirs report `spectral_radius_method="power_iteration"`. Files of model
+> format version 1 or 2 load with `bias_scaling=1.0`. Files written by later
+> versions use model format version 3 and cannot be read by rclib 0.2.0 or by
+> builds that write version 2.
 
 > **Security:** Only load files from sources you trust. Unlike `pickle`, the
 > format contains no executable code, but it is parsed by native code. Loading a

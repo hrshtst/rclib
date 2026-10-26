@@ -54,6 +54,7 @@ def _reservoir_config_from_cpp(cpp_reservoir: Any) -> reservoirs.RandomSparse | 
             include_bias=cpp_reservoir.getIncludeBias(),
             seed=cpp_reservoir.getSeed(),
             spectral_radius_method=_SPECTRAL_RADIUS_METHOD_NAMES[cpp_reservoir.getSpectralRadiusMethod()],
+            bias_scaling=cpp_reservoir.getBiasScaling(),
         )
     if isinstance(cpp_reservoir, _rclib.NvarReservoir):
         return reservoirs.Nvar(num_lags=cpp_reservoir.getNumLags(), polynomial_order=cpp_reservoir.getPolynomialOrder())
@@ -133,6 +134,7 @@ class ESN:
                 reservoir.include_bias,
                 reservoir.seed,
                 _SPECTRAL_RADIUS_METHODS[reservoir.spectral_radius_method],
+                reservoir.bias_scaling,
             )
             self._cpp_model.addReservoir(cpp_res, self.connection_type)
         elif isinstance(reservoir, reservoirs.Nvar):

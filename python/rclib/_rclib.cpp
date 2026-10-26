@@ -40,10 +40,11 @@ PYBIND11_MODULE(_rclib, m) {
 
   random_sparse
       .def(py::init<int, double, double, double, double, bool, unsigned int,
-                    RandomSparseReservoir::SpectralRadiusMethod>(),
+                    RandomSparseReservoir::SpectralRadiusMethod, double>(),
            py::arg("n_neurons"), py::arg("spectral_radius"), py::arg("sparsity"), py::arg("leak_rate"),
            py::arg("input_scaling"), py::arg("include_bias") = false, py::arg("seed") = 42,
-           py::arg("spectral_radius_method") = RandomSparseReservoir::SpectralRadiusMethod::POWER_ITERATION)
+           py::arg("spectral_radius_method") = RandomSparseReservoir::SpectralRadiusMethod::POWER_ITERATION,
+           py::arg("bias_scaling") = 1.0)
       .def("getNNeurons", &RandomSparseReservoir::getNNeurons)
       .def("getSpectralRadius", &RandomSparseReservoir::getSpectralRadius)
       .def("getSparsity", &RandomSparseReservoir::getSparsity)
@@ -52,6 +53,7 @@ PYBIND11_MODULE(_rclib, m) {
       .def("getIncludeBias", &RandomSparseReservoir::getIncludeBias)
       .def("getSeed", &RandomSparseReservoir::getSeed)
       .def("getSpectralRadiusMethod", &RandomSparseReservoir::getSpectralRadiusMethod)
+      .def("getBiasScaling", &RandomSparseReservoir::getBiasScaling)
       // The nonzero entries as numpy arrays, so that the core needs no scipy: W[rows, cols] = values.
       .def(
           "getRecurrentWeights",

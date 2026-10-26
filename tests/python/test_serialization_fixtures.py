@@ -1,7 +1,7 @@
 # Copyright (c) 2025-2026 Hiroshi Atsuta
 # SPDX-License-Identifier: Apache-2.0
 
-"""Load the frozen fixtures of model format versions 1 and 2.
+"""Load the frozen fixtures of model format versions 1 to 3.
 
 The fixtures in tests/data/serialization/v<N> (see generate.py there) check that
 files written by earlier builds keep loading with the same configuration and
@@ -117,22 +117,47 @@ V2_FIXTURE_CONFIGS = {
         ),
     ),
 }
-FIXTURES_BY_VERSION = [(1, name) for name in FIXTURE_CONFIGS] + [
-    (2, name) for name in [*FIXTURE_CONFIGS, *V2_FIXTURE_CONFIGS]
-]
+# Fixtures that exist from format version 3 on.
+V3_FIXTURE_CONFIGS = {
+    "serial_rs_bias_ridge": (
+        "serial",
+        _expected_configs(
+            reservoirs.RandomSparse(
+                n_neurons=8,
+                spectral_radius=0.9,
+                sparsity=0.5,
+                leak_rate=0.5,
+                input_scaling=1.0,
+                include_bias=True,
+                seed=6,
+                bias_scaling=0.25,
+            ),
+            readouts.Ridge(alpha=1e-3, include_bias=True),
+        ),
+    ),
+}
+FIXTURES_BY_VERSION = (
+    [(1, name) for name in FIXTURE_CONFIGS]
+    + [(2, name) for name in [*FIXTURE_CONFIGS, *V2_FIXTURE_CONFIGS]]
+    + [(3, name) for name in [*FIXTURE_CONFIGS, *V2_FIXTURE_CONFIGS, *V3_FIXTURE_CONFIGS]]
+)
 # Fixtures with expected results, and whether their readout learns online.
 RESULTS = {
     "serial_rs_nvar_ridge": False,
     "parallel_rs_nvar_rls": True,
     "serial_rs_lms": True,
     "serial_rs_dense_ridge": False,
+    "serial_rs_bias_ridge": False,
 }
 
 
 @pytest.mark.parametrize(("version", "name"), FIXTURES_BY_VERSION)
 def test_fixture_configuration(version: int, name: str) -> None:
-    """The configuration is restored exactly; version 1 files load as power iteration."""
-    connection_type, configs = (FIXTURE_CONFIGS | V2_FIXTURE_CONFIGS)[name]
+    """The configuration is restored exactly.
+
+    Version 1 files load as power iteration, and version 1 and 2 files with a bias_scaling of 1.
+    """
+    connection_type, configs = (FIXTURE_CONFIGS | V2_FIXTURE_CONFIGS | V3_FIXTURE_CONFIGS)[name]
     esn = ESN.load(_fixture(version, name))
     assert esn.connection_type == connection_type
     assert _configs(esn) == configs
@@ -158,7 +183,7 @@ def test_fixture_results(version: int, name: str) -> None:
         check(esn.predict(expected["input_predict"]), "after_partial_fit")
 
 
-@pytest.mark.parametrize("version", [1, 2])
+@pytest.mark.parametrize("version", [1, 2, 3])
 def test_unfitted_fixture_cannot_predict(version: int) -> None:
     """The unfitted fixture loads with an unfitted readout."""
     esn = ESN.load(_fixture(version, "unfitted_ridge"))

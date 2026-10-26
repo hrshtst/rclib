@@ -132,6 +132,23 @@ def test_spectral_radius_method_round_trips(tmp_path: Path, method: str) -> None
         assert cpp_method == model._SPECTRAL_RADIUS_METHODS[method]  # noqa: SLF001
 
 
+@pytest.mark.parametrize("bias_scaling", [1.0, 0.25])
+def test_bias_scaling_round_trips(tmp_path: Path, bias_scaling: float) -> None:
+    """The bias_scaling and the scaled bias survive saving and loading, and pickling."""
+    esn = ESN()
+    esn.add_reservoir(
+        reservoirs.RandomSparse(n_neurons=20, spectral_radius=0.9, include_bias=True, seed=3, bias_scaling=bias_scaling)
+    )
+    esn.set_readout(readouts.Ridge(alpha=1e-4, include_bias=True))
+    esn.save(tmp_path / "model.rclib")
+
+    pickled = pickle.loads(pickle.dumps(esn))  # noqa: S301 - data pickled by this test
+    for restored in (ESN.load(tmp_path / "model.rclib"), pickled):
+        assert _configs(restored) == _configs(esn)
+        assert restored.get_reservoir(0).getBiasScaling() == bias_scaling
+        np.testing.assert_array_equal(restored.get_reservoir(0).getBias(), esn.get_reservoir(0).getBias())
+
+
 @pytest.mark.parametrize("topology", TOPOLOGIES)
 def test_generation_continues_across_save_and_load(tmp_path: Path, topology: str) -> None:
     """Generating 3 steps, saving, loading and generating 4 more equals generating 7 steps."""
