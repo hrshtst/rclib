@@ -53,7 +53,7 @@ def plot_metric(data: pd.DataFrame, title: str, filename_suffix: str, path: Path
     plt.yscale("log")
 
     # Force integer ticks on x-axis if not too many
-    max_threads = data["threads"].max()
+    max_threads = int(data["threads"].to_numpy().max())
     if max_threads <= MAX_THREADS_FOR_TICKS:
         plt.xticks(data["threads"].unique().tolist())
 
@@ -92,7 +92,7 @@ def plot_mode_methods(df: pd.DataFrame, mode_name: str, nice_name: str, filename
     plt.yscale("log")
 
     # Force integer ticks on x-axis if not too many
-    max_threads = subset["threads"].max()
+    max_threads = int(subset["threads"].to_numpy().max())
     if max_threads <= MAX_THREADS_FOR_TICKS:
         plt.xticks(subset["threads"].unique().tolist())
 
