@@ -8,7 +8,8 @@ explores by adding noise to that output. The readout never sees the target: each
 learns whether the squared error beat its recent average (a Heaviside modulator), and it
 correlates that with its own exploration noise. After training, the model generates the sine on
 its own, without noise, through ``predict_generative``. A paired run without exploration noise
-learns nothing, since the noise is what the rule correlates with the reward.
+learns nothing here: its weights start at zero, so its output never changes and the rule's
+first-difference signal stays zero.
 
 This is a small demonstration of the idea, not a reproduction of the paper's results; the
 outcome is a property of this setup (its reservoir size, spectral radius and learning rate).

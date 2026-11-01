@@ -115,7 +115,11 @@ esn.get_readout().setWeights(weights)
 ## Details
 
 - `act(x, explore=False)` is a noise-free step that changes no learning state; with a readout it
-  equals `predict_online`. `predict` and `predict_generative` are noise-free too.
+  equals `predict_online`. `predict` and `predict_generative` are noise-free too. Before a
+  reward-modulated readout's weights exist, a noise-free step outputs zeros.
+- An exploration `amplitude` of 0 removes the noise but does not stop every rule: with a
+  `"high_pass"` or `"potential"` post signal the weights still change when the inputs change.
+  Use `explore=False` to step without recording eligibility.
 - `reinforce` needs an exploring `act` since the previous update; otherwise it raises
   `RuntimeError` and changes nothing.
 - The first reward of a key with an `"ema"` or `"window"` baseline becomes its own baseline, so it

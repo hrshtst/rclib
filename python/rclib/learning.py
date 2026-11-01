@@ -61,7 +61,10 @@ class Exploration:
         ``"uniform"`` on ``[-amplitude, amplitude]`` or ``"gaussian"`` with standard deviation
         ``amplitude``.
     amplitude : float
-        Scale of the noise; 0 turns exploration off, which stops learning.
+        Scale of the noise. With 0 nothing is perturbed: a rule whose post-synaptic signal is the
+        noise then learns nothing, but ``"high_pass"`` and ``"potential"`` signals still change
+        the weights when the inputs change. To step without recording eligibility at all, use
+        ``ESN.act(x, explore=False)``.
     probability : float
         Probability in ``(0, 1]`` that a unit is perturbed in a row; 1 perturbs every unit in
         every row, and small values give sparse kicks.

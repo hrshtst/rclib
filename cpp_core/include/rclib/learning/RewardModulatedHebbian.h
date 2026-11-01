@@ -43,6 +43,8 @@ struct RewardModulatedHebbianRule {
 
   double learning_rate = 1e-3;
   Distribution noise_distribution = UNIFORM;
+  /// 0 perturbs nothing; NOISE post signals then learn nothing, but HIGH_PASS and POTENTIAL ones
+  /// still change the weights when the inputs change. A noise-free step records no eligibility.
   double noise_amplitude = 0.1;
   /// Probability that a unit is perturbed in a row; 1 perturbs every unit in every row.
   double noise_probability = 1.0;
