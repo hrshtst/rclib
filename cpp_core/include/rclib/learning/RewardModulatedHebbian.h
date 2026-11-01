@@ -7,6 +7,9 @@
 #include <string>
 #include <vector>
 
+class BinaryReader;
+class BinaryWriter;
+
 /// Configuration of a reward-modulated Hebbian rule. A component (readout or reservoir) adds
 /// exploration noise to the potentials of its post-synaptic units, correlates pre-synaptic
 /// activity with a post-synaptic signal into an eligibility, and changes its weights in
@@ -152,6 +155,19 @@ public:
 
   /// S(y) = sign(y) |y|^power.
   static double eligibilityFunction(double y, double power);
+
+  /// Writes the rule and the learning state in the model file format, so that a loaded engine
+  /// continues exactly: the noise generator, the eligibility and covariance with their bounds,
+  /// the post-synaptic average, the baselines and the update count. Staged rows and prepared
+  /// updates are transient and not written. Throws SerializationError.
+  void save(BinaryWriter &writer) const;
+  /// Reads what save() wrote; `stream_salt` and `context` as for the constructor. Throws
+  /// SerializationError on invalid input.
+  static RewardModulatedHebbian load(BinaryReader &reader, std::uint64_t stream_salt, std::string context);
+  /// Checks the rule and that the learning state is one the engine can reach: consistent
+  /// shapes, finite values within their bounds, and baseline histories that fit the rule.
+  /// Saving and loading both run it. Throws SerializationError.
+  void checkConsistency() const;
 
 private:
   struct StagedRow {

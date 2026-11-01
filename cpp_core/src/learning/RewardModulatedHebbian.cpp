@@ -1,5 +1,7 @@
 #include "rclib/learning/RewardModulatedHebbian.h"
 
+#include "rclib/Serialization.h"
+
 #include <cmath>
 #include <stdexcept>
 #include <utility>
@@ -21,6 +23,80 @@ void requirePositive(const std::optional<double> &value, const char *name) {
 }
 
 double maxAbs(const Eigen::RowVectorXd &row) { return row.size() == 0 ? 0.0 : row.cwiseAbs().maxCoeff(); }
+
+// Stable wire codes: the file format must not depend on the enums' declaration order.
+using Rule = RewardModulatedHebbianRule;
+
+std::uint8_t toWire(Rule::Distribution value) { return value == Rule::UNIFORM ? 0 : 1; }
+std::uint8_t toWire(Rule::PostSignal value) { return value == Rule::NOISE ? 0 : value == Rule::HIGH_PASS ? 1 : 2; }
+std::uint8_t toWire(Rule::Update value) { return value == Rule::ONLINE ? 0 : 1; }
+std::uint8_t toWire(Rule::Modulator value) { return value == Rule::DIFFERENCE ? 0 : 1; }
+std::uint8_t toWire(Rule::Baseline value) { return value == Rule::EMA ? 0 : value == Rule::WINDOW ? 1 : 2; }
+
+template <typename Enum> Enum fromWire(std::uint8_t code, std::initializer_list<Enum> values, const char *name) {
+  if (code >= values.size()) {
+    throw SerializationError(std::string("unknown ") + name + " code " + std::to_string(code) + ".");
+  }
+  return *(values.begin() + code);
+}
+
+void writeOptional(BinaryWriter &writer, const std::optional<double> &value) {
+  writer.writeBool(value.has_value());
+  if (value) {
+    writer.writeDouble(*value);
+  }
+}
+
+std::optional<double> readOptional(BinaryReader &reader) {
+  if (!reader.readBool()) {
+    return std::nullopt;
+  }
+  return reader.readDouble();
+}
+
+void writeRule(BinaryWriter &writer, const Rule &rule) {
+  writer.writeDouble(rule.learning_rate);
+  writer.writeU8(toWire(rule.noise_distribution));
+  writer.writeDouble(rule.noise_amplitude);
+  writer.writeDouble(rule.noise_probability);
+  writer.writeUInt(rule.noise_seed);
+  writer.writeU8(toWire(rule.post));
+  writer.writeDouble(rule.post_decay);
+  writer.writeDouble(rule.eligibility_power);
+  writer.writeU8(toWire(rule.update));
+  writer.writeDouble(rule.trace_decay);
+  writer.writeU8(toWire(rule.modulator));
+  writer.writeU8(toWire(rule.baseline));
+  writer.writeDouble(rule.baseline_decay);
+  writer.writeInt(rule.baseline_window);
+  writeOptional(writer, rule.learning_rate_decay_steps);
+  writeOptional(writer, rule.max_update);
+  writeOptional(writer, rule.decorrelation);
+}
+
+Rule readRule(BinaryReader &reader) {
+  Rule rule;
+  rule.learning_rate = reader.readDouble();
+  rule.noise_distribution = fromWire(reader.readU8(), {Rule::UNIFORM, Rule::GAUSSIAN}, "noise_distribution");
+  rule.noise_amplitude = reader.readDouble();
+  rule.noise_probability = reader.readDouble();
+  rule.noise_seed = reader.readUInt();
+  rule.post = fromWire(reader.readU8(), {Rule::NOISE, Rule::HIGH_PASS, Rule::POTENTIAL}, "post");
+  rule.post_decay = reader.readDouble();
+  rule.eligibility_power = reader.readDouble();
+  rule.update = fromWire(reader.readU8(), {Rule::ONLINE, Rule::TRIAL}, "update");
+  rule.trace_decay = reader.readDouble();
+  rule.modulator = fromWire(reader.readU8(), {Rule::DIFFERENCE, Rule::HEAVISIDE}, "modulator");
+  rule.baseline = fromWire(reader.readU8(), {Rule::EMA, Rule::WINDOW, Rule::NONE}, "baseline");
+  rule.baseline_decay = reader.readDouble();
+  rule.baseline_window = reader.readInt();
+  rule.learning_rate_decay_steps = readOptional(reader);
+  rule.max_update = readOptional(reader);
+  rule.decorrelation = readOptional(reader);
+  return rule;
+}
+
+double maxAbs(const Eigen::MatrixXd &matrix) { return matrix.size() == 0 ? 0.0 : matrix.cwiseAbs().maxCoeff(); }
 
 } // namespace
 
@@ -384,4 +460,123 @@ void RewardModulatedHebbian::clearEligibility() {
   eligibility_bound = 0.0;
   covariance_bound = 0.0;
   has_eligibility = false;
+}
+
+void RewardModulatedHebbian::checkConsistency() const {
+  translateSerializationErrors(context.c_str(), [&] {
+    rule.validate();
+    const auto fail_consistency = [&](const std::string &what) { throw SerializationError(context + ": " + what); };
+    if (!initialized) {
+      if (eligibility.size() != 0 || covariance.size() != 0 || post_average.size() != 0 || has_eligibility ||
+          filter_initialized || eligibility_bound != 0.0 || covariance_bound != 0.0) {
+        fail_consistency("an uninitialized learning state holds activity.");
+      }
+    } else {
+      const Eigen::Index n_pre = eligibility.rows();
+      const Eigen::Index n_post = eligibility.cols();
+      if (n_pre < 1 || n_post < 1) {
+        fail_consistency("the eligibility needs at least one row and one column.");
+      }
+      const Eigen::Index covariance_size = rule.decorrelation ? n_pre : 0;
+      if (covariance.rows() != covariance_size || covariance.cols() != covariance_size) {
+        fail_consistency("the covariance does not match the eligibility and the rule.");
+      }
+      if (post_average.size() != n_post) {
+        fail_consistency("the post-synaptic average does not match the eligibility.");
+      }
+      // The bounds guard against overflow, so the matrices they bound must stay within them.
+      if (!eligibility.allFinite() || !(std::isfinite(eligibility_bound) && eligibility_bound >= maxAbs(eligibility))) {
+        fail_consistency("the eligibility is not finite or exceeds its bound.");
+      }
+      if (!covariance.allFinite() || !(std::isfinite(covariance_bound) && covariance_bound >= maxAbs(covariance))) {
+        fail_consistency("the covariance is not finite or exceeds its bound.");
+      }
+      if (!post_average.allFinite()) {
+        fail_consistency("the post-synaptic average is not finite.");
+      }
+    }
+    for (const auto &[key, history] : baselines) {
+      const bool fits = rule.baseline == Rule::EMA ? history.size() == 1
+                        : rule.baseline == Rule::WINDOW
+                            ? !history.empty() && history.size() <= static_cast<std::size_t>(rule.baseline_window)
+                            : false;
+      if (!fits) {
+        fail_consistency("the baseline of key " + std::to_string(key) + " does not fit the rule.");
+      }
+      for (double reward : history) {
+        if (!std::isfinite(reward)) {
+          fail_consistency("the baseline of key " + std::to_string(key) + " is not finite.");
+        }
+      }
+    }
+  });
+}
+
+void RewardModulatedHebbian::save(BinaryWriter &writer) const {
+  translateSerializationErrors(context.c_str(), [&] {
+    checkConsistency();
+    writeRule(writer, rule);
+    writer.writeU64(rng.getState());
+    writer.writeU64(update_count);
+    writer.writeBool(initialized);
+    if (initialized) {
+      writer.writeMatrix(eligibility);
+      writer.writeMatrix(covariance);
+      writer.writeDouble(eligibility_bound);
+      writer.writeDouble(covariance_bound);
+      writer.writeBool(filter_initialized);
+      writer.writeMatrix(post_average);
+      writer.writeBool(has_eligibility);
+    }
+    writer.writeUInt(static_cast<std::uint32_t>(baselines.size()));
+    for (const auto &[key, history] : baselines) {
+      writer.writeInt(key);
+      writer.writeUInt(static_cast<std::uint32_t>(history.size()));
+      for (double reward : history) {
+        writer.writeDouble(reward);
+      }
+    }
+  });
+}
+
+RewardModulatedHebbian RewardModulatedHebbian::load(BinaryReader &reader, std::uint64_t stream_salt,
+                                                    std::string context) {
+  const std::string name = context;
+  return translateSerializationErrors(name.c_str(), [&] {
+    RewardModulatedHebbian engine(readRule(reader), stream_salt, std::move(context)); // validates the rule
+    engine.rng.setState(reader.readU64());
+    engine.update_count = reader.readU64();
+    if (reader.readBool()) {
+      engine.eligibility = reader.readMatrix();
+      engine.covariance = reader.readMatrix();
+      engine.eligibility_bound = reader.readDouble();
+      engine.covariance_bound = reader.readDouble();
+      engine.filter_initialized = reader.readBool();
+      const Eigen::MatrixXd average = reader.readMatrix();
+      if (average.rows() != 1) {
+        throw SerializationError(name + ": the post-synaptic average must be one row.");
+      }
+      engine.post_average = average.row(0);
+      engine.has_eligibility = reader.readBool();
+      engine.initialized = true;
+    }
+    // Each key consumes input, so a bogus count fails at the end of the data.
+    const std::uint32_t n_keys = reader.readUInt();
+    for (std::uint32_t k = 0; k < n_keys; ++k) {
+      const int key = reader.readInt();
+      if (engine.baselines.count(key) != 0) {
+        throw SerializationError(name + ": the baseline of key " + std::to_string(key) + " appears twice.");
+      }
+      const std::uint32_t count = reader.readUInt();
+      if (count > static_cast<std::uint32_t>(engine.rule.baseline_window) || count * 8ULL > reader.remainingBytes()) {
+        throw SerializationError(name + ": the baseline of key " + std::to_string(key) + " is too long.");
+      }
+      std::vector<double> &history = engine.baselines[key];
+      for (std::uint32_t i = 0; i < count; ++i) {
+        history.push_back(reader.readDouble());
+      }
+    }
+    engine.checkConsistency();
+    return engine;
+  });
 }

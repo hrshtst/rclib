@@ -1,5 +1,7 @@
 #include "rclib/readouts/RewardModulatedReadout.h"
 
+#include "rclib/Serialization.h"
+
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -190,4 +192,45 @@ void RewardModulatedReadout::commitUpdate() {
 void RewardModulatedReadout::discardUpdate() {
   prepared_weights.reset();
   learning.discardUpdate();
+}
+
+void RewardModulatedReadout::checkConsistency() const {
+  translateSerializationErrors("RewardModulatedReadout", [&] {
+    if (n_outputs < 1) {
+      throw SerializationError("RewardModulatedReadout: n_outputs must be positive.");
+    }
+    learning.checkConsistency();
+    if (isInitialized() && (W.rows() < 1 + (include_bias ? 1 : 0) || W.cols() != n_outputs ||
+                            learning.getNPre() != W.rows() || learning.getNPost() != W.cols())) {
+      throw SerializationError("RewardModulatedReadout: the weights do not match the outputs or the learning state.");
+    }
+  });
+}
+
+void RewardModulatedReadout::save(BinaryWriter &writer) const {
+  translateSerializationErrors("RewardModulatedReadout", [&] {
+    checkConsistency();
+    writer.writeInt(n_outputs);
+    writer.writeBool(include_bias);
+    learning.save(writer); // the rule, then the learning state
+    if (isInitialized()) {
+      writer.writeMatrix(W);
+    }
+  });
+}
+
+std::shared_ptr<RewardModulatedReadout> RewardModulatedReadout::load(BinaryReader &reader) {
+  return translateSerializationErrors("RewardModulatedReadout", [&] {
+    const int n_outputs = reader.readInt();
+    const bool include_bias = reader.readBool();
+    RewardModulatedHebbian learning =
+        RewardModulatedHebbian::load(reader, readout_stream_salt, "RewardModulatedReadout");
+    auto readout = std::make_shared<RewardModulatedReadout>(n_outputs, learning.getRule(), include_bias); // validates
+    if (learning.isInitialized()) {
+      readout->W = reader.readMatrix();
+    }
+    readout->learning = std::move(learning);
+    readout->checkConsistency();
+    return readout;
+  });
 }

@@ -5,7 +5,10 @@
 
 from __future__ import annotations
 
+import copy
 import math
+import pickle
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -473,3 +476,44 @@ def test_esn_reinforces_the_reservoir_and_the_readout_together() -> None:
     assert esn.get_reservoir(0).getLearning().getUpdateCount() == 1
     assert esn.get_readout().getLearning().getUpdateCount() == 1
     assert not np.array_equal(_dense_weights(esn.get_reservoir(0)), recurrent)
+
+
+def _exercise(esn: ESN) -> list[np.ndarray]:
+    """Explore, reward and step noise-free, returning everything the model produced."""
+    inputs = np.cos(np.linspace(0, 2, 5)).reshape(-1, 1)
+    outputs = [esn.act(inputs)]
+    esn.reinforce(0.4, key=1)
+    outputs.append(esn.act(inputs[:2]))
+    esn.reinforce(-0.2, key=1)
+    outputs.append(esn.act(inputs, explore=False))
+    return outputs
+
+
+@pytest.mark.parametrize("readout", [True, False])
+@pytest.mark.parametrize("method", ["save", "pickle", "deepcopy"])
+def test_reward_modulated_models_continue_identically_after_a_copy(
+    tmp_path: Path, method: str, *, readout: bool
+) -> None:
+    """A saved, pickled or copied model mid-trial rebuilds its configuration and continues exactly."""
+    esn = _plastic_esn(readout=readout)
+    esn.act(np.ones((3, 1)))
+    esn.reinforce(1.0, key=1)
+    esn.act(np.full((2, 1), 0.5))  # mid-trial: the eligibility is pending
+    if method == "save":
+        path = tmp_path / "model.rclib"
+        esn.save(path)
+        restored = ESN.load(path)
+    elif method == "pickle":
+        restored = pickle.loads(pickle.dumps(esn))  # noqa: S301 - data from this test
+    else:
+        restored = copy.deepcopy(esn)
+
+    configs = [*restored._reservoirs_params, restored._readout_params]  # noqa: SLF001
+    expected = [*esn._reservoirs_params, esn._readout_params]  # noqa: SLF001
+    assert [None if c is None else (type(c), vars(c)) for c in configs] == [
+        None if c is None else (type(c), vars(c)) for c in expected
+    ]
+    assert restored._cpp_model.hasReadout() == readout  # noqa: SLF001
+    for restored_output, output in zip(_exercise(restored), _exercise(esn), strict=True):
+        np.testing.assert_array_equal(restored_output, output)
+    assert restored._cpp_model.dumps() == esn._cpp_model.dumps()  # noqa: SLF001

@@ -651,7 +651,8 @@ class ESN:
             esn._reservoirs_params = [
                 _reservoir_config_from_cpp(cpp_model.getReservoir(i)) for i in range(cpp_model.getNumReservoirs())
             ]
-            esn._readout_params = _readout_config_from_cpp(cpp_model.getReadout())
+            # A model without a readout, such as one learning in its reservoirs, has no readout config.
+            esn._readout_params = _readout_config_from_cpp(cpp_model.getReadout()) if cpp_model.hasReadout() else None
         except (TypeError, ValueError) as err:
             msg = f"Invalid model file: {err}"
             raise _rclib.SerializationError(msg) from err

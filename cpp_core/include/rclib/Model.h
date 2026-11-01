@@ -74,9 +74,10 @@ public:
   size_t getNumReservoirs() const { return reservoirs.size(); }
   const std::string &getConnectionType() const { return connection_type; }
 
-  /// Saves the configuration, weights and current reservoir states in the rclib
-  /// model format. Throws SerializationError, before writing anything, if the model
-  /// lacks a reservoir or readout, holds the same reservoir object twice, contains a
+  /// Saves the configuration, weights, current reservoir states and the learning state of
+  /// reward-modulated components in the rclib model format, so that a loaded model continues
+  /// exactly. A model without a readout is saved too. Throws SerializationError, before writing
+  /// anything, if the model lacks a reservoir, holds the same reservoir object twice, contains a
   /// component type other than the built-in ones, or is internally inconsistent.
   void save(std::ostream &os) const;
   /// Saves to a file. The model is written to a new temporary file next to `path`,

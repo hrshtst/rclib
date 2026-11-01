@@ -5,7 +5,11 @@
 #include "rclib/learning/RewardModulatedLearner.h"
 
 #include <Eigen/Dense>
+#include <memory>
 #include <optional>
+
+class BinaryReader;
+class BinaryWriter;
 
 /// A linear readout that learns from rewards instead of targets. Each exploring step adds
 /// exploration noise to the output, z = x W (+ bias row) + noise, and records the eligibility of
@@ -61,6 +65,15 @@ public:
   void discardUpdate() override;
   void clearEligibility() override { learning.clearEligibility(); }
   void resetActivity() override { learning.resetActivity(); }
+
+  /// Writes the hyperparameters, the weights and the learning state in the model file format;
+  /// the type tag is written by Model. Throws SerializationError.
+  void save(BinaryWriter &writer) const;
+  /// Reads a payload written by save(). Throws SerializationError on invalid input.
+  static std::shared_ptr<RewardModulatedReadout> load(BinaryReader &reader);
+  /// Checks that the weights and the learning state are consistent. Saving and loading both
+  /// run it. Throws SerializationError.
+  void checkConsistency() const;
 
 private:
   bool isInitialized() const { return learning.isInitialized(); }

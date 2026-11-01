@@ -1,6 +1,7 @@
 #include "rclib/reservoirs/RewardModulatedReservoir.h"
 
 #include "RandomWeights.h"
+#include "rclib/Serialization.h"
 
 #include <algorithm>
 #include <cmath>
@@ -18,6 +19,49 @@ namespace {
 // Separates this reservoir's noise from a readout's with the same rule and seed, and from that
 // of reservoirs with other weight seeds.
 constexpr std::uint64_t reservoir_stream_salt = 0x5265736572766F69ULL; // "Reservoi"
+
+// Stable wire codes, the same as RandomSparseReservoir's.
+std::uint8_t methodToWire(RandomSparseReservoir::SpectralRadiusMethod method) {
+  return method == RandomSparseReservoir::DENSE ? 1 : 0;
+}
+
+RandomSparseReservoir::SpectralRadiusMethod methodFromWire(std::uint8_t code) {
+  switch (code) {
+    case 0:
+      return RandomSparseReservoir::POWER_ITERATION;
+    case 1:
+      return RandomSparseReservoir::DENSE;
+    default:
+      throw SerializationError("RewardModulatedReservoir: unknown spectral_radius_method code " + std::to_string(code) +
+                               ".");
+  }
+}
+
+void writeMask(BinaryWriter &writer, const std::optional<std::vector<int>> &mask) {
+  writer.writeBool(mask.has_value());
+  if (mask) {
+    writer.writeUInt(static_cast<std::uint32_t>(mask->size()));
+    for (int index : *mask) {
+      writer.writeInt(index);
+    }
+  }
+}
+
+std::optional<std::vector<int>> readMask(BinaryReader &reader) {
+  if (!reader.readBool()) {
+    return std::nullopt;
+  }
+  const std::uint32_t count = reader.readUInt();
+  if (count * 4ULL > reader.remainingBytes()) {
+    throw SerializationError("RewardModulatedReservoir: a plastic neuron list is longer than the data.");
+  }
+  std::vector<int> mask;
+  mask.reserve(count);
+  for (std::uint32_t i = 0; i < count; ++i) {
+    mask.push_back(reader.readInt());
+  }
+  return mask;
+}
 
 std::optional<std::vector<int>> normalizeMask(std::optional<std::vector<int>> mask, int n_neurons, const char *name) {
   if (!mask) {
@@ -45,6 +89,30 @@ std::vector<bool> maskFlags(const std::optional<std::vector<int>> &mask, int n_n
 
 } // namespace
 
+std::uint64_t RewardModulatedReservoir::streamSalt(unsigned int seed) {
+  return reservoir_stream_salt ^ (static_cast<std::uint64_t>(seed) << 32);
+}
+
+RewardModulatedReservoir::RewardModulatedReservoir(NoWeights, int n_neurons, double spectral_radius, double sparsity,
+                                                   double leak_rate, double input_scaling, bool include_bias,
+                                                   unsigned int seed,
+                                                   RandomSparseReservoir::SpectralRadiusMethod spectral_radius_method,
+                                                   double bias_scaling, RewardModulatedHebbian learning,
+                                                   std::optional<std::vector<int>> plastic_presynaptic,
+                                                   std::optional<std::vector<int>> plastic_postsynaptic)
+    : n_neurons(n_neurons), spectral_radius(spectral_radius), sparsity(sparsity), leak_rate(leak_rate),
+      input_scaling(input_scaling), include_bias(include_bias), seed(seed),
+      spectral_radius_method(spectral_radius_method), bias_scaling(bias_scaling),
+      plastic_presynaptic(std::move(plastic_presynaptic)), plastic_postsynaptic(std::move(plastic_postsynaptic)),
+      learning(std::move(learning)) {
+  validateParameters();
+  this->plastic_presynaptic = normalizeMask(std::move(this->plastic_presynaptic), n_neurons, "plastic_presynaptic");
+  this->plastic_postsynaptic = normalizeMask(std::move(this->plastic_postsynaptic), n_neurons, "plastic_postsynaptic");
+  state = Eigen::MatrixXd::Zero(1, n_neurons);
+  potential = Eigen::MatrixXd::Zero(1, n_neurons);
+  drive = Eigen::MatrixXd::Zero(1, n_neurons);
+}
+
 RewardModulatedReservoir::RewardModulatedReservoir(int n_neurons, double spectral_radius, double sparsity,
                                                    double leak_rate, double input_scaling, bool include_bias,
                                                    unsigned int seed,
@@ -52,22 +120,15 @@ RewardModulatedReservoir::RewardModulatedReservoir(int n_neurons, double spectra
                                                    double bias_scaling, const RewardModulatedHebbianRule &rule,
                                                    std::optional<std::vector<int>> plastic_presynaptic,
                                                    std::optional<std::vector<int>> plastic_postsynaptic)
-    : n_neurons(n_neurons), spectral_radius(spectral_radius), sparsity(sparsity), leak_rate(leak_rate),
-      input_scaling(input_scaling), include_bias(include_bias), seed(seed),
-      spectral_radius_method(spectral_radius_method), bias_scaling(bias_scaling),
-      plastic_presynaptic(std::move(plastic_presynaptic)), plastic_postsynaptic(std::move(plastic_postsynaptic)),
-      learning(rule, reservoir_stream_salt ^ (static_cast<std::uint64_t>(seed) << 32), "RewardModulatedReservoir") {
-  validateParameters();
-  this->plastic_presynaptic = normalizeMask(std::move(this->plastic_presynaptic), n_neurons, "plastic_presynaptic");
-  this->plastic_postsynaptic = normalizeMask(std::move(this->plastic_postsynaptic), n_neurons, "plastic_postsynaptic");
-
+    : RewardModulatedReservoir(NoWeights{}, n_neurons, spectral_radius, sparsity, leak_rate, input_scaling,
+                               include_bias, seed, spectral_radius_method, bias_scaling,
+                               RewardModulatedHebbian(rule, streamSalt(seed), "RewardModulatedReservoir"),
+                               std::move(plastic_presynaptic), std::move(plastic_postsynaptic)) {
   random_weights::RecurrentWeights weights =
       random_weights::generateRecurrentWeights(n_neurons, spectral_radius, sparsity, include_bias, seed,
                                                spectral_radius_method, bias_scaling, "RewardModulatedReservoir");
   W_res = std::move(weights.W_res);
   bias = std::move(weights.bias);
-  state = Eigen::MatrixXd::Zero(1, n_neurons);
-  potential = Eigen::MatrixXd::Zero(1, n_neurons);
   learning.initialize(n_neurons, n_neurons);
 }
 
@@ -111,7 +172,6 @@ void RewardModulatedReservoir::step(const Eigen::MatrixXd &input, const Eigen::R
   if (!W_in_initialized) {
     W_in = random_weights::generateInputWeights(static_cast<int>(input.cols()), n_neurons, input_scaling, seed);
     W_in_initialized = true;
-    drive.resize(1, n_neurons);
   } else if (input.cols() != W_in.rows()) {
     throw std::invalid_argument("input dimension changed after RewardModulatedReservoir initialization.");
   }
@@ -266,4 +326,98 @@ void RewardModulatedReservoir::commitUpdate() {
 void RewardModulatedReservoir::discardUpdate() {
   prepared_values.reset();
   learning.discardUpdate();
+}
+
+void RewardModulatedReservoir::checkConsistency() const {
+  translateSerializationErrors("RewardModulatedReservoir", [&] {
+    validateParameters();
+    for (const auto *mask : {&plastic_presynaptic, &plastic_postsynaptic}) {
+      if (*mask && normalizeMask(*mask, n_neurons, "a plastic neuron list") != *mask) {
+        throw SerializationError("RewardModulatedReservoir: a plastic neuron list is not sorted.");
+      }
+    }
+    const auto n = static_cast<Eigen::Index>(n_neurons);
+    if (W_res.rows() != n || W_res.cols() != n) {
+      throw SerializationError("RewardModulatedReservoir: W_res must be n_neurons x n_neurons.");
+    }
+    if (bias.size() != n || state.rows() != 1 || state.cols() != n || potential.rows() != 1 || potential.cols() != n) {
+      throw SerializationError("RewardModulatedReservoir: bias, state and potential must have n_neurons entries.");
+    }
+    if (W_in_initialized && (W_in.rows() < 1 || W_in.cols() != n)) {
+      throw SerializationError("RewardModulatedReservoir: W_in must have at least one row and n_neurons columns.");
+    }
+    learning.checkConsistency();
+    if (!learning.isInitialized() || learning.getNPre() != n || learning.getNPost() != n) {
+      throw SerializationError("RewardModulatedReservoir: the learning state does not match the neurons.");
+    }
+  });
+}
+
+void RewardModulatedReservoir::save(BinaryWriter &writer) const {
+  translateSerializationErrors("RewardModulatedReservoir", [&] {
+    checkConsistency();
+    writer.writeInt(n_neurons);
+    writer.writeDouble(spectral_radius);
+    writer.writeDouble(sparsity);
+    writer.writeDouble(leak_rate);
+    writer.writeDouble(input_scaling);
+    writer.writeBool(include_bias);
+    writer.writeUInt(seed);
+    writer.writeU8(methodToWire(spectral_radius_method));
+    writer.writeDouble(bias_scaling);
+    writeMask(writer, plastic_presynaptic);
+    writeMask(writer, plastic_postsynaptic);
+    writer.writeSparse(W_res);
+    writer.writeMatrix(bias);
+    writer.writeMatrix(state);
+    writer.writeMatrix(potential);
+    writer.writeBool(W_in_initialized);
+    if (W_in_initialized) {
+      writer.writeMatrix(W_in);
+    }
+    learning.save(writer);
+  });
+}
+
+std::shared_ptr<RewardModulatedReservoir> RewardModulatedReservoir::load(BinaryReader &reader) {
+  return translateSerializationErrors("RewardModulatedReservoir", [&] {
+    const int n_neurons = reader.readInt();
+    const double spectral_radius = reader.readDouble();
+    const double sparsity = reader.readDouble();
+    const double leak_rate = reader.readDouble();
+    const double input_scaling = reader.readDouble();
+    const bool include_bias = reader.readBool();
+    const unsigned int seed = reader.readUInt();
+    const RandomSparseReservoir::SpectralRadiusMethod method = methodFromWire(reader.readU8());
+    const double bias_scaling = reader.readDouble();
+    std::optional<std::vector<int>> presynaptic = readMask(reader);
+    std::optional<std::vector<int>> postsynaptic = readMask(reader);
+    Eigen::SparseMatrix<double> W_res = reader.readSparse();
+    const Eigen::MatrixXd bias = reader.readMatrix();
+    Eigen::MatrixXd state = reader.readMatrix();
+    Eigen::MatrixXd potential = reader.readMatrix();
+    const bool W_in_initialized = reader.readBool();
+    Eigen::MatrixXd W_in;
+    if (W_in_initialized) {
+      W_in = reader.readMatrix();
+    }
+    RewardModulatedHebbian learning =
+        RewardModulatedHebbian::load(reader, streamSalt(seed), "RewardModulatedReservoir");
+    if (bias.rows() != 1) {
+      throw SerializationError("RewardModulatedReservoir: the bias must be one row.");
+    }
+    // The private constructor validates the hyperparameters and masks and draws nothing.
+    std::shared_ptr<RewardModulatedReservoir> reservoir(new RewardModulatedReservoir(
+        NoWeights{}, n_neurons, spectral_radius, sparsity, leak_rate, input_scaling, include_bias, seed, method,
+        bias_scaling, std::move(learning), std::move(presynaptic), std::move(postsynaptic)));
+    reservoir->W_res = std::move(W_res);
+    reservoir->W_res.makeCompressed();
+    reservoir->bias = bias.row(0);
+    reservoir->state = std::move(state);
+    reservoir->potential = std::move(potential);
+    reservoir->W_in = std::move(W_in);
+    reservoir->W_in_initialized = W_in_initialized;
+    reservoir->checkConsistency();
+    return reservoir;
+  });
 }

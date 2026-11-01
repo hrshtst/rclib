@@ -1,10 +1,12 @@
 #include "rclib/Model.h"
 #include "rclib/Serialization.h"
 #include "rclib/readouts/LmsReadout.h"
+#include "rclib/readouts/RewardModulatedReadout.h"
 #include "rclib/readouts/RidgeReadout.h"
 #include "rclib/readouts/RlsReadout.h"
 #include "rclib/reservoirs/NvarReservoir.h"
 #include "rclib/reservoirs/RandomSparseReservoir.h"
+#include "rclib/reservoirs/RewardModulatedReservoir.h"
 
 #include <cerrno>
 #include <cstdint>
@@ -33,6 +35,10 @@ constexpr const char *nvar_tag = "NvarReservoir";
 constexpr const char *ridge_tag = "RidgeReadout";
 constexpr const char *rls_tag = "RlsReadout";
 constexpr const char *lms_tag = "LmsReadout";
+// Tags added in version 4; earlier versions reject them as unknown, as builds that wrote them did.
+constexpr const char *reward_modulated_reservoir_tag = "RewardModulatedReservoir";
+constexpr const char *reward_modulated_readout_tag = "RewardModulatedReadout";
+constexpr std::uint32_t reward_modulated_version = 4;
 
 // Calls action(concrete, tag) with the reservoir cast to its built-in type. Types
 // are matched exactly, so a user subclass of a built-in type is rejected rather
@@ -42,9 +48,11 @@ template <typename Action> void visitReservoir(const Reservoir &reservoir, Actio
     action(static_cast<const RandomSparseReservoir &>(reservoir), random_sparse_tag);
   } else if (typeid(reservoir) == typeid(NvarReservoir)) {
     action(static_cast<const NvarReservoir &>(reservoir), nvar_tag);
+  } else if (typeid(reservoir) == typeid(RewardModulatedReservoir)) {
+    action(static_cast<const RewardModulatedReservoir &>(reservoir), reward_modulated_reservoir_tag);
   } else {
-    throw SerializationError("Model: unsupported reservoir type; only RandomSparseReservoir and NvarReservoir can be "
-                             "saved.");
+    throw SerializationError("Model: unsupported reservoir type; only RandomSparseReservoir, NvarReservoir and "
+                             "RewardModulatedReservoir can be saved.");
   }
 }
 
@@ -55,9 +63,11 @@ template <typename Action> void visitReadout(const Readout &readout, Action &&ac
     action(static_cast<const RlsReadout &>(readout), rls_tag);
   } else if (typeid(readout) == typeid(LmsReadout)) {
     action(static_cast<const LmsReadout &>(readout), lms_tag);
+  } else if (typeid(readout) == typeid(RewardModulatedReadout)) {
+    action(static_cast<const RewardModulatedReadout &>(readout), reward_modulated_readout_tag);
   } else {
-    throw SerializationError("Model: unsupported readout type; only RidgeReadout, RlsReadout and LmsReadout can be "
-                             "saved.");
+    throw SerializationError("Model: unsupported readout type; only RidgeReadout, RlsReadout, LmsReadout and "
+                             "RewardModulatedReadout can be saved.");
   }
 }
 
@@ -68,6 +78,9 @@ std::shared_ptr<Reservoir> loadReservoir(BinaryReader &reader) {
   }
   if (tag == nvar_tag) {
     return NvarReservoir::load(reader);
+  }
+  if (tag == reward_modulated_reservoir_tag && reader.formatVersion() >= reward_modulated_version) {
+    return RewardModulatedReservoir::load(reader);
   }
   throw SerializationError("Model: unknown reservoir type tag '" + tag + "'.");
 }
@@ -83,6 +96,9 @@ std::shared_ptr<Readout> loadReadout(BinaryReader &reader) {
   if (tag == lms_tag) {
     return LmsReadout::load(reader);
   }
+  if (tag == reward_modulated_readout_tag && reader.formatVersion() >= reward_modulated_version) {
+    return RewardModulatedReadout::load(reader);
+  }
   throw SerializationError("Model: unknown readout type tag '" + tag + "'.");
 }
 
@@ -91,6 +107,7 @@ std::shared_ptr<Readout> loadReadout(BinaryReader &reader) {
 // its first input; NVAR's width depends on its input width.
 int outputWidth(const RandomSparseReservoir &reservoir, int /*input*/) { return reservoir.getNNeurons(); }
 int outputWidth(const NvarReservoir &reservoir, int input) { return input > 0 ? reservoir.getOutputDim(input) : 0; }
+int outputWidth(const RewardModulatedReservoir &reservoir, int /*input*/) { return reservoir.getNNeurons(); }
 
 int knownOutputWidth(const Reservoir &reservoir, int input) {
   int width = 0;
@@ -101,7 +118,7 @@ int knownOutputWidth(const Reservoir &reservoir, int input) {
 // Threads widths through the model. getInputDim() is the width a component is
 // locked to and knownOutputWidth() the width a reservoir produces; 0 means not
 // known yet, which skips the checks that need that width.
-void checkTopology(const std::vector<std::shared_ptr<Reservoir>> &reservoirs, bool parallel, const Readout &readout) {
+void checkTopology(const std::vector<std::shared_ptr<Reservoir>> &reservoirs, bool parallel, const Readout *readout) {
   std::int64_t features = 0; // width reaching the readout
   if (parallel) {
     int input = 0; // shared by every reservoir
@@ -135,7 +152,7 @@ void checkTopology(const std::vector<std::shared_ptr<Reservoir>> &reservoirs, bo
     features = sumFeatureWidths({width});
   }
 
-  const int readout_width = readout.getInputDim();
+  const int readout_width = readout != nullptr ? readout->getInputDim() : 0;
   if (readout_width > 0 && features > 0 && readout_width != features) {
     throw SerializationError("Model: the readout is fitted to " + std::to_string(readout_width) +
                              " features but the reservoirs output " + std::to_string(features) + ".");
@@ -187,14 +204,17 @@ std::FILE *createTemporaryFile(const std::string &path, std::string &temporary_p
 // Checks shared by save and load, so that everything save() accepts load() accepts.
 void checkModel(const std::vector<std::shared_ptr<Reservoir>> &reservoirs, const std::string &connection_type,
                 const std::shared_ptr<Readout> &readout) {
-  if (reservoirs.empty() || !readout) {
-    throw SerializationError("Model: a model needs at least one reservoir and a readout.");
+  if (reservoirs.empty()) {
+    throw SerializationError("Model: a model needs at least one reservoir.");
   }
   for (const auto &reservoir : reservoirs) {
     visitReservoir(*reservoir, [](const auto &concrete, const char * /*tag*/) { concrete.checkConsistency(); });
   }
-  visitReadout(*readout, [](const auto &concrete, const char * /*tag*/) { concrete.checkConsistency(); });
-  checkTopology(reservoirs, connection_type == "parallel", *readout);
+  // A model without a readout acts with its reservoir states, as reward-modulated reservoirs do.
+  if (readout) {
+    visitReadout(*readout, [](const auto &concrete, const char * /*tag*/) { concrete.checkConsistency(); });
+  }
+  checkTopology(reservoirs, connection_type == "parallel", readout.get());
 }
 
 // Everything save() checks before writing: the shared checks plus the save-only ones.
@@ -227,10 +247,13 @@ void Model::save(std::ostream &os) const {
         concrete.save(writer);
       });
     }
-    visitReadout(*readout, [&](const auto &concrete, const char *tag) {
-      writer.writeString(tag);
-      concrete.save(writer);
-    });
+    writer.writeBool(readout != nullptr);
+    if (readout) {
+      visitReadout(*readout, [&](const auto &concrete, const char *tag) {
+        writer.writeString(tag);
+        concrete.save(writer);
+      });
+    }
   });
 }
 
@@ -251,7 +274,10 @@ Model Model::load(std::istream &is) {
     for (std::uint32_t i = 0; i < n_reservoirs; ++i) {
       model.reservoirs.push_back(loadReservoir(reader));
     }
-    model.readout = loadReadout(reader);
+    // Before version 4 every model has a readout; from then on a flag tells.
+    if (reader.formatVersion() < reward_modulated_version || reader.readBool()) {
+      model.readout = loadReadout(reader);
+    }
     if (reader.remainingBytes() != 0) {
       throw SerializationError("Model: unexpected data after the end of the model.");
     }

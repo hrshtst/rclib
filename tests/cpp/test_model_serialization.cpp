@@ -305,11 +305,7 @@ TEST_CASE("Model serialization - models that cannot be saved", "[serialization][
 
   SECTION("No reservoir") {
     model.setReadout(std::make_shared<RidgeReadout>());
-    expected_message = "at least one reservoir and a readout";
-  }
-  SECTION("No readout") {
-    model.addReservoir(std::make_shared<NvarReservoir>(2));
-    expected_message = "at least one reservoir and a readout";
+    expected_message = "at least one reservoir";
   }
   SECTION("The same reservoir object twice") {
     auto reservoir = std::make_shared<RandomSparseReservoir>(5, 0.9);
@@ -372,7 +368,9 @@ TEST_CASE("Model serialization - invalid model files are rejected", "[serializat
   RidgeReadout unfitted_ridge;
   RidgeReadout ridge_7;
   ridge_7.fit(Eigen::MatrixXd::Random(10, 7), Eigen::MatrixXd::Random(10, 1));
+  // From version 4, a flag before the readout tells whether the model has one.
   const auto write_ridge = [&](BinaryWriter &writer, const RidgeReadout &readout) {
+    writer.writeBool(true);
     writer.writeString("RidgeReadout");
     readout.save(writer);
   };
@@ -421,6 +419,7 @@ TEST_CASE("Model serialization - invalid model files are rejected", "[serializat
       writer.writeU8(0);
       writer.writeUInt(1);
       write_random_sparse(writer, *locked_random_sparse(5, 1));
+      writer.writeBool(true);
       writer.writeString("KernelReadout");
     });
     expected_message = "unknown readout type tag";
@@ -573,7 +572,7 @@ TEST_CASE("Model serialization - a rejected save keeps the existing file", "[ser
   const std::string checkpoint = readFile(path);
 
   Model model;
-  SECTION("No readout") { model.addReservoir(std::make_shared<NvarReservoir>(2)); }
+  SECTION("No reservoir") { model.setReadout(std::make_shared<RidgeReadout>()); }
   SECTION("The same reservoir object twice") {
     auto reservoir = std::make_shared<RandomSparseReservoir>(5, 0.9);
     model.addReservoir(reservoir);

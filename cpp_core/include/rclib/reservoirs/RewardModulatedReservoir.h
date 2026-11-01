@@ -7,8 +7,12 @@
 
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
+#include <memory>
 #include <optional>
 #include <vector>
+
+class BinaryReader;
+class BinaryWriter;
 
 /// A random sparse reservoir whose recurrent weights learn from rewards. Its neurons integrate
 /// a potential v and fire at the rate r = tanh(v), with the state and input as row vectors:
@@ -87,7 +91,25 @@ public:
   void clearEligibility() override { learning.clearEligibility(); }
   void resetActivity() override { learning.resetActivity(); }
 
+  /// Writes the hyperparameters, the weights, the activity and the learning state in the model
+  /// file format; the type tag is written by Model. Throws SerializationError.
+  void save(BinaryWriter &writer) const;
+  /// Reads a payload written by save(). Throws SerializationError on invalid input.
+  static std::shared_ptr<RewardModulatedReservoir> load(BinaryReader &reader);
+  /// Checks the hyperparameters and that the weights, activity and learning state are
+  /// consistent. Saving and loading both run it. Throws SerializationError.
+  void checkConsistency() const;
+
 private:
+  struct NoWeights {};
+  /// Sets and checks the hyperparameters and masks without drawing weights; used by the public
+  /// constructor, which then draws them, and by load(), which reads them.
+  RewardModulatedReservoir(NoWeights, int n_neurons, double spectral_radius, double sparsity, double leak_rate,
+                           double input_scaling, bool include_bias, unsigned int seed,
+                           RandomSparseReservoir::SpectralRadiusMethod spectral_radius_method, double bias_scaling,
+                           RewardModulatedHebbian learning, std::optional<std::vector<int>> plastic_presynaptic,
+                           std::optional<std::vector<int>> plastic_postsynaptic);
+  static std::uint64_t streamSalt(unsigned int seed);
   void validateParameters() const;
   void checkInputs(const Eigen::MatrixXd &inputs) const;
   /// Computes the potential and rates of one row: noise-free, or with `noise` staging the row.
