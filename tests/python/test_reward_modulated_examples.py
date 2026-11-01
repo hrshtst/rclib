@@ -93,3 +93,25 @@ def test_delayed_response_needs_a_supralinear_eligibility() -> None:
                 answered.append(example.evaluate(esn)[0])
     _assert_lower(final_errors["cube"], final_errors["linear"], margin=0.2)
     assert sum(correct == 2 for correct in answered) >= MIN_WINS  # noqa: PLR2004
+
+
+def test_body_control_tracks_better_with_decorrelation() -> None:
+    """Burms et al.: with an equal learning-rate search, the decorrelated rule tracks better.
+
+    Each rule picks its learning rate from five values spaced by a factor of two, by the median
+    final error on separate tuning seeds, and is then evaluated on the evaluation seeds.
+    """
+    example = _load_example("reward_modulated_body_control")
+    trials = 200
+    grids = {"plain": (0.25, 0.5, 1.0, 2.0, 4.0), "decorrelated": (25.0, 50.0, 100.0, 200.0, 400.0)}
+    tuning_seeds = (100, 101, 102)
+
+    def final_error(learning_rate: float, seed: int, name: str) -> float:
+        rule = example.rule(learning_rate, seed, decorrelated=name == "decorrelated")
+        return float(example.train(rule, trials)[1])
+
+    final_errors = {}
+    for name, grid in grids.items():
+        chosen = min(grid, key=lambda rate: np.median([final_error(rate, seed, name) for seed in tuning_seeds]))
+        final_errors[name] = [final_error(chosen, seed, name) for seed in SEEDS]
+    _assert_lower(final_errors["decorrelated"], final_errors["plain"], margin=0.005)
