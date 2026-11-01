@@ -4,6 +4,7 @@
 #include "rclib/readouts/RidgeReadout.h"
 #include "rclib/reservoirs/NvarReservoir.h"
 #include "rclib/reservoirs/RandomSparseReservoir.h"
+#include "rclib/reservoirs/RewardModulatedReservoir.h"
 
 #include <Eigen/Dense>
 #include <catch2/catch_all.hpp>
@@ -210,4 +211,88 @@ TEST_CASE("Model - resetReservoirs restarts the readout's post-synaptic average"
   REQUIRE_FALSE(readout->getLearning().isPostAverageInitialized());
   model.act(ramp(1, 1, 0.4));
   REQUIRE(readout->getLearning().getEligibility().isZero(0.0));
+}
+
+namespace {
+
+std::shared_ptr<RewardModulatedReservoir> plasticReservoir(int n, unsigned int seed, const Rule &rule = onlineRule()) {
+  return std::make_shared<RewardModulatedReservoir>(n, 0.9, 0.5, 0.5, 1.0, true, seed,
+                                                    RandomSparseReservoir::POWER_ITERATION, 1.0, rule);
+}
+
+} // namespace
+
+TEST_CASE("Model - a reward-modulated reservoir listed twice is rejected", "[Model][reward]") {
+  auto shared = plasticReservoir(5, 11);
+  const std::string connection = GENERATE(std::string("serial"), std::string("parallel"));
+  Model model;
+  model.addReservoir(shared, connection);
+  model.addReservoir(shared, connection);
+  const Eigen::MatrixXd weights = shared->getRecurrentWeights();
+  REQUIRE_THROWS_AS(model.act(ramp(1, 5, 0.0)), std::logic_error);
+  REQUIRE_THROWS_AS(model.reinforce(1.0), std::logic_error);
+  REQUIRE_THROWS_AS(model.modulate(1.0), std::logic_error);
+  REQUIRE_THROWS_AS(model.clearEligibility(), std::logic_error);
+  REQUIRE(Eigen::MatrixXd(shared->getRecurrentWeights()) == weights);
+  REQUIRE_FALSE(shared->getLearning().hasEligibility());
+  REQUIRE(shared->getInputDim() == 0);
+}
+
+TEST_CASE("Model - an update fails on all learners when one fails", "[Model][reward]") {
+  auto reservoir = plasticReservoir(8, 12);
+  Rule huge = onlineRule();
+  huge.learning_rate = 1e308;
+  auto readout = std::make_shared<RewardModulatedReadout>(1, huge, true);
+  Model model;
+  model.addReservoir(reservoir);
+  model.setReadout(readout);
+  model.act(ramp(3, 1, 0.0));
+  const Eigen::MatrixXd recurrent = reservoir->getRecurrentWeights();
+  const Eigen::MatrixXd eligibility = reservoir->getLearning().getEligibility();
+  const Eigen::MatrixXd readout_weights = readout->getWeights();
+  // The reservoir's update is fine, the readout's overflows, so neither applies.
+  REQUIRE_THROWS_AS(model.reinforce(5.0), std::runtime_error);
+  REQUIRE(Eigen::MatrixXd(reservoir->getRecurrentWeights()) == recurrent);
+  REQUIRE(reservoir->getLearning().getEligibility() == eligibility);
+  REQUIRE(reservoir->getLearning().hasEligibility());
+  REQUIRE(reservoir->getLearning().getUpdateCount() == 0);
+  REQUIRE(readout->getWeights() == readout_weights);
+  REQUIRE(readout->getLearning().getUpdateCount() == 0);
+}
+
+TEST_CASE("Model - parallel reward-modulated reservoirs act and learn as they do alone", "[Model][reward]") {
+  Model model;
+  auto first = plasticReservoir(12, 13);
+  auto second = plasticReservoir(9, 14);
+  model.addReservoir(first, "parallel");
+  model.addReservoir(second, "parallel");
+  auto first_alone = plasticReservoir(12, 13);
+  auto second_alone = plasticReservoir(9, 14);
+
+  const Eigen::MatrixXd inputs = ramp(4, 2, 0.2);
+  const Eigen::MatrixXd states = model.act(inputs);
+  REQUIRE(states.leftCols(12) == first_alone->act(inputs));
+  REQUIRE(states.rightCols(9) == second_alone->act(inputs));
+  model.reinforce(0.5);
+  first_alone->reinforce(0.5);
+  second_alone->reinforce(0.5);
+  REQUIRE(Eigen::MatrixXd(first->getRecurrentWeights()) == Eigen::MatrixXd(first_alone->getRecurrentWeights()));
+  REQUIRE(Eigen::MatrixXd(second->getRecurrentWeights()) == Eigen::MatrixXd(second_alone->getRecurrentWeights()));
+  REQUIRE(model.act(inputs, false) ==
+          (Eigen::MatrixXd(4, 21) << first_alone->act(inputs, false), second_alone->act(inputs, false)).finished());
+}
+
+TEST_CASE("Model - a model without a readout learns in its reservoir", "[Model][reward]") {
+  Model model;
+  auto reservoir = plasticReservoir(10, 15);
+  model.addReservoir(reservoir);
+  const Eigen::MatrixXd recurrent = reservoir->getRecurrentWeights();
+  const Eigen::MatrixXd rates = model.act(ramp(3, 1, 0.0));
+  REQUIRE(rates.cols() == 10);
+  model.reinforce(1.0);
+  REQUIRE(Eigen::MatrixXd(reservoir->getRecurrentWeights()) != recurrent);
+  model.act(ramp(2, 1, 0.3));
+  model.resetReservoirs();
+  REQUIRE(reservoir->getState().isZero(0.0));
+  REQUIRE(reservoir->getLearning().hasEligibility()); // a reset keeps the eligibility
 }

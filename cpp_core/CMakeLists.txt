@@ -18,6 +18,7 @@ add_library(
   src/learning/RewardModulatedHebbian.cpp
   src/reservoirs/RandomSparseReservoir.cpp
   src/reservoirs/RandomWeights.cpp
+  src/reservoirs/RewardModulatedReservoir.cpp
   src/reservoirs/NvarReservoir.cpp
   src/readouts/RidgeReadout.cpp
   src/readouts/RlsReadout.cpp

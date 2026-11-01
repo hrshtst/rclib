@@ -57,6 +57,10 @@ add_executable(test_reward_modulated_readout test_reward_modulated_readout.cpp)
 target_link_libraries(test_reward_modulated_readout PRIVATE rclib_core Catch2::Catch2WithMain)
 catch_discover_tests(test_reward_modulated_readout)
 
+add_executable(test_reward_modulated_reservoir test_reward_modulated_reservoir.cpp)
+target_link_libraries(test_reward_modulated_reservoir PRIVATE rclib_core Catch2::Catch2WithMain)
+catch_discover_tests(test_reward_modulated_reservoir)
+
 add_executable(test_model_reward_modulated test_model_reward_modulated.cpp)
 target_link_libraries(test_model_reward_modulated PRIVATE rclib_core Catch2::Catch2WithMain)
 catch_discover_tests(test_model_reward_modulated)
