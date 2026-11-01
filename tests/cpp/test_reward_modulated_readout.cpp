@@ -322,3 +322,36 @@ TEST_CASE("RewardModulatedReadout - learns a linear map from rewards alone", "[R
   }
   REQUIRE(error(probe) < initial / 10.0);
 }
+
+TEST_CASE("RewardModulatedReadout - a failed first step leaves the readout unset", "[RewardModulatedReadout]") {
+  Rule rule;
+  rule.post = Rule::NOISE;
+  rule.eligibility_power = 3.0; // 1e200 cubed overflows
+  RewardModulatedReadout readout(1, rule, true);
+  const std::uint64_t noise_state = readout.getLearning().getNoiseState();
+  const bool explicit_noise = GENERATE(false, true);
+  if (explicit_noise) {
+    REQUIRE_THROWS_AS(readout.act(Eigen::MatrixXd::Constant(1, 3, 1e200), Eigen::MatrixXd::Constant(1, 1, 0.1)),
+                      std::runtime_error);
+  } else {
+    REQUIRE_THROWS_AS(readout.act(Eigen::MatrixXd::Constant(1, 3, 1e200)), std::runtime_error);
+  }
+  REQUIRE(readout.getInputDim() == 0);
+  REQUIRE_FALSE(readout.getLearning().isInitialized());
+  REQUIRE(readout.getLearning().getEligibility().size() == 0);
+  REQUIRE(readout.getLearning().getNoiseState() == noise_state);
+  REQUIRE_THROWS_AS(readout.getWeights(), std::runtime_error);
+  // The feature width is still open.
+  readout.act(Eigen::MatrixXd::Ones(1, 2));
+  REQUIRE(readout.getInputDim() == 2);
+}
+
+TEST_CASE("RewardModulatedReadout - a noise-free step before the weights exist changes nothing",
+          "[RewardModulatedReadout]") {
+  RewardModulatedReadout readout(2, Rule{}, true);
+  const std::uint64_t noise_state = readout.getLearning().getNoiseState();
+  REQUIRE(readout.act(Eigen::MatrixXd::Ones(3, 4), false) == Eigen::MatrixXd::Zero(3, 2));
+  REQUIRE(readout.getInputDim() == 0);
+  REQUIRE_FALSE(readout.getLearning().isInitialized());
+  REQUIRE(readout.getLearning().getNoiseState() == noise_state);
+}

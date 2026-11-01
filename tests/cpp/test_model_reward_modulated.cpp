@@ -330,3 +330,15 @@ TEST_CASE("Model - a non-finite output from any readout fails the row", "[Model]
     REQUIRE_THROWS_AS(model.act(Eigen::MatrixXd::Constant(1, 1, 1e200), explore), std::runtime_error);
   }
 }
+
+TEST_CASE("Model - a failed first row leaves a reward-modulated readout unset", "[Model][reward]") {
+  Rule rule = onlineRule();
+  rule.eligibility_power = 3.0;
+  auto readout = std::make_shared<RewardModulatedReadout>(1, rule, true);
+  Model model;
+  model.addReservoir(std::make_shared<NvarReservoir>(1, 1));
+  model.setReadout(readout);
+  REQUIRE_THROWS_AS(model.act(Eigen::MatrixXd::Constant(1, 2, 1e200)), std::runtime_error);
+  REQUIRE(readout->getInputDim() == 0);
+  REQUIRE_FALSE(readout->getLearning().isInitialized());
+}

@@ -31,9 +31,11 @@ public:
 
   /// Computes the output of each row in order. With `explore`, adds exploration noise and
   /// records each row's eligibility; without it, the output is noise-free and no learning state
-  /// changes. Rows must be finite (std::invalid_argument, nothing changes). A row whose output
-  /// or eligibility is not finite throws std::runtime_error; earlier rows stay applied and the
-  /// failing row changes no learning state.
+  /// changes (before the weights exist it is zero, what the first exploring step starts from).
+  /// Rows must be finite (std::invalid_argument, nothing changes). A row whose output or
+  /// eligibility is not finite throws std::runtime_error; earlier rows stay applied and the
+  /// failing row changes no learning state. If it is the first, the weights are not created and
+  /// the feature width stays open.
   Eigen::MatrixXd act(const Eigen::MatrixXd &states, bool explore = true);
   /// Explores with the given noise, (rows, n_outputs), instead of drawing it.
   Eigen::MatrixXd act(const Eigen::MatrixXd &states, const Eigen::MatrixXd &noise);
@@ -81,6 +83,8 @@ private:
   void checkStates(const Eigen::MatrixXd &states) const;
   Eigen::RowVectorXd withBias(const Eigen::RowVectorXd &state) const;
   Eigen::RowVectorXd stage(const Eigen::RowVectorXd &state, const Eigen::RowVectorXd &noise, bool explore);
+  /// Runs a staging step, creating the weights first if needed and removing them again if it fails.
+  template <typename Body> Eigen::RowVectorXd initializingFor(Eigen::Index n_features, Body &&body);
   void prepareWeights();
 
   int n_outputs;

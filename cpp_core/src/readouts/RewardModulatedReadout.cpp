@@ -88,14 +88,35 @@ Eigen::RowVectorXd RewardModulatedReadout::stage(const Eigen::RowVectorXd &state
   return output;
 }
 
+template <typename Body>
+Eigen::RowVectorXd RewardModulatedReadout::initializingFor(Eigen::Index n_features, Body &&body) {
+  if (isInitialized()) {
+    return body();
+  }
+  // The first exploring step creates the weights and the learning state; if it fails, they go
+  // again, so the readout stays unset and its feature width open.
+  RewardModulatedHebbian unset = learning;
+  initialize(n_features);
+  try {
+    return body();
+  } catch (...) {
+    learning = std::move(unset);
+    W.resize(0, 0);
+    throw;
+  }
+}
+
 Eigen::RowVectorXd RewardModulatedReadout::stageAct(const Eigen::RowVectorXd &state, bool explore) {
   checkStates(state);
-  if (!isInitialized()) {
-    initialize(state.size());
+  if (!explore && !isInitialized()) {
+    // The output of the zero weights a first exploring step would start from; nothing changes.
+    return Eigen::RowVectorXd::Zero(n_outputs);
   }
-  // Noise-free steps leave the generator alone.
-  const Eigen::RowVectorXd noise = explore ? learning.sampleNoise() : Eigen::RowVectorXd::Zero(n_outputs);
-  return stage(state, noise, explore);
+  return initializingFor(state.size(), [&] {
+    // Noise-free steps leave the generator alone.
+    const Eigen::RowVectorXd noise = explore ? learning.sampleNoise() : Eigen::RowVectorXd::Zero(n_outputs);
+    return stage(state, noise, explore);
+  });
 }
 
 Eigen::RowVectorXd RewardModulatedReadout::stageAct(const Eigen::RowVectorXd &state, const Eigen::RowVectorXd &noise) {
@@ -103,10 +124,7 @@ Eigen::RowVectorXd RewardModulatedReadout::stageAct(const Eigen::RowVectorXd &st
   if (noise.size() != n_outputs || !noise.allFinite()) {
     throw std::invalid_argument("noise must be finite with one entry per output.");
   }
-  if (!isInitialized()) {
-    initialize(state.size());
-  }
-  return stage(state, noise, true);
+  return initializingFor(state.size(), [&] { return stage(state, noise, true); });
 }
 
 Eigen::MatrixXd RewardModulatedReadout::act(const Eigen::MatrixXd &states, bool explore) {
