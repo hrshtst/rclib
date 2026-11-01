@@ -16,6 +16,7 @@ add_library(
   src/Model.cpp
   src/ModelSerialization.cpp
   src/reservoirs/RandomSparseReservoir.cpp
+  src/reservoirs/RandomWeights.cpp
   src/reservoirs/NvarReservoir.cpp
   src/readouts/RidgeReadout.cpp
   src/readouts/RlsReadout.cpp
