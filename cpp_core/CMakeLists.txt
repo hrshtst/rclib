@@ -21,7 +21,8 @@ add_library(
   src/reservoirs/NvarReservoir.cpp
   src/readouts/RidgeReadout.cpp
   src/readouts/RlsReadout.cpp
-  src/readouts/LmsReadout.cpp)
+  src/readouts/LmsReadout.cpp
+  src/readouts/RewardModulatedReadout.cpp)
 
 set_target_properties(rclib_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 

@@ -53,6 +53,10 @@ add_executable(test_reward_modulated_hebbian test_reward_modulated_hebbian.cpp)
 target_link_libraries(test_reward_modulated_hebbian PRIVATE rclib_core Catch2::Catch2WithMain)
 catch_discover_tests(test_reward_modulated_hebbian)
 
+add_executable(test_reward_modulated_readout test_reward_modulated_readout.cpp)
+target_link_libraries(test_reward_modulated_readout PRIVATE rclib_core Catch2::Catch2WithMain)
+catch_discover_tests(test_reward_modulated_readout)
+
 add_executable(test_serialization test_serialization.cpp)
 target_link_libraries(test_serialization PRIVATE rclib_core Catch2::Catch2WithMain)
 catch_discover_tests(test_serialization)
