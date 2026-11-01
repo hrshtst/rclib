@@ -296,3 +296,37 @@ TEST_CASE("Model - a model without a readout learns in its reservoir", "[Model][
   REQUIRE(reservoir->getState().isZero(0.0));
   REQUIRE(reservoir->getLearning().hasEligibility()); // a reset keeps the eligibility
 }
+
+namespace {
+
+// A conventional readout whose finite-looking predictions overflow.
+class OverflowingReadout : public Readout {
+public:
+  void fit(const Eigen::MatrixXd & /*states*/, const Eigen::MatrixXd & /*targets*/) override {}
+  void partialFit(const Eigen::MatrixXd & /*state*/, const Eigen::MatrixXd & /*target*/) override {}
+  Eigen::MatrixXd predict(const Eigen::MatrixXd &states) override {
+    return Eigen::MatrixXd::Constant(states.rows(), 1, -std::numeric_limits<double>::infinity());
+  }
+};
+
+} // namespace
+
+TEST_CASE("Model - a non-finite output from any readout fails the row", "[Model][reward]") {
+  const bool explore = GENERATE(true, false);
+  SECTION("a conventional readout after a reward-modulated reservoir") {
+    auto reservoir = plasticReservoir(8, 16);
+    Model model;
+    model.addReservoir(reservoir);
+    model.setReadout(std::make_shared<OverflowingReadout>());
+    REQUIRE_THROWS_AS(model.act(ramp(2, 1, 0.0), explore), std::runtime_error);
+    // The reservoir staged the row, but nothing was committed.
+    REQUIRE_FALSE(reservoir->getLearning().hasEligibility());
+    REQUIRE(reservoir->getLearning().getEligibility().isZero(0.0));
+    REQUIRE(reservoir->getLearning().getEligibilityBound() == 0.0);
+  }
+  SECTION("reservoir states without a readout") {
+    Model model;
+    model.addReservoir(std::make_shared<NvarReservoir>(1, 2)); // squares 1e200
+    REQUIRE_THROWS_AS(model.act(Eigen::MatrixXd::Constant(1, 1, 1e200), explore), std::runtime_error);
+  }
+}

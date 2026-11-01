@@ -307,6 +307,10 @@ Eigen::MatrixXd Model::act(const Eigen::MatrixXd &inputs, bool explore) {
       } else {
         output = states.row(0);
       }
+      // Whatever produced it, a non-finite output fails the row before any learner commits it.
+      if (!output.allFinite()) {
+        throw std::runtime_error("act: the output of row " + std::to_string(t) + " is not finite.");
+      }
     } catch (...) {
       // The row applies to every learner or to none.
       for (RewardModulatedLearner *learner : targets) {

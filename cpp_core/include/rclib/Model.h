@@ -52,9 +52,10 @@ public:
   /// a model with a readout equals predictOnline(). Everything is checked before the model
   /// changes: the inputs must be finite and fit the widths the reservoirs and the readout are
   /// locked to (std::invalid_argument), and no reservoir object may be listed twice
-  /// (std::logic_error). A row whose output or eligibility is not finite throws
-  /// std::runtime_error: earlier rows stay applied, the failing row changes no component's
-  /// learning state, and the reservoir states are unspecified until resetReservoirs().
+  /// (std::logic_error). A row whose output, from any readout or from the reservoirs, or
+  /// eligibility is not finite throws std::runtime_error, exploring or not: earlier rows stay
+  /// applied, the failing row changes no component's learning state, and the reservoir states
+  /// are unspecified until resetReservoirs().
   Eigen::MatrixXd act(const Eigen::MatrixXd &inputs, bool explore = true);
   /// Updates every reward-modulated component for a reward: each compares it with its baseline
   /// for `key`, or with `baseline` when given (see RewardModulatedHebbianRule). The update
