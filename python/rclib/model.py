@@ -12,6 +12,7 @@ import numpy as np
 
 from . import (
     _rclib,  # Import the C++ bindings
+    learning,
     readouts,
     reservoirs,
 )
@@ -37,9 +38,74 @@ _SPECTRAL_RADIUS_METHODS = {
     "power_iteration": _rclib.RandomSparseReservoir.SpectralRadiusMethod.POWER_ITERATION,
     "dense": _rclib.RandomSparseReservoir.SpectralRadiusMethod.DENSE,
 }
+_RULE = _rclib.RewardModulatedHebbianRule
+_DISTRIBUTIONS = {"uniform": _RULE.Distribution.UNIFORM, "gaussian": _RULE.Distribution.GAUSSIAN}
+_POST_SIGNALS = {
+    "noise": _RULE.PostSignal.NOISE,
+    "high_pass": _RULE.PostSignal.HIGH_PASS,
+    "potential": _RULE.PostSignal.POTENTIAL,
+}
+_UPDATES = {"online": _RULE.Update.ONLINE, "trial": _RULE.Update.TRIAL}
+_MODULATORS = {"difference": _RULE.Modulator.DIFFERENCE, "heaviside": _RULE.Modulator.HEAVISIDE}
+_BASELINES = {"ema": _RULE.Baseline.EMA, "window": _RULE.Baseline.WINDOW, "none": _RULE.Baseline.NONE}
 _RIDGE_SOLVER_NAMES = {solver: name for name, solver in _RIDGE_SOLVERS.items()}
 _RLS_SOLVER_NAMES = {solver: name for name, solver in _RLS_SOLVERS.items()}
 _SPECTRAL_RADIUS_METHOD_NAMES = {method: name for name, method in _SPECTRAL_RADIUS_METHODS.items()}
+_DISTRIBUTION_NAMES = {value: name for name, value in _DISTRIBUTIONS.items()}
+_POST_SIGNAL_NAMES = {value: name for name, value in _POST_SIGNALS.items()}
+_UPDATE_NAMES = {value: name for name, value in _UPDATES.items()}
+_MODULATOR_NAMES = {value: name for name, value in _MODULATORS.items()}
+_BASELINE_NAMES = {value: name for name, value in _BASELINES.items()}
+
+
+def _rule_to_cpp(rule: learning.RewardModulatedHebbian) -> Any:  # noqa: ANN401
+    """Build the C++ rule described by a Python rule configuration."""
+    cpp_rule = _rclib.RewardModulatedHebbianRule()
+    cpp_rule.learning_rate = rule.learning_rate
+    cpp_rule.noise_distribution = _DISTRIBUTIONS[rule.exploration.distribution]
+    cpp_rule.noise_amplitude = rule.exploration.amplitude
+    cpp_rule.noise_probability = rule.exploration.probability
+    cpp_rule.noise_seed = rule.exploration.seed
+    cpp_rule.post = _POST_SIGNALS[rule.post]
+    cpp_rule.post_decay = rule.post_decay
+    cpp_rule.eligibility_power = rule.eligibility_power
+    cpp_rule.update = _UPDATES[rule.update]
+    cpp_rule.trace_decay = rule.trace_decay
+    cpp_rule.modulator = _MODULATORS[rule.modulator]
+    cpp_rule.baseline = _BASELINES[rule.baseline.kind]
+    cpp_rule.baseline_decay = rule.baseline.decay
+    cpp_rule.baseline_window = rule.baseline.window
+    cpp_rule.learning_rate_decay_steps = rule.learning_rate_decay_steps
+    cpp_rule.max_update = rule.max_update
+    cpp_rule.decorrelation = rule.decorrelation
+    return cpp_rule
+
+
+def _rule_from_cpp(cpp_rule: Any) -> learning.RewardModulatedHebbian:  # noqa: ANN401
+    """Rebuild the Python configuration of a C++ rule."""
+    return learning.RewardModulatedHebbian(
+        learning_rate=cpp_rule.learning_rate,
+        exploration=learning.Exploration(
+            distribution=_DISTRIBUTION_NAMES[cpp_rule.noise_distribution],
+            amplitude=cpp_rule.noise_amplitude,
+            probability=cpp_rule.noise_probability,
+            seed=cpp_rule.noise_seed,
+        ),
+        post=_POST_SIGNAL_NAMES[cpp_rule.post],
+        post_decay=cpp_rule.post_decay,
+        eligibility_power=cpp_rule.eligibility_power,
+        update=_UPDATE_NAMES[cpp_rule.update],
+        trace_decay=cpp_rule.trace_decay,
+        modulator=_MODULATOR_NAMES[cpp_rule.modulator],
+        baseline=learning.Baseline(
+            kind=_BASELINE_NAMES[cpp_rule.baseline],
+            decay=cpp_rule.baseline_decay,
+            window=cpp_rule.baseline_window,
+        ),
+        learning_rate_decay_steps=cpp_rule.learning_rate_decay_steps,
+        max_update=cpp_rule.max_update,
+        decorrelation=cpp_rule.decorrelation,
+    )
 
 
 def _reservoir_config_from_cpp(cpp_reservoir: Any) -> reservoirs.RandomSparse | reservoirs.Nvar:  # noqa: ANN401
@@ -62,7 +128,9 @@ def _reservoir_config_from_cpp(cpp_reservoir: Any) -> reservoirs.RandomSparse | 
     raise TypeError(msg)
 
 
-def _readout_config_from_cpp(cpp_readout: Any) -> readouts.Ridge | readouts.Rls | readouts.Lms:  # noqa: ANN401
+def _readout_config_from_cpp(
+    cpp_readout: Any,  # noqa: ANN401
+) -> readouts.Ridge | readouts.Rls | readouts.Lms | readouts.RewardModulated:
     """Rebuild the Python configuration of a loaded C++ readout."""
     if isinstance(cpp_readout, _rclib.RidgeReadout):
         return readouts.Ridge(
@@ -80,6 +148,12 @@ def _readout_config_from_cpp(cpp_readout: Any) -> readouts.Ridge | readouts.Rls 
         )
     if isinstance(cpp_readout, _rclib.LmsReadout):
         return readouts.Lms(learning_rate=cpp_readout.getLearningRate(), include_bias=cpp_readout.getIncludeBias())
+    if isinstance(cpp_readout, _rclib.RewardModulatedReadout):
+        return readouts.RewardModulated(
+            n_outputs=cpp_readout.getNOutputs(),
+            rule=_rule_from_cpp(cpp_readout.getRule()),
+            include_bias=cpp_readout.getIncludeBias(),
+        )
     msg = f"Unsupported readout type: {type(cpp_readout).__name__}"
     raise TypeError(msg)
 
@@ -100,6 +174,8 @@ def _cpp_readout_from_config(readout: Any) -> Any:  # noqa: ANN401
         return _rclib.RlsReadout(readout.lambda_, readout.delta, readout.include_bias, _RLS_SOLVERS[readout.solver])
     if isinstance(readout, readouts.Lms):
         return _rclib.LmsReadout(readout.learning_rate, readout.include_bias)
+    if isinstance(readout, readouts.RewardModulated):
+        return _rclib.RewardModulatedReadout(readout.n_outputs, _rule_to_cpp(readout.rule), readout.include_bias)
     msg = "Unsupported readout type"
     raise TypeError(msg)
 
@@ -410,6 +486,81 @@ class ESN:
             cpp_readout.partialFit(current_state, y)
         else:
             self._cpp_model.partialFit(x, y)
+
+    def act(self, x: ArrayLike, *, explore: bool = True) -> np.ndarray:
+        """Step the model through ``x`` row by row to learn from rewards.
+
+        With ``explore``, the reward-modulated components add exploration noise and record each
+        row's eligibility for the next :meth:`reinforce`; without it every step is noise-free and
+        no learning state changes, which equals :meth:`predict_online`. A model without a readout
+        returns the reservoir states, whose designated neurons can serve as outputs.
+
+        Parameters
+        ----------
+        x : ArrayLike
+            Input rows, one per time step.
+        explore : bool, optional
+            Whether to explore and record eligibility. Default is True.
+
+        Returns
+        -------
+        np.ndarray
+            The output of each row: the readout's, or the reservoir states without a readout.
+
+        Raises
+        ------
+        ValueError
+            If the inputs are not finite or do not fit the widths the model is locked to.
+        RuntimeError
+            If a reservoir object is listed twice, or a row's output or eligibility is not
+            finite. A failing row changes no learning state and keeps the rows before it.
+        """
+        self._update_readout()
+        return self._cpp_model.act(x, explore)
+
+    def reinforce(self, reward: float, *, key: int = 0, baseline: float | None = None) -> None:
+        """Update the reward-modulated components for a reward.
+
+        Each component compares the reward with its baseline for ``key`` (see
+        ``learning.Baseline``), or with ``baseline`` when given, and changes its weights in
+        proportion to the eligibility recorded by :meth:`act`. The update applies to every
+        component or to none.
+
+        Parameters
+        ----------
+        reward : float
+            The reward.
+        key : int, optional
+            The baseline to use and update, such as a trial type. Default is 0.
+        baseline : float, optional
+            A baseline to use instead of the internal one, which is then left unchanged.
+
+        Raises
+        ------
+        ValueError
+            If the reward or baseline is not finite.
+        RuntimeError
+            If the model has no reward-modulated component, a component has not explored since
+            its last update, or the update would not be finite.
+        """
+        self._cpp_model.reinforce(reward, key, baseline)
+
+    def modulate(self, modulator: float) -> None:
+        """Update the reward-modulated components with the modulator given directly.
+
+        This applies ``dW = eta * modulator * eligibility`` without a baseline, so any critic,
+        such as a temporal-difference error, can drive learning.
+
+        Parameters
+        ----------
+        modulator : float
+            The modulator ``m``.
+        """
+        self._cpp_model.modulate(modulator)
+
+    def clear_eligibility(self) -> None:
+        """Zero the eligibility of the reward-modulated components, for example after an aborted trial."""
+        self._cpp_model.clearEligibility()
 
     def save(self, path: str | os.PathLike[str]) -> None:
         """Save the model to a file.
