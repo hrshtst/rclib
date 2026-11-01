@@ -54,3 +54,26 @@ def test_pattern_generation_needs_exploration() -> None:
             example.train(esn, train_steps)
             errors[name].append(example.normalized_error(example.generate(esn, 500), train_steps))
     _assert_lower(errors["exploring"], errors["no exploration"], margin=0.5)
+
+
+def test_cursor_control_recovers_and_assigns_credit() -> None:
+    """Legenstein et al.: the EH rule recovers the perturbed decoder and shifts the rotated units more."""
+    example = _load_example("reward_modulated_bci")
+    final_rewards: dict[str, list[float]] = {}
+    shifts: dict[str, list[float]] = {"rotated": [], "others": []}
+    with np.errstate(over="ignore", invalid="ignore"):  # the run without a baseline diverges
+        for seed in SEEDS:
+            for name, rule in example.rules(seed).items():
+                rewards, rotated, others = example.run(rule, seed, 320)
+                final_rewards.setdefault(name, []).append(float(np.mean(rewards[-20:])))
+                if name == "EH rule":
+                    shifts["rotated"].append(float(np.mean(rotated)))
+                    shifts["others"].append(float(np.mean(others)))
+    assert sum(reward > 0.9 for reward in final_rewards["EH rule"]) >= MIN_WINS  # noqa: PLR2004
+    # Lower is better for both: the negated reward, and the shift of the units the decoder reads right.
+    _assert_lower(
+        [-reward for reward in final_rewards["EH rule"]],
+        [-reward for reward in final_rewards["without a reward baseline"]],
+        margin=0.3,
+    )
+    _assert_lower(shifts["others"], shifts["rotated"], margin=5.0)
