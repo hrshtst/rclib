@@ -84,6 +84,26 @@ def _readout_config_from_cpp(cpp_readout: Any) -> readouts.Ridge | readouts.Rls 
     raise TypeError(msg)
 
 
+def _cpp_readout_from_config(readout: Any) -> Any:  # noqa: ANN401
+    """Build the C++ readout described by a Python readout configuration."""
+    if isinstance(readout, readouts.Ridge):
+        if readout.solver not in _RIDGE_SOLVERS:
+            msg = f"Unsupported solver: {readout.solver}"
+            raise ValueError(msg)
+        return _rclib.RidgeReadout(
+            readout.alpha, readout.include_bias, _RIDGE_SOLVERS[readout.solver], readout.tolerance
+        )
+    if isinstance(readout, readouts.Rls):
+        if readout.solver not in _RLS_SOLVERS:
+            msg = f"Unsupported RLS solver: {readout.solver}"
+            raise ValueError(msg)
+        return _rclib.RlsReadout(readout.lambda_, readout.delta, readout.include_bias, _RLS_SOLVERS[readout.solver])
+    if isinstance(readout, readouts.Lms):
+        return _rclib.LmsReadout(readout.learning_rate, readout.include_bias)
+    msg = "Unsupported readout type"
+    raise TypeError(msg)
+
+
 class ESN:
     """Echo State Network (ESN) model."""
 
@@ -165,16 +185,18 @@ class ESN:
         TypeError
             If the readout type is unsupported.
         """
-        # Store the Python readout object's parameters
+        # Build the C++ readout first and record the configuration only once the C++ model
+        # holds it, so a rejected readout leaves both sides unchanged and a second call
+        # replaces the readout set before.
+        self._cpp_model.setReadout(_cpp_readout_from_config(readout))
         self._readout_params = readout
-        self._update_readout()
 
     def _update_readout(self) -> None:
-        """Instantiate or update the C++ readout based on current parameters."""
+        """Create the C++ readout from the stored configuration if the C++ model has none."""
         if self._readout_params is None:
             return
 
-        # Don't re-instantiate if already exists (to preserve online learning state)
+        # An existing readout is kept, so its fitted or online learning state survives.
         try:
             if self._cpp_model.getReadout() is not None:
                 return
@@ -182,33 +204,7 @@ class ESN:
             # getReadout() throws if not set
             pass
 
-        readout = self._readout_params
-
-        # Create and set the C++ readout to the C++ model
-        if isinstance(readout, readouts.Ridge):
-            if readout.solver not in _RIDGE_SOLVERS:
-                msg = f"Unsupported solver: {readout.solver}"
-                raise ValueError(msg)
-
-            cpp_readout = _rclib.RidgeReadout(
-                readout.alpha, readout.include_bias, _RIDGE_SOLVERS[readout.solver], readout.tolerance
-            )
-            self._cpp_model.setReadout(cpp_readout)
-        elif isinstance(readout, readouts.Rls):
-            if readout.solver not in _RLS_SOLVERS:
-                msg = f"Unsupported RLS solver: {readout.solver}"
-                raise ValueError(msg)
-
-            cpp_readout = _rclib.RlsReadout(
-                readout.lambda_, readout.delta, readout.include_bias, _RLS_SOLVERS[readout.solver]
-            )
-            self._cpp_model.setReadout(cpp_readout)
-        elif isinstance(readout, readouts.Lms):
-            cpp_readout = _rclib.LmsReadout(readout.learning_rate, readout.include_bias)
-            self._cpp_model.setReadout(cpp_readout)
-        else:
-            msg = "Unsupported readout type"
-            raise TypeError(msg)
+        self._cpp_model.setReadout(_cpp_readout_from_config(self._readout_params))
 
     def fit(self, x: ArrayLike, y: ArrayLike, washout_len: int = 0) -> None:
         """Fit the model to the data.
