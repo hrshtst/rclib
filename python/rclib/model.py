@@ -108,7 +108,9 @@ def _rule_from_cpp(cpp_rule: Any) -> learning.RewardModulatedHebbian:  # noqa: A
     )
 
 
-def _reservoir_config_from_cpp(cpp_reservoir: Any) -> reservoirs.RandomSparse | reservoirs.Nvar:  # noqa: ANN401
+def _reservoir_config_from_cpp(
+    cpp_reservoir: Any,  # noqa: ANN401
+) -> reservoirs.RandomSparse | reservoirs.Nvar | reservoirs.RewardModulated:
     """Rebuild the Python configuration of a loaded C++ reservoir."""
     if isinstance(cpp_reservoir, _rclib.RandomSparseReservoir):
         return reservoirs.RandomSparse(
@@ -124,6 +126,21 @@ def _reservoir_config_from_cpp(cpp_reservoir: Any) -> reservoirs.RandomSparse | 
         )
     if isinstance(cpp_reservoir, _rclib.NvarReservoir):
         return reservoirs.Nvar(num_lags=cpp_reservoir.getNumLags(), polynomial_order=cpp_reservoir.getPolynomialOrder())
+    if isinstance(cpp_reservoir, _rclib.RewardModulatedReservoir):
+        return reservoirs.RewardModulated(
+            n_neurons=cpp_reservoir.getNNeurons(),
+            spectral_radius=cpp_reservoir.getSpectralRadius(),
+            sparsity=cpp_reservoir.getSparsity(),
+            leak_rate=cpp_reservoir.getLeakRate(),
+            input_scaling=cpp_reservoir.getInputScaling(),
+            rule=_rule_from_cpp(cpp_reservoir.getRule()),
+            include_bias=cpp_reservoir.getIncludeBias(),
+            seed=cpp_reservoir.getSeed(),
+            spectral_radius_method=_SPECTRAL_RADIUS_METHOD_NAMES[cpp_reservoir.getSpectralRadiusMethod()],
+            bias_scaling=cpp_reservoir.getBiasScaling(),
+            plastic_presynaptic=cpp_reservoir.getPlasticPresynaptic(),
+            plastic_postsynaptic=cpp_reservoir.getPlasticPostsynaptic(),
+        )
     msg = f"Unsupported reservoir type: {type(cpp_reservoir).__name__}"
     raise TypeError(msg)
 
@@ -235,6 +252,22 @@ class ESN:
             self._cpp_model.addReservoir(cpp_res, self.connection_type)
         elif isinstance(reservoir, reservoirs.Nvar):
             cpp_res = _rclib.NvarReservoir(reservoir.num_lags, reservoir.polynomial_order)
+            self._cpp_model.addReservoir(cpp_res, self.connection_type)
+        elif isinstance(reservoir, reservoirs.RewardModulated):
+            cpp_res = _rclib.RewardModulatedReservoir(
+                reservoir.n_neurons,
+                reservoir.spectral_radius,
+                reservoir.sparsity,
+                reservoir.leak_rate,
+                reservoir.input_scaling,
+                reservoir.include_bias,
+                reservoir.seed,
+                _SPECTRAL_RADIUS_METHODS[reservoir.spectral_radius_method],
+                reservoir.bias_scaling,
+                _rule_to_cpp(reservoir.rule),
+                reservoir.plastic_presynaptic,
+                reservoir.plastic_postsynaptic,
+            )
             self._cpp_model.addReservoir(cpp_res, self.connection_type)
         # Add other reservoir types here as they are implemented
         else:

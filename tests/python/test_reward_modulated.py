@@ -34,6 +34,7 @@ class _ReferenceLearner:
         self.average: np.ndarray | None = None
         self.baselines: dict[int, list[float]] = {}
         self.updates = 0
+        self.plastic: np.ndarray | None = None  # the weights an update may change; None means all
 
     def row(self, pre: np.ndarray, potential: np.ndarray, noise: np.ndarray) -> None:
         rule = self.rule
@@ -92,6 +93,8 @@ class _ReferenceLearner:
             delta = (eta * modulator) * direction
             if rule.max_update is not None:
                 delta = np.clip(delta, -rule.max_update, rule.max_update)
+            if self.plastic is not None:
+                delta = np.where(self.plastic, delta, 0.0)
             self.weights = self.weights + delta
         self.updates += 1
         if rule.update == "trial":
@@ -116,8 +119,54 @@ class _ReferenceReadout(_ReferenceLearner):
         return np.array(outputs)
 
 
+def _dense_weights(reservoir: object) -> np.ndarray:
+    """The recurrent weights of a C++ reservoir as a dense matrix."""
+    rows, cols, values = reservoir.getRecurrentWeights()
+    n = reservoir.getNNeurons()
+    weights = np.zeros((n, n))
+    weights[rows, cols] = values
+    return weights
+
+
+class _ReferenceReservoir(_ReferenceLearner):
+    """A reward-modulated reservoir: ``v = (1 - leak) v + leak (u @ W_in + b + r_prev @ W) + noise``."""
+
+    def __init__(self, rule: learning.RewardModulatedHebbian, reservoir: object) -> None:
+        super().__init__(rule, _dense_weights(reservoir))
+        n = len(self.weights)
+        pattern = self.weights != 0
+        presynaptic = np.ones(n, dtype=bool)
+        postsynaptic = np.ones(n, dtype=bool)
+        if (neurons := reservoir.getPlasticPresynaptic()) is not None:
+            presynaptic = np.isin(np.arange(n), neurons)
+        if (neurons := reservoir.getPlasticPostsynaptic()) is not None:
+            postsynaptic = np.isin(np.arange(n), neurons)
+        self.plastic = pattern & presynaptic[:, None] & postsynaptic[None, :]
+        self.leak = reservoir.getLeakRate()
+        self.bias = reservoir.getBias()
+        self.rate = np.zeros(n)
+        self.potential = np.zeros(n)
+
+    def act(self, inputs: np.ndarray, noise: np.ndarray, input_weights: np.ndarray) -> np.ndarray:
+        rates = []
+        for row, row_noise in zip(inputs, noise, strict=True):
+            drive = row @ input_weights + self.bias + self.rate @ self.weights
+            previous = self.rate
+            self.potential = (1 - self.leak) * self.potential + self.leak * drive + row_noise
+            self.rate = np.tanh(self.potential)
+            self.row(previous, self.potential, row_noise)
+            rates.append(self.rate)
+        return np.array(rates)
+
+    def reset(self) -> None:
+        self.rate = np.zeros_like(self.rate)
+        self.potential = np.zeros_like(self.potential)
+        self.reset_activity()
+
+
 def _rule(**kwargs: object) -> learning.RewardModulatedHebbian:
-    return learning.RewardModulatedHebbian(learning_rate=0.3, **kwargs)  # type: ignore[arg-type]
+    settings = {"learning_rate": 0.3, **kwargs}
+    return learning.RewardModulatedHebbian(**settings)
 
 
 ORACLE_RULES = {
@@ -290,3 +339,137 @@ def test_readout_learns_a_linear_map_from_rewards_alone() -> None:
         reward = -float(np.sum((esn.act(x) - target) ** 2))
         esn.reinforce(reward, baseline=clean)
     assert error() < initial / 10
+
+
+RESERVOIR_RULES = {
+    "online_heaviside": (_rule(post="high_pass", modulator="heaviside", learning_rate=0.05), None, None),
+    "trial_cube_masked": (
+        _rule(post="high_pass", post_decay=0.05, eligibility_power=3.0, update="trial", max_update=0.01),
+        [0, 1, 2, 3, 5],
+        [1, 2, 4, 5, 6],
+    ),
+    "trial_decorrelated": (_rule(post="noise", update="trial", decorrelation=1.0), None, [0, 3, 6]),
+}
+
+
+@pytest.mark.parametrize("name", RESERVOIR_RULES)
+def test_reservoir_follows_the_reference_rule(name: str) -> None:
+    """The reservoir's dynamics and learning match a dense NumPy reference."""
+    rule, presynaptic, postsynaptic = RESERVOIR_RULES[name]
+    reservoir = _rclib.RewardModulatedReservoir(
+        8,
+        0.9,
+        0.4,
+        0.3,
+        1.0,
+        True,  # noqa: FBT003
+        sorted(RESERVOIR_RULES).index(name),
+        _rclib.RandomSparseReservoir.SpectralRadiusMethod.POWER_ITERATION,
+        1.0,
+        _rule_to_cpp(rule),
+        presynaptic,
+        postsynaptic,
+    )
+    reference = _ReferenceReservoir(rule, reservoir)
+    initial = _dense_weights(reservoir)
+    rng = np.random.default_rng(seed=7)
+    for _ in range(3):
+        reservoir.resetState()
+        reference.reset()
+        for step in range(3):
+            inputs = rng.uniform(-1, 1, (int(rng.integers(1, 4)), 2))
+            noise = 0.1 * rng.standard_normal((len(inputs), 8))
+            rates = reservoir.actWithNoise(inputs, noise)
+            np.testing.assert_allclose(
+                rates, reference.act(inputs, noise, reservoir.getInputWeights()), rtol=RTOL, atol=ATOL
+            )
+            if rule.update == "online" or step == 2:  # noqa: PLR2004
+                reward = float(rng.normal())
+                reservoir.reinforce(reward, 0, None)
+                reference.reinforce(reward, 0, None)
+                np.testing.assert_allclose(_dense_weights(reservoir), reference.weights, rtol=RTOL, atol=ATOL)
+    np.testing.assert_allclose(reservoir.getPotential()[0], reference.potential, rtol=RTOL, atol=ATOL)
+    # The pattern stays, and frozen synapses keep their weights exactly.
+    assert reference.plastic is not None
+    final = _dense_weights(reservoir)
+    np.testing.assert_array_equal(final != 0, initial != 0)
+    np.testing.assert_array_equal(final[~reference.plastic], initial[~reference.plastic])
+    assert np.any(final[reference.plastic] != initial[reference.plastic])
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "error", "match"),
+    [
+        ({"leak_rate": 0.0}, ValueError, "leak_rate"),
+        ({"spectral_radius_method": "lanczos"}, ValueError, "spectral_radius_method"),
+        ({"plastic_presynaptic": [0, 8]}, ValueError, "plastic_presynaptic"),
+        ({"plastic_postsynaptic": [-1]}, ValueError, "plastic_postsynaptic"),
+        ({"plastic_presynaptic": [3, 3]}, ValueError, "distinct"),
+        ({"plastic_presynaptic": [1.5]}, TypeError, None),
+        ({"rule": 0.1}, TypeError, "rule"),
+    ],
+)
+def test_reservoir_config_rejects_invalid_settings(
+    kwargs: dict[str, object], error: type[Exception], match: str | None
+) -> None:
+    """The reservoir configuration checks its hyperparameters, masks and rule."""
+    settings: dict[str, object] = {"rule": _rule(), **kwargs}
+    with pytest.raises(error, match=match):
+        reservoirs.RewardModulated(8, 0.9, **settings)  # type: ignore[arg-type]
+
+
+def test_reservoir_config_sorts_its_masks() -> None:
+    """Masks become sorted tuples, so equal settings compare equal after a round trip."""
+    config = reservoirs.RewardModulated(8, 0.9, rule=_rule(), plastic_presynaptic=[5, 1], plastic_postsynaptic=())
+    assert config.plastic_presynaptic == (1, 5)
+    assert config.plastic_postsynaptic == ()
+    assert reservoirs.RewardModulated(8, 0.9, rule=_rule()).plastic_presynaptic is None
+
+
+def _plastic_esn(*, readout: bool = False) -> ESN:
+    """A model with a reward-modulated reservoir, and a reward-modulated readout if asked."""
+    esn = ESN()
+    esn.add_reservoir(
+        reservoirs.RewardModulated(
+            10, 0.9, sparsity=0.5, leak_rate=0.5, rule=_rule(post="noise"), include_bias=True, seed=3
+        )
+    )
+    if readout:
+        esn.set_readout(readouts.RewardModulated(1, _rule(post="noise"), include_bias=True))
+    return esn
+
+
+def test_esn_with_a_reward_modulated_reservoir_and_no_readout() -> None:
+    """Without a readout, act returns the rates and reinforce updates the recurrent weights."""
+    esn = _plastic_esn()
+    reservoir = esn.get_reservoir(0)
+    assert isinstance(reservoir, _rclib.RewardModulatedReservoir)
+    initial = _dense_weights(reservoir)
+    inputs = np.sin(np.linspace(0, 2, 6)).reshape(-1, 1)
+    rates = esn.act(inputs)
+    assert rates.shape == (6, 10)
+    esn.reinforce(1.0, key=3)
+    esn.act(inputs)
+    esn.reinforce(2.0, key=3)
+    assert not np.array_equal(_dense_weights(reservoir), initial)
+    with pytest.raises(RuntimeError, match="readout"):
+        esn.predict(inputs)
+
+    # A noise-free act equals the reservoir's own noise-free steps and changes no learning state.
+    eligibility = reservoir.getLearning().getEligibility()
+    esn.reset_reservoirs()
+    expected = reservoir.act(inputs, False)  # noqa: FBT003
+    esn.reset_reservoirs()
+    np.testing.assert_array_equal(esn.act(inputs, explore=False), expected)
+    np.testing.assert_array_equal(reservoir.getLearning().getEligibility(), eligibility)
+
+
+def test_esn_reinforces_the_reservoir_and_the_readout_together() -> None:
+    """One reward updates every reward-modulated component of the model."""
+    esn = _plastic_esn(readout=True)
+    recurrent = _dense_weights(esn.get_reservoir(0))
+    esn.act(np.ones((4, 1)))
+    esn.reinforce(1.5, baseline=0.0)
+    assert esn.get_reservoir(0).getLearning().getUpdateCount() == 1
+    assert esn.get_readout().getLearning().getUpdateCount() == 1
+    assert not np.array_equal(_dense_weights(esn.get_reservoir(0)), recurrent)

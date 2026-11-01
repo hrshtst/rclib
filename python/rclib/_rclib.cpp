@@ -7,6 +7,7 @@
 #include "rclib/readouts/RlsReadout.h"
 #include "rclib/reservoirs/NvarReservoir.h"
 #include "rclib/reservoirs/RandomSparseReservoir.h"
+#include "rclib/reservoirs/RewardModulatedReservoir.h"
 
 #include <optional>
 #include <pybind11/eigen.h>
@@ -16,6 +17,27 @@
 #include <string>
 
 namespace py = pybind11;
+
+namespace {
+
+// The nonzero entries of a sparse matrix as numpy arrays, so that the core needs no scipy:
+// W[rows, cols] = values.
+py::tuple sparseEntries(const Eigen::SparseMatrix<double> &weights) {
+  Eigen::VectorXi rows(weights.nonZeros());
+  Eigen::VectorXi cols(weights.nonZeros());
+  Eigen::VectorXd values(weights.nonZeros());
+  Eigen::Index k = 0;
+  for (Eigen::Index j = 0; j < weights.outerSize(); ++j) {
+    for (Eigen::SparseMatrix<double>::InnerIterator it(weights, j); it; ++it, ++k) {
+      rows(k) = static_cast<int>(it.row());
+      cols(k) = static_cast<int>(it.col());
+      values(k) = it.value();
+    }
+  }
+  return py::make_tuple(rows, cols, values);
+}
+
+} // namespace
 
 PYBIND11_MODULE(_rclib, m) {
   m.doc() = "rclib C++ core: high-performance reservoir computing (reservoirs, "
@@ -60,21 +82,7 @@ PYBIND11_MODULE(_rclib, m) {
       // The nonzero entries as numpy arrays, so that the core needs no scipy: W[rows, cols] = values.
       .def(
           "getRecurrentWeights",
-          [](const RandomSparseReservoir &res) {
-            const Eigen::SparseMatrix<double> &weights = res.getRecurrentWeights();
-            Eigen::VectorXi rows(weights.nonZeros());
-            Eigen::VectorXi cols(weights.nonZeros());
-            Eigen::VectorXd values(weights.nonZeros());
-            Eigen::Index k = 0;
-            for (Eigen::Index j = 0; j < weights.outerSize(); ++j) {
-              for (Eigen::SparseMatrix<double>::InnerIterator it(weights, j); it; ++it, ++k) {
-                rows(k) = static_cast<int>(it.row());
-                cols(k) = static_cast<int>(it.col());
-                values(k) = it.value();
-              }
-            }
-            return py::make_tuple(rows, cols, values);
-          },
+          [](const RandomSparseReservoir &res) { return sparseEntries(res.getRecurrentWeights()); },
           "The recurrent weights W_res as (rows, cols, values), copies of the nonzero entries: W[rows, cols] = "
           "values gives the (n_neurons, n_neurons) matrix, applied as state @ W.")
       .def("getInputWeights", &RandomSparseReservoir::getInputWeights, py::return_value_policy::copy,
@@ -221,6 +229,56 @@ PYBIND11_MODULE(_rclib, m) {
       .def("getRule", &RewardModulatedReadout::getRule, py::return_value_policy::copy)
       .def("getLearning", &RewardModulatedReadout::getLearning, py::return_value_policy::reference_internal,
            "The learning state, valid while the readout lives.");
+
+  py::class_<RewardModulatedReservoir, Reservoir, std::shared_ptr<RewardModulatedReservoir>>(m,
+                                                                                             "RewardModulatedReservoir")
+      .def(
+          py::init<int, double, double, double, double, bool, unsigned int, RandomSparseReservoir::SpectralRadiusMethod,
+                   double, const Rule &, std::optional<std::vector<int>>, std::optional<std::vector<int>>>(),
+          py::arg("n_neurons"), py::arg("spectral_radius"), py::arg("sparsity"), py::arg("leak_rate"),
+          py::arg("input_scaling"), py::arg("include_bias"), py::arg("seed"), py::arg("spectral_radius_method"),
+          py::arg("bias_scaling"), py::arg("rule"), py::arg("plastic_presynaptic") = py::none(),
+          py::arg("plastic_postsynaptic") = py::none())
+      .def("act", py::overload_cast<const Eigen::MatrixXd &, bool>(&RewardModulatedReservoir::act), py::arg("inputs"),
+           py::arg("explore") = true, "The rates of each row; exploring adds noise and records the eligibility.")
+      .def("actWithNoise",
+           py::overload_cast<const Eigen::MatrixXd &, const Eigen::MatrixXd &>(&RewardModulatedReservoir::act),
+           py::arg("inputs"), py::arg("noise"), "Explores with the given noise instead of drawing it.")
+      .def(
+          "reinforce",
+          [](RewardModulatedReservoir &res, double reward, int key, std::optional<double> baseline) {
+            res.reinforce(reward, key, baseline);
+          },
+          py::arg("reward"), py::arg("key") = 0, py::arg("baseline") = py::none())
+      .def(
+          "modulate", [](RewardModulatedReservoir &res, double modulator) { res.modulate(modulator); },
+          py::arg("modulator"))
+      .def("clearEligibility", &RewardModulatedReservoir::clearEligibility)
+      .def("getNNeurons", &RewardModulatedReservoir::getNNeurons)
+      .def("getSpectralRadius", &RewardModulatedReservoir::getSpectralRadius)
+      .def("getSparsity", &RewardModulatedReservoir::getSparsity)
+      .def("getLeakRate", &RewardModulatedReservoir::getLeakRate)
+      .def("getInputScaling", &RewardModulatedReservoir::getInputScaling)
+      .def("getIncludeBias", &RewardModulatedReservoir::getIncludeBias)
+      .def("getSeed", &RewardModulatedReservoir::getSeed)
+      .def("getSpectralRadiusMethod", &RewardModulatedReservoir::getSpectralRadiusMethod)
+      .def("getBiasScaling", &RewardModulatedReservoir::getBiasScaling)
+      .def("getPlasticPresynaptic", &RewardModulatedReservoir::getPlasticPresynaptic)
+      .def("getPlasticPostsynaptic", &RewardModulatedReservoir::getPlasticPostsynaptic)
+      .def("getRule", &RewardModulatedReservoir::getRule, py::return_value_policy::copy)
+      .def("getLearning", &RewardModulatedReservoir::getLearning, py::return_value_policy::reference_internal,
+           "The learning state, valid while the reservoir lives.")
+      .def("getPotential", &RewardModulatedReservoir::getPotential, py::return_value_policy::copy,
+           "The potentials after the last step as a copy, (1, n_neurons).")
+      .def(
+          "getRecurrentWeights",
+          [](const RewardModulatedReservoir &res) { return sparseEntries(res.getRecurrentWeights()); },
+          "The recurrent weights W_res as (rows, cols, values), copies of the nonzero entries: W[rows, cols] = "
+          "values gives the (n_neurons, n_neurons) matrix, applied as rate @ W.")
+      .def("getInputWeights", &RewardModulatedReservoir::getInputWeights, py::return_value_policy::copy,
+           "The input weights W_in as a copy, (input_dim, n_neurons); raises before the first step.")
+      .def("getBias", &RewardModulatedReservoir::getBias, py::return_value_policy::copy,
+           "The bias as a copy, (n_neurons,); zero without include_bias.");
 
   // Bind Model class
   py::class_<Model>(m, "Model")
