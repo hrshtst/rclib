@@ -1,14 +1,16 @@
-// Loads the frozen fixtures of model format versions 1 to 3 (tests/data/serialization/v<N>,
+// Loads the frozen fixtures of model format versions 1 to 4 (tests/data/serialization/v<N>,
 // see generate.py there) to check that files written by earlier builds keep
 // loading with the same configuration and results.
 
 #include "rclib/Model.h"
 #include "rclib/Serialization.h"
 #include "rclib/readouts/LmsReadout.h"
+#include "rclib/readouts/RewardModulatedReadout.h"
 #include "rclib/readouts/RidgeReadout.h"
 #include "rclib/readouts/RlsReadout.h"
 #include "rclib/reservoirs/NvarReservoir.h"
 #include "rclib/reservoirs/RandomSparseReservoir.h"
+#include "rclib/reservoirs/RewardModulatedReservoir.h"
 
 #include <Eigen/Dense>
 #include <catch2/catch_all.hpp>
@@ -104,7 +106,7 @@ void requireExpectedResults(Model &model, int version, const std::string &name, 
 } // namespace
 
 TEST_CASE("Serialization fixtures - serial RandomSparse -> NVAR with Ridge", "[serialization][fixtures]") {
-  const int version = GENERATE(1, 2, 3);
+  const int version = GENERATE(1, 2, 3, 4);
   CAPTURE(version);
   Model model = loadFixture(version, "serial_rs_nvar_ridge");
   REQUIRE(model.getConnectionType() == "serial");
@@ -137,7 +139,7 @@ TEST_CASE("Serialization fixtures - serial RandomSparse -> NVAR with Ridge", "[s
 }
 
 TEST_CASE("Serialization fixtures - parallel RandomSparse + NVAR with rank-k RLS", "[serialization][fixtures]") {
-  const int version = GENERATE(1, 2, 3);
+  const int version = GENERATE(1, 2, 3, 4);
   CAPTURE(version);
   Model model = loadFixture(version, "parallel_rs_nvar_rls");
   REQUIRE(model.getConnectionType() == "parallel");
@@ -167,7 +169,7 @@ TEST_CASE("Serialization fixtures - parallel RandomSparse + NVAR with rank-k RLS
 }
 
 TEST_CASE("Serialization fixtures - serial RandomSparse with LMS", "[serialization][fixtures]") {
-  const int version = GENERATE(1, 2, 3);
+  const int version = GENERATE(1, 2, 3, 4);
   CAPTURE(version);
   Model model = loadFixture(version, "serial_rs_lms");
   REQUIRE(model.getConnectionType() == "serial");
@@ -187,7 +189,7 @@ TEST_CASE("Serialization fixtures - serial RandomSparse with LMS", "[serializati
 }
 
 TEST_CASE("Serialization fixtures - uninitialized reservoir and unfitted Ridge", "[serialization][fixtures]") {
-  const int version = GENERATE(1, 2, 3);
+  const int version = GENERATE(1, 2, 3, 4);
   CAPTURE(version);
   Model model = loadFixture(version, "unfitted_ridge");
   REQUIRE(model.getNumReservoirs() == 1);
@@ -209,7 +211,7 @@ TEST_CASE("Serialization fixtures - uninitialized reservoir and unfitted Ridge",
 
 TEST_CASE("Serialization fixtures v2+ - serial RandomSparse scaled by the dense method with Ridge",
           "[serialization][fixtures]") {
-  const int version = GENERATE(2, 3);
+  const int version = GENERATE(2, 3, 4);
   CAPTURE(version);
   Model model = loadFixture(version, "serial_rs_dense_ridge");
   REQUIRE(model.getConnectionType() == "serial");
@@ -236,9 +238,11 @@ TEST_CASE("Serialization fixtures v2+ - serial RandomSparse scaled by the dense 
   requireExpectedResults(model, version, "serial_rs_dense_ridge", false);
 }
 
-TEST_CASE("Serialization fixtures v3 - serial RandomSparse with a scaled bias with Ridge",
+TEST_CASE("Serialization fixtures v3+ - serial RandomSparse with a scaled bias with Ridge",
           "[serialization][fixtures]") {
-  Model model = loadFixture(3, "serial_rs_bias_ridge");
+  const int version = GENERATE(3, 4);
+  CAPTURE(version);
+  Model model = loadFixture(version, "serial_rs_bias_ridge");
   REQUIRE(model.getConnectionType() == "serial");
   REQUIRE(model.getNumReservoirs() == 1);
 
@@ -261,5 +265,88 @@ TEST_CASE("Serialization fixtures v3 - serial RandomSparse with a scaled bias wi
   REQUIRE(ridge->getEffectiveSolver() == RidgeReadout::CHOLESKY);
   REQUIRE(ridge->getInputDim() == 8);
 
-  requireExpectedResults(model, 3, "serial_rs_bias_ridge", false);
+  requireExpectedResults(model, version, "serial_rs_bias_ridge", false);
+}
+
+namespace {
+
+using Rule = RewardModulatedHebbianRule;
+
+// The reward fixtures' sequence documented in v4/generate.py: explore, reward, noise-free steps.
+void requireRewardResults(Model &model, const std::string &name, Eigen::Index input_width) {
+  const auto expected = readExpected(4, name);
+  const auto rows = [&](const std::string &key) {
+    const Eigen::MatrixXd &column = expected.at(key);
+    // Stored row by row, as numpy ravels a 2-D array.
+    Eigen::MatrixXd values(column.rows() / input_width, input_width);
+    for (Eigen::Index i = 0; i < column.rows(); ++i) {
+      values(i / input_width, i % input_width) = column(i);
+    }
+    return values;
+  };
+  const auto flatten = [](const Eigen::MatrixXd &matrix) {
+    Eigen::MatrixXd column(matrix.size(), 1);
+    for (Eigen::Index i = 0; i < matrix.size(); ++i) {
+      column(i) = matrix(i / matrix.cols(), i % matrix.cols());
+    }
+    return column;
+  };
+  requireClose(flatten(model.act(rows("input_act"))), expected.at("explore"));
+  model.reinforce(expected.at("reward")(0), static_cast<int>(expected.at("key")(0)));
+  requireClose(flatten(model.act(rows("input_noise_free"), false)), expected.at("noise_free"));
+}
+
+} // namespace
+
+TEST_CASE("Serialization fixtures v4 - reward-modulated components saved mid-learning", "[serialization][fixtures]") {
+  SECTION("serial RandomSparse with an online Heaviside readout") {
+    Model model = loadFixture(4, "reward_serial_rs_readout");
+    REQUIRE(model.getConnectionType() == "serial");
+    REQUIRE(as<RandomSparseReservoir>(model.getReservoir(0))->getSeed() == 7U);
+    const auto readout = as<RewardModulatedReadout>(model.getReadout());
+    REQUIRE(readout->getNOutputs() == 2);
+    REQUIRE(readout->getIncludeBias());
+    const Rule &rule = readout->getRule();
+    REQUIRE(rule.modulator == Rule::HEAVISIDE);
+    REQUIRE(rule.post == Rule::HIGH_PASS);
+    REQUIRE(rule.learning_rate_decay_steps == 20.0);
+    REQUIRE(rule.noise_seed == 11U);
+    REQUIRE(readout->getLearning().hasEligibility());
+    REQUIRE(readout->getLearning().getUpdateCount() == 4);
+    REQUIRE(readout->getLearning().getBaselines().size() == 2);
+    requireRewardResults(model, "reward_serial_rs_readout", 1);
+  }
+  SECTION("a reward-modulated reservoir learning by trials, with a Ridge readout") {
+    Model model = loadFixture(4, "reward_reservoir_ridge");
+    const auto reservoir = as<RewardModulatedReservoir>(model.getReservoir(0));
+    REQUIRE(reservoir->getNNeurons() == 8);
+    REQUIRE(reservoir->getLeakRate() == 0.4);
+    REQUIRE(reservoir->getPlasticPresynaptic() == std::vector<int>{0, 1, 2, 3, 4, 5});
+    REQUIRE(reservoir->getPlasticPostsynaptic() == std::vector<int>{1, 2, 3, 5, 6, 7});
+    const Rule &rule = reservoir->getRule();
+    REQUIRE(rule.update == Rule::TRIAL);
+    REQUIRE(rule.eligibility_power == 3.0);
+    REQUIRE(rule.baseline == Rule::WINDOW);
+    REQUIRE(rule.baseline_window == 2);
+    REQUIRE(reservoir->getLearning().getBaselines().size() == 3);
+    REQUIRE(reservoir->getLearning().hasEligibility());
+    as<RidgeReadout>(model.getReadout());
+    requireRewardResults(model, "reward_reservoir_ridge", 1);
+  }
+  SECTION("an identity NVAR with a decorrelated trial readout") {
+    Model model = loadFixture(4, "reward_nvar_decorrelated");
+    const auto readout = as<RewardModulatedReadout>(model.getReadout());
+    REQUIRE(readout->getRule().decorrelation == 1.0);
+    REQUIRE(readout->getRule().noise_distribution == Rule::GAUSSIAN);
+    REQUIRE(readout->getLearning().getCovariance().rows() == 3);
+    requireRewardResults(model, "reward_nvar_decorrelated", 3);
+  }
+  SECTION("a reward-modulated reservoir without a readout") {
+    Model model = loadFixture(4, "reward_reservoir_no_readout");
+    REQUIRE_FALSE(model.hasReadout());
+    const auto reservoir = as<RewardModulatedReservoir>(model.getReservoir(0));
+    REQUIRE(reservoir->getRule().post_decay == 0.8);
+    REQUIRE(reservoir->getLearning().isPostAverageInitialized());
+    requireRewardResults(model, "reward_reservoir_no_readout", 2);
+  }
 }
