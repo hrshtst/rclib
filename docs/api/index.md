@@ -9,6 +9,7 @@ This section documents the Python API for `rclib`. The C++ core is wrapped effic
         members:
             - RandomSparse
             - Nvar
+            - RewardModulated
 
 ## Readouts
 
@@ -18,6 +19,20 @@ This section documents the Python API for `rclib`. The C++ core is wrapped effic
             - Ridge
             - Rls
             - Lms
+            - RewardModulated
+
+## Learning from Rewards
+
+::: rclib.learning
+    options:
+        members:
+            - RewardModulatedHebbian
+            - Exploration
+            - Baseline
+            - legenstein2010
+            - hoerzer2014
+            - miconi2017
+            - burms2015
 
 ## Model
 

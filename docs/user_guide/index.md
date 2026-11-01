@@ -18,3 +18,4 @@ Key features include:
 *   [Quick Start](quick_start.md): Get up and running with a simple example.
 *   [Core Concepts](core_concepts.md): Learn about Reservoirs, Readouts, and Model configuration.
 *   [Advanced Usage](advanced_usage.md): Explore Online Learning, Generative Prediction, and Parallelization.
+*   [Learning from Rewards](reward_modulated_learning.md): Train readouts and recurrent weights from a reward signal by exploration.
