@@ -146,3 +146,53 @@ def test_reward_modulated_readout_config() -> None:
         readouts.RewardModulated(0, rule, include_bias=True)
     with pytest.raises(TypeError, match="rule"):
         readouts.RewardModulated(1, _rclib.RewardModulatedHebbianRule(), include_bias=True)
+
+
+PRESETS = {
+    "legenstein2010": (
+        learning.legenstein2010,
+        {"post": "high_pass", "post_decay": 0.8, "update": "online", "modulator": "difference"},
+        learning.Baseline(kind="ema", decay=0.8),
+    ),
+    "hoerzer2014": (
+        learning.hoerzer2014,
+        {"post": "high_pass", "post_decay": 0.0, "update": "online", "modulator": "heaviside"},
+        learning.Baseline(kind="ema", decay=0.8),
+    ),
+    "miconi2017": (
+        learning.miconi2017,
+        {"post": "high_pass", "eligibility_power": 3.0, "update": "trial", "max_update": 1e-4},
+        learning.Baseline(kind="ema", decay=0.33),
+    ),
+    "burms2015": (
+        learning.burms2015,
+        {"post": "noise", "update": "trial", "decorrelation": 1.0, "modulator": "difference"},
+        learning.Baseline(kind="window", window=50),
+    ),
+}
+
+
+@pytest.mark.parametrize("name", PRESETS)
+def test_presets_give_the_settings_of_their_variant(name: str) -> None:
+    """Each preset sets the choices that define its published variant."""
+    preset, settings, baseline = PRESETS[name]
+    rule = preset(0.25)
+    assert rule.learning_rate == 0.25  # noqa: PLR2004
+    for setting, value in settings.items():
+        assert getattr(rule, setting) == value
+    assert rule.baseline == baseline
+
+
+def test_presets_take_overrides_and_validate_them() -> None:
+    """Overrides replace settings and are validated like any rule."""
+    exploration = learning.Exploration(amplitude=0.3, probability=0.01, seed=7)
+    rule = learning.miconi2017(0.1, exploration=exploration, max_update=None)
+    assert rule.exploration == exploration
+    assert rule.max_update is None
+    assert learning.burms2015(0.5, modulator="heaviside").modulator == "heaviside"
+    with pytest.raises(ValueError, match="decorrelation requires trial"):
+        learning.burms2015(0.5, update="online")
+    with pytest.raises(ValueError, match="post_decay"):
+        learning.legenstein2010(0.1, post_decay=1.0)
+    with pytest.raises(TypeError):
+        learning.hoerzer2014(0.1, unknown_setting=1.0)

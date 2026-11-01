@@ -17,14 +17,17 @@ shape ``(n_pre, n_post)``::
 
 where ``post`` is the injected noise, the potential minus its average before the row
 (``"high_pass"``), or the potential itself, ``C`` sums ``pre.T @ pre`` over the trial, and
-``R_avg`` is the reward baseline of the reward's key before that reward. See the user guide
-for how the four published variants map to these settings.
+``R_avg`` is the reward baseline of the reward's key before that reward. The presets
+:func:`legenstein2010`, :func:`hoerzer2014`, :func:`miconi2017` and :func:`burms2015` give the
+settings of four published variants.
 """
 
 from __future__ import annotations
 
+import dataclasses
 import math
 from dataclasses import dataclass, field
+from typing import Any
 
 #: Largest seed of the exploration noise, which the C++ core stores as an unsigned 32-bit int.
 MAX_SEED = 2**32 - 1
@@ -223,3 +226,163 @@ class RewardModulatedHebbian:
         if self.decorrelation is not None and self.eligibility_power != 1:
             msg = "decorrelation requires an eligibility_power of 1."
             raise ValueError(msg)
+
+
+# Presets: the choices that define each published variant. They are starting points, not
+# reproductions of the papers; the learning rate and the exploration amplitude depend on the task,
+# and every setting can be overridden.
+
+
+def legenstein2010(learning_rate: float, **overrides: Any) -> RewardModulatedHebbian:  # noqa: ANN401
+    """The exploratory Hebbian (EH) rule of Legenstein et al. (2010).
+
+    Every unit's potential gets uniform noise in every row; the post-synaptic signal is the
+    potential minus its exponential average (``post_decay`` 0.8), and the modulator is the reward
+    minus its exponential average (decay 0.8). The weights change at every rewarded row.
+
+    Parameters
+    ----------
+    learning_rate : float
+        The learning rate.
+    **overrides : Any
+        Settings of :class:`RewardModulatedHebbian` to replace.
+
+    Returns
+    -------
+    RewardModulatedHebbian
+        The rule.
+
+    References
+    ----------
+    Legenstein, R., Chase, S. M., Schwartz, A. B., & Maass, W. (2010). A reward-modulated Hebbian
+    learning rule can explain experimentally observed network reorganization in a brain control
+    task. The Journal of Neuroscience, 30(25), 8400-8410.
+    """
+    rule = RewardModulatedHebbian(
+        learning_rate=learning_rate,
+        exploration=Exploration(distribution="uniform", amplitude=0.1),
+        post="high_pass",
+        post_decay=0.8,
+        update="online",
+        modulator="difference",
+        baseline=Baseline(kind="ema", decay=0.8),
+    )
+    return dataclasses.replace(rule, **overrides)
+
+
+def hoerzer2014(learning_rate: float, **overrides: Any) -> RewardModulatedHebbian:  # noqa: ANN401
+    """The EH rule with a binary modulator of Hoerzer et al. (2014).
+
+    Meant for a readout whose noisy output is fed back into a chaotic reservoir. The output gets
+    uniform noise in every row, the post-synaptic signal is its first difference (``post_decay``
+    0), and the weights change only when the reward beats its exponential average (decay 0.8):
+    the modulator is 1 or 0. Hoerzer et al. let the learning rate decay over training; set
+    ``learning_rate_decay_steps`` to do the same.
+
+    Parameters
+    ----------
+    learning_rate : float
+        The learning rate.
+    **overrides : Any
+        Settings of :class:`RewardModulatedHebbian` to replace.
+
+    Returns
+    -------
+    RewardModulatedHebbian
+        The rule.
+
+    References
+    ----------
+    Hoerzer, G. M., Legenstein, R., & Maass, W. (2014). Emergence of complex computational
+    structures from chaotic neural networks through reward-modulated Hebbian learning. Cerebral
+    Cortex, 24(3), 677-690.
+    """
+    rule = RewardModulatedHebbian(
+        learning_rate=learning_rate,
+        exploration=Exploration(distribution="uniform", amplitude=0.2),
+        post="high_pass",
+        post_decay=0.0,
+        update="online",
+        modulator="heaviside",
+        baseline=Baseline(kind="ema", decay=0.8),
+    )
+    return dataclasses.replace(rule, **overrides)
+
+
+def miconi2017(learning_rate: float, **overrides: Any) -> RewardModulatedHebbian:  # noqa: ANN401
+    """The rule of Miconi (2017) for recurrent weights learning from a delayed reward.
+
+    Each neuron's potential gets a sparse uniform kick (probability 0.003, amplitude 0.5 per row).
+    The eligibility sums the cube of the Hebbian product of the previous rate and the potential
+    minus its fast average over the trial; the cube keeps the large products of the kicks and
+    suppresses the small ones of the network's relaxation. One update per trial uses the reward
+    minus its exponential average for the trial's key (decay 0.33), clipped to 1e-4 per weight.
+    Use it with ``reservoirs.RewardModulated``, whose potential-leak dynamics it assumes.
+
+    Parameters
+    ----------
+    learning_rate : float
+        The learning rate.
+    **overrides : Any
+        Settings of :class:`RewardModulatedHebbian` to replace.
+
+    Returns
+    -------
+    RewardModulatedHebbian
+        The rule.
+
+    References
+    ----------
+    Miconi, T. (2017). Biologically plausible learning in recurrent neural networks reproduces
+    neural dynamics observed during cognitive tasks. eLife, 6, e20899.
+    """
+    rule = RewardModulatedHebbian(
+        learning_rate=learning_rate,
+        exploration=Exploration(distribution="uniform", amplitude=0.5, probability=0.003),
+        post="high_pass",
+        post_decay=0.05,
+        eligibility_power=3.0,
+        update="trial",
+        modulator="difference",
+        baseline=Baseline(kind="ema", decay=0.33),
+        max_update=1e-4,
+    )
+    return dataclasses.replace(rule, **overrides)
+
+
+def burms2015(learning_rate: float, **overrides: Any) -> RewardModulatedHebbian:  # noqa: ANN401
+    """The decorrelated trial rule of Burms et al. (2015).
+
+    Every unit gets Gaussian noise (standard deviation 0.05) in every row, and the eligibility
+    correlates the pre-synaptic activity with this known noise over the trial. One update per trial
+    uses ``inv(C + I) @ E``, which decorrelates correlated pre-synaptic activity such as redundant
+    sensors, and the reward minus the mean of the last 50 rewards of the trial's key. Pass
+    ``modulator="heaviside"`` for the variant that learns only from better-than-expected trials.
+
+    Parameters
+    ----------
+    learning_rate : float
+        The learning rate.
+    **overrides : Any
+        Settings of :class:`RewardModulatedHebbian` to replace.
+
+    Returns
+    -------
+    RewardModulatedHebbian
+        The rule.
+
+    References
+    ----------
+    Burms, J., Caluwaerts, K., & Dambre, J. (2015). Reward-modulated Hebbian plasticity as leverage
+    for partially embodied control in compliant robotics. Frontiers in Neurorobotics, 9, 9.
+    """
+    rule = RewardModulatedHebbian(
+        learning_rate=learning_rate,
+        exploration=Exploration(distribution="gaussian", amplitude=0.05),
+        post="noise",
+        update="trial",
+        modulator="difference",
+        baseline=Baseline(kind="window", window=50),
+        decorrelation=1.0,
+    )
+    return dataclasses.replace(rule, **overrides)
