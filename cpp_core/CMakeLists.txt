@@ -15,6 +15,7 @@ add_library(
   src/Serialization.cpp
   src/Model.cpp
   src/ModelSerialization.cpp
+  src/learning/RewardModulatedHebbian.cpp
   src/reservoirs/RandomSparseReservoir.cpp
   src/reservoirs/RandomWeights.cpp
   src/reservoirs/NvarReservoir.cpp
