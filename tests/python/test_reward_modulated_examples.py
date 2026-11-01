@@ -77,3 +77,19 @@ def test_cursor_control_recovers_and_assigns_credit() -> None:
         margin=0.3,
     )
     _assert_lower(shifts["others"], shifts["rotated"], margin=5.0)
+
+
+def test_delayed_response_needs_a_supralinear_eligibility() -> None:
+    """Miconi: recurrent weights learn the delayed response with the cube, not with a linear eligibility."""
+    example = _load_example("reward_modulated_delayed_response")
+    final_errors: dict[str, list[float]] = {"cube": [], "linear": []}
+    answered = []
+    for seed in SEEDS:
+        for name, power in (("cube", 3.0), ("linear", 1.0)):
+            esn = example.build_model(seed, eligibility_power=power)
+            errors = example.train(esn, 1500, seed)
+            final_errors[name].append(float(np.mean(errors[-100:])))
+            if name == "cube":
+                answered.append(example.evaluate(esn)[0])
+    _assert_lower(final_errors["cube"], final_errors["linear"], margin=0.2)
+    assert sum(correct == 2 for correct in answered) >= MIN_WINS  # noqa: PLR2004
