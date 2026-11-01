@@ -20,6 +20,12 @@ RTOL = 1e-10
 ATOL = 1e-12
 
 
+def _scaled_mean(values: list[float]) -> float:
+    """The mean of the values, scaled by their largest magnitude so that it cannot overflow."""
+    scale = max(abs(value) for value in values) or 1.0
+    return scale * (sum(value / scale for value in values) / len(values))
+
+
 def _eligibility_function(values: np.ndarray, power: float) -> np.ndarray:
     """S(y) = sign(y) |y|^power."""
     return values if power == 1 else np.sign(values) * np.abs(values) ** power
@@ -71,9 +77,11 @@ class _ReferenceLearner:
             expected = 0.0
         elif rule.baseline.kind == "ema":
             expected = reward if history is None else history[0]
-            new_history = [rule.baseline.decay * expected + (1 - rule.baseline.decay) * reward]
+            scale = max(abs(expected), abs(reward)) or 1.0
+            decay = rule.baseline.decay
+            new_history = [scale * (decay * (expected / scale) + (1 - decay) * (reward / scale))]
         else:
-            expected = reward if not history else sum(value / len(history) for value in history)
+            expected = reward if not history else _scaled_mean(history)
             new_history = [*(history or []), reward][-rule.baseline.window :]
         if rule.modulator == "difference":
             modulator = reward - expected

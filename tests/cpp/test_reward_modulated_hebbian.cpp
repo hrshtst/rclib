@@ -643,3 +643,41 @@ TEST_CASE("RewardModulatedHebbian - a rejected update changes no learning state"
     REQUIRE(Snapshot(engine) == before);
   }
 }
+
+TEST_CASE("RewardModulatedHebbian - baselines of finite rewards stay finite", "[RewardModulatedHebbian]") {
+  Rule rule;
+  rule.post = Rule::POTENTIAL;
+  constexpr double huge = std::numeric_limits<double>::max();
+  SECTION("a window of the largest rewards") {
+    rule.baseline = Rule::WINDOW;
+    rule.baseline_window = 3;
+  }
+  SECTION("an exponential average of the largest rewards") {
+    rule.baseline = Rule::EMA;
+    rule.baseline_decay = GENERATE(0.0, 0.3, 0.8, 0.999);
+  }
+  RewardModulatedHebbian engine = makeEngine(rule, 1, 1);
+  for (int i = 0; i < 5; ++i) {
+    commitRow(engine, row({1.0}), row({1.0}));
+    REQUIRE_NOTHROW(reinforce(engine, huge));
+    REQUIRE(std::isfinite(*engine.getBaseline(0)));
+  }
+  REQUIRE(*engine.getBaseline(0) == huge);
+  // The baseline equals the rewards, so the next difference is zero, not an overflow.
+  commitRow(engine, row({1.0}), row({1.0}));
+  engine.prepareReinforce(huge, 0, std::nullopt);
+  REQUIRE(engine.preparedDelta() == nullptr);
+}
+
+TEST_CASE("RewardModulatedHebbian - the window baseline is the mean of its rewards", "[RewardModulatedHebbian]") {
+  Rule rule;
+  rule.post = Rule::POTENTIAL;
+  rule.baseline = Rule::WINDOW;
+  rule.baseline_window = 4;
+  RewardModulatedHebbian engine = makeEngine(rule, 1, 1);
+  for (double reward : {-2.0, 6.0, 0.5, 3.5, 10.0}) {
+    commitRow(engine, row({1.0}), row({1.0}));
+    reinforce(engine, reward);
+  }
+  REQUIRE_THAT(*engine.getBaseline(0), Catch::Matchers::WithinRel(5.0, 1e-15)); // 6, 0.5, 3.5, 10
+}

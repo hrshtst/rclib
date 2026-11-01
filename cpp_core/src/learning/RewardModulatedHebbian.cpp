@@ -2,6 +2,7 @@
 
 #include "rclib/Serialization.h"
 
+#include <algorithm>
 #include <cmath>
 #include <stdexcept>
 #include <utility>
@@ -23,6 +24,33 @@ void requirePositive(const std::optional<double> &value, const char *name) {
 }
 
 double maxAbs(const Eigen::RowVectorXd &row) { return row.size() == 0 ? 0.0 : row.cwiseAbs().maxCoeff(); }
+
+// The mean of finite values. Scaled by their largest magnitude, every term and the mean of the
+// scaled terms lie in [-1, 1], so the mean cannot overflow; dividing each value by the count
+// first can (three rewards of DBL_MAX).
+double scaledMean(const std::vector<double> &values) {
+  double scale = 0.0;
+  for (double value : values) {
+    scale = std::max(scale, std::abs(value));
+  }
+  if (scale == 0.0) {
+    return 0.0;
+  }
+  double sum = 0.0;
+  for (double value : values) {
+    sum += value / scale;
+  }
+  return scale * (sum / static_cast<double>(values.size()));
+}
+
+// decay * previous + (1 - decay) * reward, scaled the same way.
+double scaledAverage(double previous, double reward, double decay) {
+  const double scale = std::max(std::abs(previous), std::abs(reward));
+  if (scale == 0.0) {
+    return 0.0;
+  }
+  return scale * (decay * (previous / scale) + (1.0 - decay) * (reward / scale));
+}
 
 // Stable wire codes: the file format must not depend on the enums' declaration order.
 using Rule = RewardModulatedHebbianRule;
@@ -325,13 +353,7 @@ std::optional<double> RewardModulatedHebbian::getBaseline(int key) const {
   if (rule.baseline == RewardModulatedHebbianRule::EMA) {
     return history.front();
   }
-  // Divide before adding, so the mean of finite rewards cannot overflow.
-  double mean = 0.0;
-  const double count = static_cast<double>(history.size());
-  for (double reward : history) {
-    mean += reward / count;
-  }
-  return mean;
+  return scaledMean(history);
 }
 
 double RewardModulatedHebbian::getLearningRate() const {
@@ -362,9 +384,11 @@ void RewardModulatedHebbian::prepareReinforce(double reward, int key, std::optio
     expected = getBaseline(key).value_or(reward);
     updated_key = key;
     const auto found = baselines.find(key);
+    double next = 0.0; // the baseline after this reward
     if (rule.baseline == RewardModulatedHebbianRule::EMA) {
       const double previous = found == baselines.end() ? reward : found->second.front();
-      history = {rule.baseline_decay * previous + (1.0 - rule.baseline_decay) * reward};
+      next = scaledAverage(previous, reward, rule.baseline_decay);
+      history = {next};
     } else {
       if (found != baselines.end()) {
         history = found->second;
@@ -373,6 +397,12 @@ void RewardModulatedHebbian::prepareReinforce(double reward, int key, std::optio
       if (history.size() > static_cast<std::size_t>(rule.baseline_window)) {
         history.erase(history.begin());
       }
+      next = scaledMean(history);
+    }
+    // Scaling keeps it finite for finite rewards; checking it keeps a non-finite baseline out
+    // even at the last rounding step.
+    if (!std::isfinite(next)) {
+      fail("the reward baseline would overflow.");
     }
   }
 
