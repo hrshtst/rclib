@@ -12,4 +12,8 @@ public:
   /// Input width the reservoir is locked to after its first advance(); 0 while
   /// any width is still accepted (or when the type does not track it).
   virtual int getInputDim() const { return 0; }
+  /// One step of Model::act(). A reservoir that learns from rewards adds exploration noise
+  /// and stages the step's eligibility when `explore` is set, for Model to commit or discard;
+  /// every other reservoir just advances.
+  virtual const Eigen::MatrixXd &stageAct(const Eigen::MatrixXd &input, bool /*explore*/) { return advance(input); }
 };

@@ -61,9 +61,10 @@ Eigen::MatrixXd RewardModulatedReadout::predict(const Eigen::MatrixXd &states) {
     throw std::runtime_error("RewardModulatedReadout must act or have its weights set before predict.");
   }
   checkStates(states);
-  Eigen::MatrixXd output = states * W.topRows(states.cols());
-  if (include_bias) {
-    output.rowwise() += W.row(W.rows() - 1);
+  // Row by row, the same arithmetic as a noise-free act, so the two agree bit for bit.
+  Eigen::MatrixXd output(states.rows(), n_outputs);
+  for (Eigen::Index t = 0; t < states.rows(); ++t) {
+    output.row(t) = withBias(states.row(t)) * W;
   }
   return output;
 }
