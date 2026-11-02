@@ -474,3 +474,42 @@ def test_get_readout_gives_the_fitted_weights() -> None:
     output = model.predict_online(rng.random((1, 2)))
     state = model.get_reservoir(0).getState()
     np.testing.assert_allclose(output, state @ weights[:-1] + weights[-1], atol=1e-12, rtol=0.0)
+
+
+def test_set_readout_replaces_the_readout_set_before() -> None:
+    """A second set_readout installs the new readout, not only its configuration."""
+    model = ESN()
+    model.add_reservoir(reservoirs.RandomSparse(n_neurons=20, spectral_radius=0.9, seed=4))
+    model.set_readout(readouts.Ridge(alpha=1e-6, include_bias=True))
+    lms = readouts.Lms(learning_rate=0.05, include_bias=False)
+    model.set_readout(lms)
+
+    assert isinstance(model.get_readout(), _rclib.LmsReadout)
+    assert model.get_readout().getLearningRate() == lms.learning_rate
+    assert model._readout_params is lms  # noqa: SLF001
+
+
+@pytest.mark.parametrize(
+    ("readout", "error"),
+    [
+        (readouts.Ridge(alpha=1e-6, include_bias=True, solver="unknown"), ValueError),
+        (readouts.Rls(lambda_=0.99, delta=1.0, include_bias=True, solver="unknown"), ValueError),
+        ("not a readout", TypeError),
+    ],
+)
+def test_rejected_readout_leaves_the_readout_set_before(readout: object, error: type[Exception]) -> None:
+    """A readout the model cannot build changes neither the fitted readout nor its configuration."""
+    model = ESN()
+    model.add_reservoir(reservoirs.RandomSparse(n_neurons=20, spectral_radius=0.9, seed=4))
+    ridge = readouts.Ridge(alpha=1e-6, include_bias=True)
+    model.set_readout(ridge)
+    rng = np.random.default_rng(seed=4)
+    model.fit(rng.random((50, 1)), rng.random((50, 1)))
+    probe = rng.random((10, 1))
+    expected = model.predict(probe)
+
+    with pytest.raises(error, match="Unsupported"):
+        model.set_readout(readout)
+
+    assert model._readout_params is ridge  # noqa: SLF001
+    np.testing.assert_array_equal(model.predict(probe), expected)

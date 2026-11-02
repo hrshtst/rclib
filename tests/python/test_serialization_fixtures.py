@@ -1,7 +1,7 @@
 # Copyright (c) 2025-2026 Hiroshi Atsuta
 # SPDX-License-Identifier: Apache-2.0
 
-"""Load the frozen fixtures of model format versions 1 to 3.
+"""Load the frozen fixtures of model format versions 1 to 4.
 
 The fixtures in tests/data/serialization/v<N> (see generate.py there) check that
 files written by earlier builds keep loading with the same configuration and
@@ -14,7 +14,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from rclib import ESN, readouts, reservoirs
+from rclib import ESN, learning, readouts, reservoirs
 
 FIXTURES = Path(__file__).resolve().parents[1] / "data" / "serialization"
 
@@ -33,13 +33,13 @@ def _read_expected(version: int, name: str) -> dict[str, np.ndarray]:
     return arrays
 
 
-def _configs(esn: ESN) -> list[tuple[type, dict[str, object]]]:
+def _configs(esn: ESN) -> list[tuple[type, dict[str, object]] | None]:
     params = [*esn._reservoirs_params, esn._readout_params]  # noqa: SLF001
-    return [(type(config), vars(config)) for config in params]
+    return [None if config is None else (type(config), vars(config)) for config in params]
 
 
-def _expected_configs(*configs: object) -> list[tuple[type, dict[str, object]]]:
-    return [(type(config), vars(config)) for config in configs]
+def _expected_configs(*configs: object) -> list[tuple[type, dict[str, object]] | None]:
+    return [None if config is None else (type(config), vars(config)) for config in configs]
 
 
 FIXTURE_CONFIGS = {
@@ -136,10 +136,89 @@ V3_FIXTURE_CONFIGS = {
         ),
     ),
 }
+# Fixtures that exist from format version 4 on: reward-modulated components saved mid-learning,
+# with the input width of their expected results.
+V4_REWARD_FIXTURES = {
+    "reward_serial_rs_readout": (
+        "serial",
+        1,
+        _expected_configs(
+            reservoirs.RandomSparse(
+                n_neurons=8,
+                spectral_radius=0.9,
+                sparsity=0.5,
+                leak_rate=0.5,
+                input_scaling=1.0,
+                include_bias=True,
+                seed=7,
+            ),
+            readouts.RewardModulated(
+                2,
+                learning.hoerzer2014(0.05, learning_rate_decay_steps=20.0, exploration=learning.Exploration(seed=11)),
+                include_bias=True,
+            ),
+        ),
+    ),
+    "reward_reservoir_ridge": (
+        "serial",
+        1,
+        _expected_configs(
+            reservoirs.RewardModulated(
+                8,
+                0.9,
+                0.5,
+                0.4,
+                1.0,
+                rule=learning.miconi2017(
+                    0.5,
+                    exploration=learning.Exploration(amplitude=0.5, probability=0.2, seed=12),
+                    max_update=0.01,
+                    baseline=learning.Baseline(kind="window", window=2),
+                ),
+                include_bias=True,
+                seed=8,
+                plastic_presynaptic=[0, 1, 2, 3, 4, 5],
+                plastic_postsynaptic=[1, 2, 3, 5, 6, 7],
+            ),
+            readouts.Ridge(alpha=1e-3, include_bias=True),
+        ),
+    ),
+    "reward_nvar_decorrelated": (
+        "serial",
+        3,
+        _expected_configs(
+            reservoirs.Nvar(num_lags=1, polynomial_order=1),
+            readouts.RewardModulated(
+                1,
+                learning.burms2015(
+                    0.2, exploration=learning.Exploration(distribution="gaussian", amplitude=0.1, seed=13)
+                ),
+                include_bias=False,
+            ),
+        ),
+    ),
+    "reward_reservoir_no_readout": (
+        "serial",
+        2,
+        _expected_configs(
+            reservoirs.RewardModulated(
+                6,
+                1.1,
+                0.6,
+                0.5,
+                1.0,
+                rule=learning.legenstein2010(0.05, exploration=learning.Exploration(seed=14)),
+                include_bias=True,
+                seed=9,
+            ),
+            None,
+        ),
+    ),
+}
 FIXTURES_BY_VERSION = (
     [(1, name) for name in FIXTURE_CONFIGS]
     + [(2, name) for name in [*FIXTURE_CONFIGS, *V2_FIXTURE_CONFIGS]]
-    + [(3, name) for name in [*FIXTURE_CONFIGS, *V2_FIXTURE_CONFIGS, *V3_FIXTURE_CONFIGS]]
+    + [(version, name) for version in (3, 4) for name in [*FIXTURE_CONFIGS, *V2_FIXTURE_CONFIGS, *V3_FIXTURE_CONFIGS]]
 )
 # Fixtures with expected results, and whether their readout learns online.
 RESULTS = {
@@ -183,9 +262,33 @@ def test_fixture_results(version: int, name: str) -> None:
         check(esn.predict(expected["input_predict"]), "after_partial_fit")
 
 
-@pytest.mark.parametrize("version", [1, 2, 3])
+@pytest.mark.parametrize("version", [1, 2, 3, 4])
 def test_unfitted_fixture_cannot_predict(version: int) -> None:
     """The unfitted fixture loads with an unfitted readout."""
     esn = ESN.load(_fixture(version, "unfitted_ridge"))
     with pytest.raises(RuntimeError, match="must be fit"):
         esn.predict(np.ones((3, 1)))
+
+
+@pytest.mark.parametrize("name", V4_REWARD_FIXTURES)
+def test_reward_fixture_configuration(name: str) -> None:
+    """A reward-modulated model saved mid-learning restores its configuration exactly."""
+    connection_type, _, configs = V4_REWARD_FIXTURES[name]
+    esn = ESN.load(_fixture(4, name))
+    assert esn.connection_type == connection_type
+    assert _configs(esn) == configs
+
+
+@pytest.mark.parametrize("name", V4_REWARD_FIXTURES)
+def test_reward_fixture_results(name: str) -> None:
+    """Exploring, reinforcing and noise-free steps follow the sequence documented in v4/generate.py."""
+    _, input_width, _ = V4_REWARD_FIXTURES[name]
+    esn = ESN.load(_fixture(4, name))
+    expected = _read_expected(4, name)
+
+    def check(actual: np.ndarray, key: str) -> None:
+        np.testing.assert_allclose(actual.reshape(-1, 1), expected[key], rtol=1e-10, atol=1e-12)
+
+    check(esn.act(expected["input_act"].reshape(-1, input_width)), "explore")
+    esn.reinforce(float(expected["reward"][0, 0]), key=int(expected["key"][0, 0]))
+    check(esn.act(expected["input_noise_free"].reshape(-1, input_width), explore=False), "noise_free")

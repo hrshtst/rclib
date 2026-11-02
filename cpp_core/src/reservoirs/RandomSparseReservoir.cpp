@@ -1,83 +1,20 @@
 #include "rclib/reservoirs/RandomSparseReservoir.h"
 
+#include "RandomWeights.h"
 #include "rclib/Serialization.h"
 
 #include <Eigen/Dense>
-#include <Eigen/Eigenvalues>
 #include <Eigen/Sparse>
 #include <cmath>
 #include <cstdint>
 #include <memory>
-#include <random>
 #include <stdexcept>
 #include <string>
-#include <vector>
+#include <utility>
 
 #ifdef RCLIB_USE_OPENMP
 #  include <omp.h>
 #endif
-
-// Helper function to generate a sparse random matrix
-Eigen::SparseMatrix<double> generate_sparse_random_matrix(int size, double sparsity, std::mt19937 &gen) {
-  std::vector<Eigen::Triplet<double>> triplets;
-  std::uniform_real_distribution<> dis(-1.0, 1.0);
-  std::uniform_int_distribution<> pos_dis(0, size - 1);
-
-  // size * size can exceed INT_MAX for large reservoirs (n_neurons > ~46340),
-  // so compute the entry count in 64-bit to avoid wrapping to a negative value.
-  const long long total_cells = static_cast<long long>(size) * size;
-  const long long num_non_zero = static_cast<long long>(static_cast<double>(total_cells) * sparsity);
-  triplets.reserve(static_cast<size_t>(num_non_zero));
-
-  for (long long k = 0; k < num_non_zero; ++k) {
-    triplets.push_back(Eigen::Triplet<double>(pos_dis(gen), pos_dis(gen), dis(gen)));
-  }
-
-  Eigen::SparseMatrix<double> mat(size, size);
-  mat.setFromTriplets(triplets.begin(), triplets.end());
-  return mat;
-}
-
-// Function to find the spectral radius (largest eigenvalue modulus) of a sparse matrix using power iteration.
-// Random sparse matrices often have a complex-conjugate dominant pair or near ties in modulus, where the norm
-// after the last step does not converge. The geometric mean of the per-step growth ||A b_k|| over the second
-// half of the iterations does: the first half lets the dominant eigenvalues take over.
-// The start vector is drawn from gen, not Eigen's Random(), which reads the global std::rand() state.
-double largest_eigenvalue(const Eigen::SparseMatrix<double> &mat, std::mt19937 &gen, int iterations = 1000) {
-  if (mat.rows() == 0) {
-    return 0.0;
-  }
-  std::uniform_real_distribution<> dis(-1.0, 1.0);
-  Eigen::VectorXd b_k = Eigen::VectorXd::NullaryExpr(mat.rows(), [&]() { return dis(gen); });
-  b_k.normalize(); // leaves a zero vector unchanged
-  const int burn_in = iterations / 2;
-  double log_growth_sum = 0.0;
-  for (int i = 0; i < iterations; ++i) {
-    Eigen::VectorXd b_k1 = mat * b_k;
-    const double growth = b_k1.norm();
-    if (growth < 1e-9) {
-      return 0.0; // Matrix is likely zero or the iterate collapsed; also keeps log() away from zero
-    }
-    if (i >= burn_in) {
-      log_growth_sum += std::log(growth);
-    }
-    b_k = b_k1 / growth;
-  }
-  return std::exp(log_growth_sum / (iterations - burn_in));
-}
-
-// Function to find the exact spectral radius of a sparse matrix from the eigenvalues of its dense copy.
-// Costs O(n^3) time and O(n^2) memory.
-double dense_spectral_radius(const Eigen::SparseMatrix<double> &mat) {
-  if (mat.rows() == 0) {
-    return 0.0;
-  }
-  const Eigen::EigenSolver<Eigen::MatrixXd> solver(Eigen::MatrixXd(mat), /*computeEigenvectors=*/false);
-  if (solver.info() != Eigen::Success) {
-    throw std::runtime_error("RandomSparseReservoir: the dense eigenvalue solver did not converge.");
-  }
-  return solver.eigenvalues().cwiseAbs().maxCoeff();
-}
 
 namespace {
 
@@ -117,35 +54,13 @@ RandomSparseReservoir::RandomSparseReservoir(int n_neurons, double spectral_radi
 
   state = Eigen::MatrixXd::Zero(1, n_neurons);
 
-  std::mt19937 gen(seed);
-  W_res = generate_sparse_random_matrix(n_neurons, sparsity, gen);
+  random_weights::RecurrentWeights weights =
+      random_weights::generateRecurrentWeights(n_neurons, spectral_radius, sparsity, include_bias, seed,
+                                               spectral_radius_method, bias_scaling, "RandomSparseReservoir");
+  W_res = std::move(weights.W_res);
+  bias = std::move(weights.bias);
 
-  if (spectral_radius > 0) {
-    double max_eigenvalue = 0.0;
-    if (spectral_radius_method == DENSE) {
-      max_eigenvalue = dense_spectral_radius(W_res);
-    } else {
-      // Its own generator: the start vector depends only on the seed, and W_res and bias keep their draws from gen.
-      std::mt19937 power_iteration_gen(seed + 2);
-      max_eigenvalue = largest_eigenvalue(W_res, power_iteration_gen);
-    }
-    if (max_eigenvalue > 1e-9) {
-      W_res = W_res * (spectral_radius / max_eigenvalue);
-    }
-  }
-  W_res.makeCompressed();
-
-  if (include_bias) {
-    std::uniform_real_distribution<> dis(-1.0, 1.0);
-    bias = Eigen::RowVectorXd::NullaryExpr(n_neurons, [&]() { return dis(gen); });
-    // Scaled after the draws, which a bias_scaling of 1 leaves bit for bit.
-    bias *= bias_scaling;
-  } else {
-    bias = Eigen::RowVectorXd::Zero(n_neurons);
-  }
-
-  // Store the generator state or re-seed later for W_in if needed.
-  // For now, let's re-create the generator with the same seed + offset for W_in to keep it deterministic.
+  // W_in is drawn at the first advance(), from its own generator seeded with seed + 1.
   this->seed = seed;
 }
 
@@ -178,10 +93,7 @@ void RandomSparseReservoir::initialize_W_in(int input_dim) {
   if (input_dim <= 0) {
     throw std::invalid_argument("input_dim must be positive.");
   }
-  // Use a different seed sequence for W_in based on the original seed
-  std::mt19937 gen(seed + 1);
-  std::uniform_real_distribution<> dis(-1.0, 1.0);
-  W_in = Eigen::MatrixXd::NullaryExpr(input_dim, n_neurons, [&]() { return dis(gen); }) * input_scaling;
+  W_in = random_weights::generateInputWeights(input_dim, n_neurons, input_scaling, seed);
   W_in_initialized = true;
 }
 

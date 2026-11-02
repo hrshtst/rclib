@@ -114,3 +114,6 @@ CMakeInit.txt
 /docs/*.toc
 /docs/*.out
 /docs/listings_setup.tex
+
+# Private reference papers; not redistributable, never tracked
+/resource/

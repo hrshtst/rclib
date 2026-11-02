@@ -17,8 +17,9 @@ public:
 };
 
 /// Version written by BinaryWriter::writeHeader; BinaryReader accepts versions 1..this.
-/// Version 2 added RandomSparseReservoir's spectral_radius_method, version 3 its bias_scaling.
-constexpr std::uint32_t serialization_format_version = 3;
+/// Version 2 added RandomSparseReservoir's spectral_radius_method, version 3 its bias_scaling,
+/// and version 4 the reward-modulated readout and reservoir and models without a readout.
+constexpr std::uint32_t serialization_format_version = 4;
 
 /// Longest string a model file may contain. Strings only hold component type tags.
 constexpr std::uint32_t serialization_max_string_length = 64;
@@ -55,6 +56,7 @@ public:
   void writeInt(std::int32_t value);
   void writeUInt(std::uint32_t value);
   void writeDouble(double value);
+  void writeU64(std::uint64_t value);
   /// u32 length followed by the bytes; at most serialization_max_string_length bytes.
   void writeString(const std::string &value);
   /// i64 rows, i64 cols, then the values in column-major order.
@@ -91,6 +93,7 @@ public:
   std::int32_t readInt();
   std::uint32_t readUInt();
   double readDouble();
+  std::uint64_t readU64();
   std::string readString();
   Eigen::MatrixXd readMatrix();
   Eigen::SparseMatrix<double> readSparse();

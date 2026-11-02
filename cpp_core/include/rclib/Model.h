@@ -5,8 +5,11 @@
 
 #include <iosfwd>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
+
+class RewardModulatedLearner;
 
 class Model {
 public:
@@ -38,16 +41,44 @@ public:
   /// back an output whose width differs from the input width the reservoirs are
   /// locked to throws std::invalid_argument, also for n_steps == 1.
   Eigen::MatrixXd predictGenerative(const Eigen::MatrixXd &prime_inputs, int n_steps);
+  /// Resets the reservoir states and the activity the reward-modulated components filter,
+  /// such as their post-synaptic averages. Weights, eligibility and baselines stay.
   void resetReservoirs();
+
+  /// Steps the model through `inputs` row by row to learn from rewards, and returns each row's
+  /// output: the readout's output, or the reservoir states when the model has no readout. With
+  /// `explore`, reward-modulated components add exploration noise and record each row's
+  /// eligibility; without it every step is noise-free and no learning state changes, which for
+  /// a model with a readout equals predictOnline(). Everything is checked before the model
+  /// changes: the inputs must be finite and fit the widths the reservoirs and the readout are
+  /// locked to (std::invalid_argument), and no reservoir object may be listed twice
+  /// (std::logic_error). A row whose output, from any readout or from the reservoirs, or
+  /// eligibility is not finite throws std::runtime_error, exploring or not: earlier rows stay
+  /// applied, the failing row changes no component's learning state, and the reservoir states
+  /// are unspecified until resetReservoirs().
+  Eigen::MatrixXd act(const Eigen::MatrixXd &inputs, bool explore = true);
+  /// Updates every reward-modulated component for a reward: each compares it with its baseline
+  /// for `key`, or with `baseline` when given (see RewardModulatedHebbianRule). The update
+  /// applies to all components or to none: std::invalid_argument for a non-finite reward or
+  /// baseline, std::logic_error if the model has no reward-modulated component, lists one twice,
+  /// or one has not explored since its last update, and std::runtime_error if a modulator or new
+  /// weights would not be finite.
+  void reinforce(double reward, int key = 0, std::optional<double> baseline = std::nullopt);
+  /// Updates every reward-modulated component with the modulator given directly, all or none.
+  void modulate(double modulator);
+  /// Zeroes the eligibility of every reward-modulated component.
+  void clearEligibility();
 
   std::shared_ptr<Reservoir> getReservoir(size_t index) const;
   std::shared_ptr<Readout> getReadout() const;
+  bool hasReadout() const { return readout != nullptr; }
   size_t getNumReservoirs() const { return reservoirs.size(); }
   const std::string &getConnectionType() const { return connection_type; }
 
-  /// Saves the configuration, weights and current reservoir states in the rclib
-  /// model format. Throws SerializationError, before writing anything, if the model
-  /// lacks a reservoir or readout, holds the same reservoir object twice, contains a
+  /// Saves the configuration, weights, current reservoir states and the learning state of
+  /// reward-modulated components in the rclib model format, so that a loaded model continues
+  /// exactly. A model without a readout is saved too. Throws SerializationError, before writing
+  /// anything, if the model lacks a reservoir, holds the same reservoir object twice, contains a
   /// component type other than the built-in ones, or is internally inconsistent.
   void save(std::ostream &os) const;
   /// Saves to a file. The model is written to a new temporary file next to `path`,
@@ -62,7 +93,17 @@ public:
   static Model load(const std::string &path);
 
 private:
-  Eigen::MatrixXd collectStates(const Eigen::MatrixXd &inputs);
+  /// How collectStates() steps each reservoir: advance(), or stageAct() exploring or not.
+  enum class Step { Advance, Explore, NoiseFree };
+
+  Eigen::MatrixXd collectStates(const Eigen::MatrixXd &inputs, Step step = Step::Advance);
+  /// The reward-modulated components, after checking that none is listed twice
+  /// (std::logic_error, naming `operation`).
+  std::vector<RewardModulatedLearner *> learners(const char *operation) const;
+  /// Throws std::logic_error if the readout learns from rewards, which `operation` cannot train.
+  void checkSupervisedReadout(const char *operation) const;
+  /// Prepares an update on every learner and commits it on all, or discards it on all.
+  template <typename Prepare> void update(const std::vector<RewardModulatedLearner *> &targets, Prepare &&prepare);
   /// Throws std::invalid_argument, prefixed with `context`, if input `input_width`
   /// columns wide does not fit the widths the reservoirs are locked to by earlier input.
   void checkInputWidth(Eigen::Index input_width, const std::string &context) const;

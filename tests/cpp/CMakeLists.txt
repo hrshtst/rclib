@@ -49,6 +49,22 @@ add_executable(test_seed_consistency test_seed_consistency.cpp)
 target_link_libraries(test_seed_consistency PRIVATE rclib_core Catch2::Catch2WithMain)
 catch_discover_tests(test_seed_consistency)
 
+add_executable(test_reward_modulated_hebbian test_reward_modulated_hebbian.cpp)
+target_link_libraries(test_reward_modulated_hebbian PRIVATE rclib_core Catch2::Catch2WithMain)
+catch_discover_tests(test_reward_modulated_hebbian)
+
+add_executable(test_reward_modulated_readout test_reward_modulated_readout.cpp)
+target_link_libraries(test_reward_modulated_readout PRIVATE rclib_core Catch2::Catch2WithMain)
+catch_discover_tests(test_reward_modulated_readout)
+
+add_executable(test_reward_modulated_reservoir test_reward_modulated_reservoir.cpp)
+target_link_libraries(test_reward_modulated_reservoir PRIVATE rclib_core Catch2::Catch2WithMain)
+catch_discover_tests(test_reward_modulated_reservoir)
+
+add_executable(test_model_reward_modulated test_model_reward_modulated.cpp)
+target_link_libraries(test_model_reward_modulated PRIVATE rclib_core Catch2::Catch2WithMain)
+catch_discover_tests(test_model_reward_modulated)
+
 add_executable(test_serialization test_serialization.cpp)
 target_link_libraries(test_serialization PRIVATE rclib_core Catch2::Catch2WithMain)
 catch_discover_tests(test_serialization)
@@ -56,6 +72,10 @@ catch_discover_tests(test_serialization)
 add_executable(test_model_serialization test_model_serialization.cpp)
 target_link_libraries(test_model_serialization PRIVATE rclib_core Catch2::Catch2WithMain)
 catch_discover_tests(test_model_serialization)
+
+add_executable(test_reward_modulated_serialization test_reward_modulated_serialization.cpp)
+target_link_libraries(test_reward_modulated_serialization PRIVATE rclib_core Catch2::Catch2WithMain)
+catch_discover_tests(test_reward_modulated_serialization)
 
 add_executable(test_serialization_fixtures test_serialization_fixtures.cpp)
 target_link_libraries(test_serialization_fixtures PRIVATE rclib_core Catch2::Catch2WithMain)

@@ -282,7 +282,7 @@ def _with_mismatched_readout_after_unused_reservoir() -> ESN:
 
 @pytest.mark.parametrize(
     "make_model",
-    [_without_readout, _without_reservoir, _with_mismatched_readout, _with_mismatched_readout_after_unused_reservoir],
+    [_without_reservoir, _with_mismatched_readout, _with_mismatched_readout_after_unused_reservoir],
 )
 def test_rejected_save_keeps_the_existing_file(tmp_path: Path, make_model: Callable[[], ESN]) -> None:
     """A model that cannot be saved raises and leaves an existing file untouched."""
@@ -370,4 +370,15 @@ def test_copies_keep_instance_state_and_subclass(duplicate: Callable[[ESN], ESN]
 def test_pickling_an_unsavable_model_raises() -> None:
     """Pickling a model that cannot be saved raises SerializationError."""
     with pytest.raises(rclib.SerializationError):
-        pickle.dumps(_without_readout())
+        pickle.dumps(_without_reservoir())
+
+
+def test_a_model_without_a_readout_round_trips(tmp_path: Path) -> None:
+    """A model without a readout saves and loads, with no readout configuration."""
+    esn = _without_readout()
+    states = esn.act(np.ones((2, 1)))
+    esn.save(tmp_path / "model.rclib")
+    restored = ESN.load(tmp_path / "model.rclib")
+    assert restored._readout_params is None  # noqa: SLF001
+    np.testing.assert_array_equal(restored.get_reservoir(0).getState(), states[-1:])
+    np.testing.assert_array_equal(restored.act(np.full((1, 1), 0.5)), esn.act(np.full((1, 1), 0.5)))

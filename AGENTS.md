@@ -4,7 +4,7 @@ Guidance for AI coding assistants working in this repository. Keep this file con
 
 ## Project
 
-**rclib** is a reservoir-computing framework: a C++17 core (Eigen) exposed to Python via `pybind11`. C++ lives in `cpp_core/`, the Python package in `python/rclib/` (the extension module is `_rclib`, built from `python/rclib/_rclib.cpp`). Architecture is modular and swappable: **Reservoir** (RandomSparse, NVAR) + **Readout** (Ridge, RLS, LMS) + **Model** (ESN, serial/parallel stacking). The library auto-selects solvers and (for `N > 1000`) switches to parallel reservoir updates.
+**rclib** is a reservoir-computing framework: a C++17 core (Eigen) exposed to Python via `pybind11`. C++ lives in `cpp_core/`, the Python package in `python/rclib/` (the extension module is `_rclib`, built from `python/rclib/_rclib.cpp`). Architecture is modular and swappable: **Reservoir** (RandomSparse, NVAR, reward-modulated) + **Readout** (Ridge, RLS, LMS, reward-modulated) + **Model** (ESN, serial/parallel stacking). Reward-modulated components learn from a scalar reward by exploration (`rclib.learning`; see `docs/theory/reward_modulated_hebbian.md`). The library auto-selects solvers and (for `N > 1000`) switches to parallel reservoir updates.
 
 ## Setup
 

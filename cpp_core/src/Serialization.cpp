@@ -57,6 +57,8 @@ void BinaryWriter::writeUInt(std::uint32_t value) { writeBytes(&value, sizeof(va
 
 void BinaryWriter::writeDouble(double value) { writeBytes(&value, sizeof(value)); }
 
+void BinaryWriter::writeU64(std::uint64_t value) { writeBytes(&value, sizeof(value)); }
+
 void BinaryWriter::writeInt64(std::int64_t value) { writeBytes(&value, sizeof(value)); }
 
 void BinaryWriter::writeString(const std::string &value) {
@@ -171,6 +173,12 @@ std::uint32_t BinaryReader::readUInt() {
 
 double BinaryReader::readDouble() {
   double value = 0.0;
+  readBytes(&value, sizeof(value));
+  return value;
+}
+
+std::uint64_t BinaryReader::readU64() {
+  std::uint64_t value = 0;
   readBytes(&value, sizeof(value));
   return value;
 }

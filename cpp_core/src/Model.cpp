@@ -1,9 +1,15 @@
 #include "rclib/Model.h"
 
+#include "rclib/learning/RewardModulatedLearner.h"
+#include "rclib/readouts/RewardModulatedReadout.h"
+
 #ifdef RCLIB_USE_OPENMP
 #  include <omp.h>
 #endif
+#include <algorithm>
+#include <cmath>
 #include <exception>
+#include <set>
 #include <stdexcept>
 #include <string>
 
@@ -53,6 +59,7 @@ void Model::fit(const Eigen::MatrixXd &inputs, const Eigen::MatrixXd &targets, i
   if (reservoirs.empty() || !readout) {
     throw std::runtime_error("Model is not fully configured. Add at least one reservoir and a readout.");
   }
+  checkSupervisedReadout("fit");
   checkSequence(inputs, targets, washout_len, "");
   checkInputWidth(inputs.cols(), "");
 
@@ -65,6 +72,7 @@ void Model::fitSequences(const std::vector<Eigen::MatrixXd> &inputs, const std::
   if (reservoirs.empty() || !readout) {
     throw std::runtime_error("Model is not fully configured. Add at least one reservoir and a readout.");
   }
+  checkSupervisedReadout("fitSequences");
   if (inputs.empty()) {
     throw std::invalid_argument("inputs must hold at least one sequence.");
   }
@@ -108,6 +116,7 @@ void Model::partialFit(const Eigen::MatrixXd &input, const Eigen::MatrixXd &targ
   if (reservoirs.empty() || !readout) {
     throw std::runtime_error("Model is not fully configured. Add at least one reservoir and a readout.");
   }
+  checkSupervisedReadout("partialFit");
   if (input.rows() == 0 || input.cols() == 0) {
     throw std::invalid_argument("input must be a non-empty 2D matrix.");
   }
@@ -216,15 +225,180 @@ void Model::resetReservoirs() {
   for (int i = 0; i < static_cast<int>(reservoirs.size()); ++i) {
     reservoirs[i]->resetState();
   }
+  // Reward-modulated reservoirs reset their own filters in resetState().
+  if (auto *learner = dynamic_cast<RewardModulatedLearner *>(readout.get())) {
+    learner->resetActivity();
+  }
 }
 
-Eigen::MatrixXd Model::collectStates(const Eigen::MatrixXd &inputs) {
+std::vector<RewardModulatedLearner *> Model::learners(const char *operation) const {
+  std::vector<RewardModulatedLearner *> found;
+  for (const auto &res : reservoirs) {
+    if (auto *learner = dynamic_cast<RewardModulatedLearner *>(res.get())) {
+      if (std::find(found.begin(), found.end(), learner) != found.end()) {
+        throw std::logic_error(std::string(operation) +
+                               ": a reward-modulated reservoir is listed twice in the model, so it would learn twice.");
+      }
+      found.push_back(learner);
+    }
+  }
+  if (auto *learner = dynamic_cast<RewardModulatedLearner *>(readout.get())) {
+    found.push_back(learner);
+  }
+  return found;
+}
+
+void Model::checkSupervisedReadout(const char *operation) const {
+  if (dynamic_cast<const RewardModulatedLearner *>(readout.get()) != nullptr) {
+    throw std::logic_error(std::string(operation) + ": the readout learns from rewards; use act and reinforce.");
+  }
+}
+
+Eigen::MatrixXd Model::act(const Eigen::MatrixXd &inputs, bool explore) {
+  if (reservoirs.empty()) {
+    throw std::runtime_error("Model is not fully configured. Add at least one reservoir.");
+  }
+  if (inputs.rows() == 0 || inputs.cols() == 0) {
+    throw std::invalid_argument("inputs must be a non-empty 2D matrix.");
+  }
+  if (!inputs.allFinite()) {
+    throw std::invalid_argument("inputs must be finite.");
+  }
+  // Stepping one object twice per row would differ from the per-layer order of the other
+  // methods in a serial model and race in a parallel one.
+  std::set<const Reservoir *> distinct;
+  for (const auto &res : reservoirs) {
+    if (!distinct.insert(res.get()).second) {
+      throw std::logic_error("act: a reservoir object is listed twice in the model; act needs distinct reservoirs.");
+    }
+  }
+  const std::vector<RewardModulatedLearner *> targets = learners("act");
+  checkInputWidth(inputs.cols(), "");
+  if (readout) {
+    int features = 0;
+    if (connection_type == "serial") {
+      features = static_cast<int>(inputs.cols());
+      for (const auto &res : reservoirs) {
+        features = res->getOutputDim(features);
+      }
+    } else {
+      for (const auto &res : reservoirs) {
+        features += res->getOutputDim(static_cast<int>(inputs.cols()));
+      }
+    }
+    const int locked = readout->getInputDim();
+    if (locked > 0 && features != locked) {
+      throw std::invalid_argument("the reservoirs give " + std::to_string(features) +
+                                  " features, but the readout expects " + std::to_string(locked) + ".");
+    }
+  }
+
+  auto *reward_readout = dynamic_cast<RewardModulatedReadout *>(readout.get());
+  const Step step = explore ? Step::Explore : Step::NoiseFree;
+  Eigen::MatrixXd outputs;
+  for (Eigen::Index t = 0; t < inputs.rows(); ++t) {
+    Eigen::RowVectorXd output;
+    try {
+      const Eigen::MatrixXd states = collectStates(inputs.row(t), step);
+      if (reward_readout != nullptr) {
+        output = reward_readout->stageAct(states.row(0), explore);
+      } else if (readout) {
+        output = readout->predict(states).row(0);
+      } else {
+        output = states.row(0);
+      }
+      // Whatever produced it, a non-finite output fails the row before any learner commits it.
+      if (!output.allFinite()) {
+        throw std::runtime_error("act: the output of row " + std::to_string(t) + " is not finite.");
+      }
+    } catch (...) {
+      // The row applies to every learner or to none.
+      for (RewardModulatedLearner *learner : targets) {
+        learner->discardRow();
+      }
+      throw;
+    }
+    if (explore) {
+      for (RewardModulatedLearner *learner : targets) {
+        learner->commitRow();
+      }
+    }
+    if (t == 0) {
+      outputs.resize(inputs.rows(), output.size());
+    }
+    outputs.row(t) = output;
+  }
+  return outputs;
+}
+
+template <typename Prepare>
+void Model::update(const std::vector<RewardModulatedLearner *> &targets, Prepare &&prepare) {
+  try {
+    for (RewardModulatedLearner *learner : targets) {
+      prepare(*learner);
+    }
+  } catch (...) {
+    for (RewardModulatedLearner *learner : targets) {
+      learner->discardUpdate();
+    }
+    throw;
+  }
+  for (RewardModulatedLearner *learner : targets) {
+    learner->commitUpdate();
+  }
+}
+
+void Model::reinforce(double reward, int key, std::optional<double> baseline) {
+  if (!std::isfinite(reward)) {
+    throw std::invalid_argument("reward must be finite.");
+  }
+  if (baseline && !std::isfinite(*baseline)) {
+    throw std::invalid_argument("baseline must be finite.");
+  }
+  const std::vector<RewardModulatedLearner *> targets = learners("reinforce");
+  if (targets.empty()) {
+    throw std::logic_error("reinforce: the model has no reward-modulated component.");
+  }
+  for (const RewardModulatedLearner *learner : targets) {
+    learner->checkReady();
+  }
+  update(targets, [&](RewardModulatedLearner &learner) { learner.prepareReinforce(reward, key, baseline); });
+}
+
+void Model::modulate(double modulator) {
+  if (!std::isfinite(modulator)) {
+    throw std::invalid_argument("modulator must be finite.");
+  }
+  const std::vector<RewardModulatedLearner *> targets = learners("modulate");
+  if (targets.empty()) {
+    throw std::logic_error("modulate: the model has no reward-modulated component.");
+  }
+  for (const RewardModulatedLearner *learner : targets) {
+    learner->checkReady();
+  }
+  update(targets, [&](RewardModulatedLearner &learner) { learner.prepareModulate(modulator); });
+}
+
+void Model::clearEligibility() {
+  const std::vector<RewardModulatedLearner *> targets = learners("clearEligibility");
+  if (targets.empty()) {
+    throw std::logic_error("clearEligibility: the model has no reward-modulated component.");
+  }
+  for (RewardModulatedLearner *learner : targets) {
+    learner->clearEligibility();
+  }
+}
+
+Eigen::MatrixXd Model::collectStates(const Eigen::MatrixXd &inputs, Step step) {
+  const auto stepReservoir = [step](Reservoir &res, const Eigen::MatrixXd &row) -> const Eigen::MatrixXd & {
+    return step == Step::Advance ? res.advance(row) : res.stageAct(row, step == Step::Explore);
+  };
   if (connection_type == "serial") {
     Eigen::MatrixXd current_input = inputs;
     for (const auto &res : reservoirs) {
       Eigen::MatrixXd res_states(inputs.rows(), res->getOutputDim(static_cast<int>(current_input.cols())));
       for (int i = 0; i < current_input.rows(); ++i) {
-        res_states.row(i) = res->advance(current_input.row(i));
+        res_states.row(i) = stepReservoir(*res, current_input.row(i));
       }
       current_input = res_states;
     }
@@ -243,7 +417,7 @@ Eigen::MatrixXd Model::collectStates(const Eigen::MatrixXd &inputs) {
       auto &res = reservoirs[static_cast<size_t>(r)];
       Eigen::MatrixXd res_states(inputs.rows(), res->getOutputDim(static_cast<int>(inputs.cols())));
       for (int i = 0; i < inputs.rows(); ++i) {
-        res_states.row(i) = res->advance(inputs.row(i));
+        res_states.row(i) = stepReservoir(*res, inputs.row(i));
       }
       reservoir_outputs[static_cast<size_t>(r)] = res_states;
     } catch (...) {

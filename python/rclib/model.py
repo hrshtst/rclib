@@ -12,6 +12,7 @@ import numpy as np
 
 from . import (
     _rclib,  # Import the C++ bindings
+    learning,
     readouts,
     reservoirs,
 )
@@ -37,12 +38,79 @@ _SPECTRAL_RADIUS_METHODS = {
     "power_iteration": _rclib.RandomSparseReservoir.SpectralRadiusMethod.POWER_ITERATION,
     "dense": _rclib.RandomSparseReservoir.SpectralRadiusMethod.DENSE,
 }
+_RULE = _rclib.RewardModulatedHebbianRule
+_DISTRIBUTIONS = {"uniform": _RULE.Distribution.UNIFORM, "gaussian": _RULE.Distribution.GAUSSIAN}
+_POST_SIGNALS = {
+    "noise": _RULE.PostSignal.NOISE,
+    "high_pass": _RULE.PostSignal.HIGH_PASS,
+    "potential": _RULE.PostSignal.POTENTIAL,
+}
+_UPDATES = {"online": _RULE.Update.ONLINE, "trial": _RULE.Update.TRIAL}
+_MODULATORS = {"difference": _RULE.Modulator.DIFFERENCE, "heaviside": _RULE.Modulator.HEAVISIDE}
+_BASELINES = {"ema": _RULE.Baseline.EMA, "window": _RULE.Baseline.WINDOW, "none": _RULE.Baseline.NONE}
 _RIDGE_SOLVER_NAMES = {solver: name for name, solver in _RIDGE_SOLVERS.items()}
 _RLS_SOLVER_NAMES = {solver: name for name, solver in _RLS_SOLVERS.items()}
 _SPECTRAL_RADIUS_METHOD_NAMES = {method: name for name, method in _SPECTRAL_RADIUS_METHODS.items()}
+_DISTRIBUTION_NAMES = {value: name for name, value in _DISTRIBUTIONS.items()}
+_POST_SIGNAL_NAMES = {value: name for name, value in _POST_SIGNALS.items()}
+_UPDATE_NAMES = {value: name for name, value in _UPDATES.items()}
+_MODULATOR_NAMES = {value: name for name, value in _MODULATORS.items()}
+_BASELINE_NAMES = {value: name for name, value in _BASELINES.items()}
 
 
-def _reservoir_config_from_cpp(cpp_reservoir: Any) -> reservoirs.RandomSparse | reservoirs.Nvar:  # noqa: ANN401
+def _rule_to_cpp(rule: learning.RewardModulatedHebbian) -> Any:  # noqa: ANN401
+    """Build the C++ rule described by a Python rule configuration."""
+    cpp_rule = _rclib.RewardModulatedHebbianRule()
+    cpp_rule.learning_rate = rule.learning_rate
+    cpp_rule.noise_distribution = _DISTRIBUTIONS[rule.exploration.distribution]
+    cpp_rule.noise_amplitude = rule.exploration.amplitude
+    cpp_rule.noise_probability = rule.exploration.probability
+    cpp_rule.noise_seed = rule.exploration.seed
+    cpp_rule.post = _POST_SIGNALS[rule.post]
+    cpp_rule.post_decay = rule.post_decay
+    cpp_rule.eligibility_power = rule.eligibility_power
+    cpp_rule.update = _UPDATES[rule.update]
+    cpp_rule.trace_decay = rule.trace_decay
+    cpp_rule.modulator = _MODULATORS[rule.modulator]
+    cpp_rule.baseline = _BASELINES[rule.baseline.kind]
+    cpp_rule.baseline_decay = rule.baseline.decay
+    cpp_rule.baseline_window = rule.baseline.window
+    cpp_rule.learning_rate_decay_steps = rule.learning_rate_decay_steps
+    cpp_rule.max_update = rule.max_update
+    cpp_rule.decorrelation = rule.decorrelation
+    return cpp_rule
+
+
+def _rule_from_cpp(cpp_rule: Any) -> learning.RewardModulatedHebbian:  # noqa: ANN401
+    """Rebuild the Python configuration of a C++ rule."""
+    return learning.RewardModulatedHebbian(
+        learning_rate=cpp_rule.learning_rate,
+        exploration=learning.Exploration(
+            distribution=_DISTRIBUTION_NAMES[cpp_rule.noise_distribution],
+            amplitude=cpp_rule.noise_amplitude,
+            probability=cpp_rule.noise_probability,
+            seed=cpp_rule.noise_seed,
+        ),
+        post=_POST_SIGNAL_NAMES[cpp_rule.post],
+        post_decay=cpp_rule.post_decay,
+        eligibility_power=cpp_rule.eligibility_power,
+        update=_UPDATE_NAMES[cpp_rule.update],
+        trace_decay=cpp_rule.trace_decay,
+        modulator=_MODULATOR_NAMES[cpp_rule.modulator],
+        baseline=learning.Baseline(
+            kind=_BASELINE_NAMES[cpp_rule.baseline],
+            decay=cpp_rule.baseline_decay,
+            window=cpp_rule.baseline_window,
+        ),
+        learning_rate_decay_steps=cpp_rule.learning_rate_decay_steps,
+        max_update=cpp_rule.max_update,
+        decorrelation=cpp_rule.decorrelation,
+    )
+
+
+def _reservoir_config_from_cpp(
+    cpp_reservoir: Any,  # noqa: ANN401
+) -> reservoirs.RandomSparse | reservoirs.Nvar | reservoirs.RewardModulated:
     """Rebuild the Python configuration of a loaded C++ reservoir."""
     if isinstance(cpp_reservoir, _rclib.RandomSparseReservoir):
         return reservoirs.RandomSparse(
@@ -58,11 +126,28 @@ def _reservoir_config_from_cpp(cpp_reservoir: Any) -> reservoirs.RandomSparse | 
         )
     if isinstance(cpp_reservoir, _rclib.NvarReservoir):
         return reservoirs.Nvar(num_lags=cpp_reservoir.getNumLags(), polynomial_order=cpp_reservoir.getPolynomialOrder())
+    if isinstance(cpp_reservoir, _rclib.RewardModulatedReservoir):
+        return reservoirs.RewardModulated(
+            n_neurons=cpp_reservoir.getNNeurons(),
+            spectral_radius=cpp_reservoir.getSpectralRadius(),
+            sparsity=cpp_reservoir.getSparsity(),
+            leak_rate=cpp_reservoir.getLeakRate(),
+            input_scaling=cpp_reservoir.getInputScaling(),
+            rule=_rule_from_cpp(cpp_reservoir.getRule()),
+            include_bias=cpp_reservoir.getIncludeBias(),
+            seed=cpp_reservoir.getSeed(),
+            spectral_radius_method=_SPECTRAL_RADIUS_METHOD_NAMES[cpp_reservoir.getSpectralRadiusMethod()],
+            bias_scaling=cpp_reservoir.getBiasScaling(),
+            plastic_presynaptic=cpp_reservoir.getPlasticPresynaptic(),
+            plastic_postsynaptic=cpp_reservoir.getPlasticPostsynaptic(),
+        )
     msg = f"Unsupported reservoir type: {type(cpp_reservoir).__name__}"
     raise TypeError(msg)
 
 
-def _readout_config_from_cpp(cpp_readout: Any) -> readouts.Ridge | readouts.Rls | readouts.Lms:  # noqa: ANN401
+def _readout_config_from_cpp(
+    cpp_readout: Any,  # noqa: ANN401
+) -> readouts.Ridge | readouts.Rls | readouts.Lms | readouts.RewardModulated:
     """Rebuild the Python configuration of a loaded C++ readout."""
     if isinstance(cpp_readout, _rclib.RidgeReadout):
         return readouts.Ridge(
@@ -80,7 +165,35 @@ def _readout_config_from_cpp(cpp_readout: Any) -> readouts.Ridge | readouts.Rls 
         )
     if isinstance(cpp_readout, _rclib.LmsReadout):
         return readouts.Lms(learning_rate=cpp_readout.getLearningRate(), include_bias=cpp_readout.getIncludeBias())
+    if isinstance(cpp_readout, _rclib.RewardModulatedReadout):
+        return readouts.RewardModulated(
+            n_outputs=cpp_readout.getNOutputs(),
+            rule=_rule_from_cpp(cpp_readout.getRule()),
+            include_bias=cpp_readout.getIncludeBias(),
+        )
     msg = f"Unsupported readout type: {type(cpp_readout).__name__}"
+    raise TypeError(msg)
+
+
+def _cpp_readout_from_config(readout: Any) -> Any:  # noqa: ANN401
+    """Build the C++ readout described by a Python readout configuration."""
+    if isinstance(readout, readouts.Ridge):
+        if readout.solver not in _RIDGE_SOLVERS:
+            msg = f"Unsupported solver: {readout.solver}"
+            raise ValueError(msg)
+        return _rclib.RidgeReadout(
+            readout.alpha, readout.include_bias, _RIDGE_SOLVERS[readout.solver], readout.tolerance
+        )
+    if isinstance(readout, readouts.Rls):
+        if readout.solver not in _RLS_SOLVERS:
+            msg = f"Unsupported RLS solver: {readout.solver}"
+            raise ValueError(msg)
+        return _rclib.RlsReadout(readout.lambda_, readout.delta, readout.include_bias, _RLS_SOLVERS[readout.solver])
+    if isinstance(readout, readouts.Lms):
+        return _rclib.LmsReadout(readout.learning_rate, readout.include_bias)
+    if isinstance(readout, readouts.RewardModulated):
+        return _rclib.RewardModulatedReadout(readout.n_outputs, _rule_to_cpp(readout.rule), readout.include_bias)
+    msg = "Unsupported readout type"
     raise TypeError(msg)
 
 
@@ -140,6 +253,22 @@ class ESN:
         elif isinstance(reservoir, reservoirs.Nvar):
             cpp_res = _rclib.NvarReservoir(reservoir.num_lags, reservoir.polynomial_order)
             self._cpp_model.addReservoir(cpp_res, self.connection_type)
+        elif isinstance(reservoir, reservoirs.RewardModulated):
+            cpp_res = _rclib.RewardModulatedReservoir(
+                reservoir.n_neurons,
+                reservoir.spectral_radius,
+                reservoir.sparsity,
+                reservoir.leak_rate,
+                reservoir.input_scaling,
+                reservoir.include_bias,
+                reservoir.seed,
+                _SPECTRAL_RADIUS_METHODS[reservoir.spectral_radius_method],
+                reservoir.bias_scaling,
+                _rule_to_cpp(reservoir.rule),
+                reservoir.plastic_presynaptic,
+                reservoir.plastic_postsynaptic,
+            )
+            self._cpp_model.addReservoir(cpp_res, self.connection_type)
         # Add other reservoir types here as they are implemented
         else:
             msg = "Unsupported reservoir type"
@@ -165,16 +294,18 @@ class ESN:
         TypeError
             If the readout type is unsupported.
         """
-        # Store the Python readout object's parameters
+        # Build the C++ readout first and record the configuration only once the C++ model
+        # holds it, so a rejected readout leaves both sides unchanged and a second call
+        # replaces the readout set before.
+        self._cpp_model.setReadout(_cpp_readout_from_config(readout))
         self._readout_params = readout
-        self._update_readout()
 
     def _update_readout(self) -> None:
-        """Instantiate or update the C++ readout based on current parameters."""
+        """Create the C++ readout from the stored configuration if the C++ model has none."""
         if self._readout_params is None:
             return
 
-        # Don't re-instantiate if already exists (to preserve online learning state)
+        # An existing readout is kept, so its fitted or online learning state survives.
         try:
             if self._cpp_model.getReadout() is not None:
                 return
@@ -182,33 +313,7 @@ class ESN:
             # getReadout() throws if not set
             pass
 
-        readout = self._readout_params
-
-        # Create and set the C++ readout to the C++ model
-        if isinstance(readout, readouts.Ridge):
-            if readout.solver not in _RIDGE_SOLVERS:
-                msg = f"Unsupported solver: {readout.solver}"
-                raise ValueError(msg)
-
-            cpp_readout = _rclib.RidgeReadout(
-                readout.alpha, readout.include_bias, _RIDGE_SOLVERS[readout.solver], readout.tolerance
-            )
-            self._cpp_model.setReadout(cpp_readout)
-        elif isinstance(readout, readouts.Rls):
-            if readout.solver not in _RLS_SOLVERS:
-                msg = f"Unsupported RLS solver: {readout.solver}"
-                raise ValueError(msg)
-
-            cpp_readout = _rclib.RlsReadout(
-                readout.lambda_, readout.delta, readout.include_bias, _RLS_SOLVERS[readout.solver]
-            )
-            self._cpp_model.setReadout(cpp_readout)
-        elif isinstance(readout, readouts.Lms):
-            cpp_readout = _rclib.LmsReadout(readout.learning_rate, readout.include_bias)
-            self._cpp_model.setReadout(cpp_readout)
-        else:
-            msg = "Unsupported readout type"
-            raise TypeError(msg)
+        self._cpp_model.setReadout(_cpp_readout_from_config(self._readout_params))
 
     def fit(self, x: ArrayLike, y: ArrayLike, washout_len: int = 0) -> None:
         """Fit the model to the data.
@@ -415,6 +520,81 @@ class ESN:
         else:
             self._cpp_model.partialFit(x, y)
 
+    def act(self, x: ArrayLike, *, explore: bool = True) -> np.ndarray:
+        """Step the model through ``x`` row by row to learn from rewards.
+
+        With ``explore``, the reward-modulated components add exploration noise and record each
+        row's eligibility for the next :meth:`reinforce`; without it every step is noise-free and
+        no learning state changes, which equals :meth:`predict_online`. A model without a readout
+        returns the reservoir states, whose designated neurons can serve as outputs.
+
+        Parameters
+        ----------
+        x : ArrayLike
+            Input rows, one per time step.
+        explore : bool, optional
+            Whether to explore and record eligibility. Default is True.
+
+        Returns
+        -------
+        np.ndarray
+            The output of each row: the readout's, or the reservoir states without a readout.
+
+        Raises
+        ------
+        ValueError
+            If the inputs are not finite or do not fit the widths the model is locked to.
+        RuntimeError
+            If a reservoir object is listed twice, or a row's output or eligibility is not
+            finite. A failing row changes no learning state and keeps the rows before it.
+        """
+        self._update_readout()
+        return self._cpp_model.act(x, explore)
+
+    def reinforce(self, reward: float, *, key: int = 0, baseline: float | None = None) -> None:
+        """Update the reward-modulated components for a reward.
+
+        Each component compares the reward with its baseline for ``key`` (see
+        ``learning.Baseline``), or with ``baseline`` when given, and changes its weights in
+        proportion to the eligibility recorded by :meth:`act`. The update applies to every
+        component or to none.
+
+        Parameters
+        ----------
+        reward : float
+            The reward.
+        key : int, optional
+            The baseline to use and update, such as a trial type. Default is 0.
+        baseline : float, optional
+            A baseline to use instead of the internal one, which is then left unchanged.
+
+        Raises
+        ------
+        ValueError
+            If the reward or baseline is not finite.
+        RuntimeError
+            If the model has no reward-modulated component, a component has not explored since
+            its last update, or the update would not be finite.
+        """
+        self._cpp_model.reinforce(reward, key, baseline)
+
+    def modulate(self, modulator: float) -> None:
+        """Update the reward-modulated components with the modulator given directly.
+
+        This applies ``dW = eta * modulator * eligibility`` without a baseline, so any critic,
+        such as a temporal-difference error, can drive learning.
+
+        Parameters
+        ----------
+        modulator : float
+            The modulator ``m``.
+        """
+        self._cpp_model.modulate(modulator)
+
+    def clear_eligibility(self) -> None:
+        """Zero the eligibility of the reward-modulated components, for example after an aborted trial."""
+        self._cpp_model.clearEligibility()
+
     def save(self, path: str | os.PathLike[str]) -> None:
         """Save the model to a file.
 
@@ -471,7 +651,8 @@ class ESN:
             esn._reservoirs_params = [
                 _reservoir_config_from_cpp(cpp_model.getReservoir(i)) for i in range(cpp_model.getNumReservoirs())
             ]
-            esn._readout_params = _readout_config_from_cpp(cpp_model.getReadout())
+            # A model without a readout, such as one learning in its reservoirs, has no readout config.
+            esn._readout_params = _readout_config_from_cpp(cpp_model.getReadout()) if cpp_model.hasReadout() else None
         except (TypeError, ValueError) as err:
             msg = f"Invalid model file: {err}"
             raise _rclib.SerializationError(msg) from err

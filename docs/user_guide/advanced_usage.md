@@ -236,7 +236,7 @@ objects also support `pickle` and `copy.deepcopy`, which use the same format.
 Saving replaces an existing file in one step: if saving fails, the existing
 file is left unchanged. Every save or load failure raises
 `rclib.SerializationError` (a `RuntimeError` subclass; `SerializationError` in
-C++). Examples are a model without a readout, a component whose widths do not
+C++). Examples are a model without a reservoir, a component whose widths do not
 match its neighbours, a custom reservoir or readout type, the same reservoir
 object added twice (C++ only), and a corrupted or truncated file. Running out of
 memory raises `MemoryError` (`std::bad_alloc` in C++) instead.
@@ -244,8 +244,9 @@ memory raises `MemoryError` (`std::bad_alloc` in C++) instead.
 > **Compatibility:** Files written by rclib 0.2.0 still load; their `RandomSparse`
 > reservoirs report `spectral_radius_method="power_iteration"`. Files of model
 > format version 1 or 2 load with `bias_scaling=1.0`. Files written by later
-> versions use model format version 3 and cannot be read by rclib 0.2.0 or by
-> builds that write version 2.
+> versions use model format version 4, which adds reward-modulated components and
+> models without a readout, and cannot be read by rclib 0.2.0 or by builds that
+> write an earlier version.
 
 > **Security:** Only load files from sources you trust. Unlike `pickle`, the
 > format contains no executable code, but it is parsed by native code. Loading a

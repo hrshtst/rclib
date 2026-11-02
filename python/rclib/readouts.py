@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import math
 
+from .learning import RewardModulatedHebbian
+
 
 class Ridge:
     """Ridge Regression Readout configuration."""
@@ -90,4 +92,33 @@ class Lms:
             raise ValueError(msg)
 
         self.learning_rate = learning_rate
+        self.include_bias = include_bias
+
+
+class RewardModulated:
+    """Reward-modulated readout configuration: a linear readout that learns from rewards.
+
+    The output is ``x @ W`` (plus a bias row) and, while exploring, the exploration noise of the
+    rule. ``ESN.act`` explores and records the eligibility, and ``ESN.reinforce`` changes ``W``.
+    The weights start at zero at the first ``act``; ``get_readout().setWeights`` can set them
+    first. ``ESN.fit`` and ``ESN.partial_fit`` do not apply to this readout.
+    """
+
+    def __init__(self, n_outputs: int, rule: RewardModulatedHebbian, *, include_bias: bool) -> None:
+        """Initialize the reward-modulated readout.
+
+        Args:
+            n_outputs: Number of outputs.
+            rule: The learning rule, a ``learning.RewardModulatedHebbian``.
+            include_bias: Whether to include a bias term, a constant input of 1 with a plastic weight.
+        """
+        if n_outputs <= 0:
+            msg = "n_outputs must be positive."
+            raise ValueError(msg)
+        if not isinstance(rule, RewardModulatedHebbian):
+            msg = "rule must be a learning.RewardModulatedHebbian."
+            raise TypeError(msg)
+
+        self.n_outputs = n_outputs
+        self.rule = rule
         self.include_bias = include_bias

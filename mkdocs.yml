@@ -33,10 +33,12 @@ nav:
       - Quick Start: user_guide/quick_start.md
       - Core Concepts: user_guide/core_concepts.md
       - Advanced Usage: user_guide/advanced_usage.md
+      - Learning from Rewards: user_guide/reward_modulated_learning.md
   - Theory:
       - Overview: theory/index.md
       - Reservoir Computing: theory/reservoir_computing.md
       - Readout Algorithms: theory/readout_algorithms.md
+      - Reward-Modulated Hebbian Learning: theory/reward_modulated_hebbian.md
   - API Reference:
       - Overview: api/index.md
   - Development:

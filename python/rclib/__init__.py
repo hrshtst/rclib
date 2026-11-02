@@ -5,10 +5,10 @@
 
 from __future__ import annotations
 
-from . import _rclib, readouts, reservoirs
+from . import _rclib, learning, readouts, reservoirs
 from .model import ESN
 
 #: Raised when a model cannot be saved or a model file cannot be loaded (a RuntimeError subclass).
 SerializationError: type[RuntimeError] = _rclib.SerializationError
 
-__all__ = ["ESN", "SerializationError", "readouts", "reservoirs"]
+__all__ = ["ESN", "SerializationError", "learning", "readouts", "reservoirs"]

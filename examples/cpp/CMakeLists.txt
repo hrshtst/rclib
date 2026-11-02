@@ -24,3 +24,6 @@ target_link_libraries(multi_dimensional_prediction PRIVATE rclib_core)
 
 add_executable(performance_benchmark performance_benchmark.cpp)
 target_link_libraries(performance_benchmark PRIVATE rclib_core)
+
+add_executable(reward_modulated_pattern_generation reward_modulated_pattern_generation.cpp)
+target_link_libraries(reward_modulated_pattern_generation PRIVATE rclib_core)

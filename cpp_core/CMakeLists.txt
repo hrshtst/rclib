@@ -15,11 +15,15 @@ add_library(
   src/Serialization.cpp
   src/Model.cpp
   src/ModelSerialization.cpp
+  src/learning/RewardModulatedHebbian.cpp
   src/reservoirs/RandomSparseReservoir.cpp
+  src/reservoirs/RandomWeights.cpp
+  src/reservoirs/RewardModulatedReservoir.cpp
   src/reservoirs/NvarReservoir.cpp
   src/readouts/RidgeReadout.cpp
   src/readouts/RlsReadout.cpp
-  src/readouts/LmsReadout.cpp)
+  src/readouts/LmsReadout.cpp
+  src/readouts/RewardModulatedReadout.cpp)
 
 set_target_properties(rclib_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 

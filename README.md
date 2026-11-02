@@ -7,6 +7,7 @@
 *   **Performance:** Core logic in C++17 using Eigen for linear algebra.
 *   **Scalability:** Efficient handling of sparse reservoirs and complex architectures.
 *   **Flexibility:** Modular design separating Reservoirs and Readouts.
+*   **Learning from Rewards:** Reward-modulated Hebbian learning of readouts and recurrent weights by exploration, for goal-directed tasks without targets ([guide](docs/user_guide/reward_modulated_learning.md)).
 *   **Ease of Use:** Pythonic interface via `pybind11` and `scikit-learn` style API.
 *   **Reproducibility:** Deterministic results via explicit seeding of random reservoirs.
 
@@ -155,7 +156,7 @@ Model restored = Model::load("model.rclib");
 ```
 
 Only load files from sources you trust. Files written by rclib 0.2.0 still load,
-but files written by later versions use model format version 2, which rclib 0.2.0
+but files written by later versions use model format version 4, which rclib 0.2.0
 cannot read. See
 [Saving and Loading Models](docs/user_guide/advanced_usage.md#saving-and-loading-models)
 for what is stored, error handling and portability.
