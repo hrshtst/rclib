@@ -16,9 +16,17 @@ readout (`readouts.RewardModulated`) and the recurrent weights of a reservoir
 
 As everywhere in `rclib`, activities are row vectors and a weight matrix $\mathbf{W}$ maps a
 pre-synaptic row $\mathbf{p}$ to the post-synaptic **potential** $\mathbf{v} = \mathbf{p}\mathbf{W}$,
-so $W_{ij}$ is the weight from unit $i$ to unit $j$. While exploring, every post-synaptic unit adds
-noise $\boldsymbol{\xi}$ to its potential. Each exploring step computes a post-synaptic signal
-$\mathbf{q}$ and adds the Hebbian product of the two sides to an **eligibility** $\mathbf{E}$:
+so $W_{ij}$ is the weight from unit $i$ to unit $j$. Here $\mathbf{p}$ is the activity on the input
+side of the weights that learn, not necessarily the model's input. For a reward-modulated readout
+it is the feature row the readout receives: the reservoir state, with a trailing 1 when the readout
+has a bias. For a reward-modulated reservoir it is the previous rate $\mathbf{r}(t-1)$ of its own
+neurons, because only its recurrent weights learn; its input and bias add fixed terms to the
+potential (see [Where the Rule Learns](#where-the-rule-learns)). The model's input is $\mathbf{p}$
+only when an identity NVAR passes it straight to a reward-modulated readout.
+
+While exploring, every post-synaptic unit adds noise $\boldsymbol{\xi}$ to its potential. Each
+exploring step computes a post-synaptic signal $\mathbf{q}$ and adds the Hebbian product of the two
+sides to an **eligibility** $\mathbf{E}$:
 
 $$ \mathbf{E} \leftarrow \gamma \mathbf{E} + S(\mathbf{p})^{T} S(\mathbf{q}), \qquad S(y) = \operatorname{sign}(y)\,|y|^{k} $$
 
