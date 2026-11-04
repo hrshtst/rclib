@@ -27,6 +27,12 @@ public:
   bool getIncludeBias() const { return include_bias; }
   Solver getSolver() const { return solver; }
 
+  /// The current readout weights: a (n_features [+ 1], n_outputs) matrix whose
+  /// last row is the bias term when include_bias is true. Every fit or
+  /// partialFit changes them. Read-only; throws before the first fit or
+  /// partialFit, and after a failed fit.
+  const Eigen::MatrixXd &getWeights() const;
+
   /// Writes the hyperparameters and the fitted state in the model file format;
   /// the type tag is written by Model. Throws SerializationError.
   void save(BinaryWriter &writer) const;
