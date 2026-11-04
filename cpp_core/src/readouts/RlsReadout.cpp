@@ -150,6 +150,14 @@ void RlsReadout::partialFit(const Eigen::MatrixXd &state, const Eigen::MatrixXd 
   }
 }
 
+const Eigen::MatrixXd &RlsReadout::getWeights() const {
+  // Keyed on `initialized`, as getInputDim: a failed fit() leaves stale weights in place.
+  if (!initialized) {
+    throw std::runtime_error("RlsReadout must be fit before getWeights.");
+  }
+  return W_out;
+}
+
 Eigen::MatrixXd RlsReadout::predict(const Eigen::MatrixXd &states) {
   if (!initialized) {
     throw std::runtime_error("RlsReadout must be fit before predict.");

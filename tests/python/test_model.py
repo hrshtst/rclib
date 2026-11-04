@@ -476,6 +476,21 @@ def test_get_readout_gives_the_fitted_weights() -> None:
     np.testing.assert_allclose(output, state @ weights[:-1] + weights[-1], atol=1e-12, rtol=0.0)
 
 
+def test_get_readout_gives_the_rls_weights_while_learning_online() -> None:
+    """An RLS readout's weights, read between online updates, give the next online output."""
+    model = ESN()
+    model.add_reservoir(reservoirs.RandomSparse(n_neurons=30, spectral_radius=0.9, leak_rate=0.5, seed=3))
+    model.set_readout(readouts.Rls(lambda_=0.99, delta=1.0, include_bias=True))
+    rng = np.random.default_rng(seed=3)
+    model.partial_fit(rng.random((1, 2)), rng.random((1, 2)))
+    for _ in range(5):
+        weights = model.get_readout().getWeights()
+        output = model.predict_online(rng.random((1, 2)))
+        state = model.get_reservoir(0).getState()
+        np.testing.assert_allclose(output, state @ weights[:-1] + weights[-1], atol=1e-12, rtol=0.0)
+        model.partial_fit(None, rng.random((1, 2)))
+
+
 def test_set_readout_replaces_the_readout_set_before() -> None:
     """A second set_readout installs the new readout, not only its configuration."""
     model = ESN()

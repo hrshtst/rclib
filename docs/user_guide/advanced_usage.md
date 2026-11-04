@@ -147,8 +147,9 @@ $n^3$.
 A trained model can be studied outside `rclib`, for instance by evaluating its
 update at states the reservoirs have never been in, to find fixed points or
 linearize it along a run. A `RandomSparse` reservoir (the object `get_reservoir`
-returns) gives copies of its weights, and a fitted ridge readout (from
-`get_readout`) its weights, with the bias row last when it has one:
+returns) gives copies of its weights, and a fitted ridge or RLS readout (from
+`get_readout`) its weights, for RLS as they stand after the last update, with
+the bias row last when it has one:
 
 ```python
 reservoir = model.get_reservoir(0)

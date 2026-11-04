@@ -140,7 +140,10 @@ PYBIND11_MODULE(_rclib, m) {
       .def("getLambda", &RlsReadout::getLambda)
       .def("getDelta", &RlsReadout::getDelta)
       .def("getIncludeBias", &RlsReadout::getIncludeBias)
-      .def("getSolver", &RlsReadout::getSolver);
+      .def("getSolver", &RlsReadout::getSolver)
+      .def("getWeights", &RlsReadout::getWeights, py::return_value_policy::copy,
+           "The current weights as a copy: shape (n_features + include_bias, n_outputs), bias row last; every fit "
+           "or partialFit changes them.");
 
   // Bind LmsReadout
   py::class_<LmsReadout, Readout, std::shared_ptr<LmsReadout>>(m, "LmsReadout")

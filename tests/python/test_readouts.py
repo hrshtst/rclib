@@ -397,6 +397,29 @@ def test_ridge_readout_weights_are_readable_and_read_only() -> None:
     assert np.allclose(plain.predict(states), states @ plain.getWeights(), atol=1e-12, rtol=0.0)
 
 
+def test_rls_readout_weights_are_readable_and_read_only() -> None:
+    """The current weights are exposed as a copy with the bias row last, after every update."""
+    rng = np.random.default_rng(seed=11)
+    states = rng.random((40, 6))
+    targets = rng.random((40, 2))
+    readout = _rclib.RlsReadout(lambda_=0.99, delta=1.0, include_bias=True)
+    with pytest.raises(RuntimeError, match="must be fit before getWeights"):
+        readout.getWeights()
+    for row in range(len(states)):
+        readout.partialFit(states[row : row + 1], targets[row : row + 1])
+        weights = readout.getWeights()
+        assert weights.shape == (7, 2)
+        np.testing.assert_allclose(readout.predict(states), states @ weights[:-1] + weights[-1], atol=1e-12, rtol=0.0)
+    weights = readout.getWeights()
+    expected = readout.predict(states)
+    weights[:] = 0.0  # a copy: mutating it leaves the readout untouched
+    np.testing.assert_array_equal(readout.predict(states), expected)
+    plain = _rclib.RlsReadout(lambda_=0.99, delta=1.0, include_bias=False)
+    plain.fit(states, targets)
+    assert plain.getWeights().shape == (6, 2)
+    np.testing.assert_allclose(plain.predict(states), states @ plain.getWeights(), atol=1e-12, rtol=0.0)
+
+
 def test_readout_getters_and_input_dim() -> None:
     """Configuration getters return constructor values; getInputDim reports the fitted width."""
     rng = np.random.default_rng(seed=3)

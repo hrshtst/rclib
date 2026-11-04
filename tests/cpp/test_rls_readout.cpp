@@ -89,3 +89,57 @@ TEST_CASE("RlsReadout - configuration getters and input width", "[RlsReadout]") 
   readout.partialFit(Eigen::MatrixXd::Random(1, 4), Eigen::MatrixXd::Random(1, 1));
   REQUIRE(readout.getInputDim() == 4);
 }
+
+TEST_CASE("RlsReadout - the weights are readable", "[RlsReadout]") {
+  const int n_samples = 40;
+  const int n_features = 6;
+  const int n_targets = 2;
+  const Eigen::MatrixXd states = Eigen::MatrixXd::Random(n_samples, n_features);
+  const Eigen::MatrixXd targets = Eigen::MatrixXd::Random(n_samples, n_targets);
+
+  SECTION("Before the first update") {
+    RlsReadout readout(0.99, 1.0, true);
+    REQUIRE_THROWS_AS(readout.getWeights(), std::runtime_error);
+  }
+
+  SECTION("With bias the last row is the bias term, after every update") {
+    RlsReadout readout(0.99, 1.0, true);
+    for (int i = 0; i < n_samples; ++i) {
+      readout.partialFit(states.row(i), targets.row(i));
+      const Eigen::MatrixXd &weights = readout.getWeights();
+      REQUIRE(weights.rows() == n_features + 1);
+      REQUIRE(weights.cols() == n_targets);
+      Eigen::MatrixXd expected = states * weights.topRows(n_features);
+      expected.rowwise() += weights.row(n_features);
+      REQUIRE((readout.predict(states) - expected).norm() < 1e-12);
+    }
+  }
+
+  SECTION("Without bias the matrix is the plain map") {
+    RlsReadout readout(1.0, 1.0, false, RlsReadout::RANK_K_UPDATE);
+    readout.fit(states, targets);
+    const Eigen::MatrixXd &weights = readout.getWeights();
+    REQUIRE(weights.rows() == n_features);
+    REQUIRE(weights.cols() == n_targets);
+    REQUIRE((readout.predict(states) - states * weights).norm() < 1e-12);
+  }
+
+  SECTION("The first update from zero weights") {
+    // With P = I / delta, one rank-1 update gives W = x^T y / (delta * lambda + x x^T).
+    const double lambda = 0.9;
+    const double delta = 2.0;
+    RlsReadout readout(lambda, delta, false);
+    const Eigen::MatrixXd x = states.topRows(1);
+    const Eigen::MatrixXd y = targets.topRows(1);
+    readout.partialFit(x, y);
+    const Eigen::MatrixXd expected = x.transpose() * y / (delta * lambda + x.squaredNorm());
+    REQUIRE((readout.getWeights() - expected).norm() < 1e-12);
+  }
+
+  SECTION("A failed fit leaves no weights to read") {
+    RlsReadout readout(0.99, 1.0, true);
+    readout.partialFit(states, targets);
+    REQUIRE_THROWS(readout.fit(Eigen::MatrixXd(0, n_features), Eigen::MatrixXd(0, n_targets)));
+    REQUIRE_THROWS_AS(readout.getWeights(), std::runtime_error);
+  }
+}
