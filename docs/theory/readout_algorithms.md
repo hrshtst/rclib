@@ -70,6 +70,57 @@ RLS updates the weights recursively for each new data point. It maintains an inv
 For `lambda < 1.0`, `rank_k_update` falls back to sequential rank-1 updates so
 the result remains mathematically equivalent to ordinary RLS.
 
+### Forgetting Methods
+
+With $\lambda < 1$, each sample forgets part of the old information, so that the
+weights can follow a target that changes. In terms of the information matrix
+$\mathbf{R} = \mathbf{P}^{-1}$, the update above forgets *exponentially*: it
+discounts $\mathbf{R}$ in every direction, then adds the sample,
+
+$$ \mathbf{R} \leftarrow \lambda \mathbf{R} + \mathbf{x}\mathbf{x}^T. $$
+
+In a direction that the inputs never excite, nothing is added, so $\mathbf{R}$
+decays there as $\lambda^n$ and $\mathbf{P}$ grows as $\lambda^{-n}$: the
+covariance *winds up*. This happens whenever the inputs span fewer dimensions
+than the readout has features, for instance when every sample comes from the same
+repeated trajectory, or when some features are linear combinations of others.
+Rounding errors along those directions grow with $\mathbf{P}$, and the weights
+are lost well before $\mathbf{P}$ overflows.
+
+`forgetting_method="directional"` forgets only along the sample's input, following
+the idea of directional forgetting (Kulhavý, 1987; Bittanti, Bolzern and Campi,
+1990). Up to the noise variance, $\mathbf{x}^T \mathbf{P} \mathbf{x}$ is the
+variance of the prediction for the input $\mathbf{x}$, so
+$\mathbf{x}\mathbf{x}^T / (\mathbf{x}^T \mathbf{P} \mathbf{x})$ is the information
+that $\mathbf{R}$ holds along $\mathbf{x}$: taking all of it away leaves a singular
+matrix, with $\mathbf{P}\mathbf{x}$ in its null space. Directional forgetting takes
+away the share $1 - \lambda$ of it, then adds the sample, as exponential forgetting
+does:
+
+$$ \mathbf{R} \leftarrow \mathbf{R} - (1 - \lambda) \frac{\mathbf{x}\mathbf{x}^T}{\mathbf{x}^T \mathbf{P} \mathbf{x}} + \mathbf{x}\mathbf{x}^T. $$
+
+The update changes $\mathbf{R}$ only along the sample, so $\mathbf{R}\mathbf{v}$
+stays as it was for every $\mathbf{v}$ orthogonal to all the inputs: directions
+that the samples do not excite keep their information, and $\mathbf{P}$ stays
+bounded there, while the excited ones still forget. By the Sherman–Morrison
+formula, with $s = \mathbf{x}^T \mathbf{P} \mathbf{x}$,
+
+$$ \mathbf{P} \leftarrow \mathbf{P} + \frac{(1 - \lambda) - s}{\lambda + s} \frac{(\mathbf{P}\mathbf{x})(\mathbf{P}\mathbf{x})^T}{s}, $$
+
+one symmetric rank-1 update, as for exponential forgetting, so the cost is the
+same. The updated $\mathbf{P}$ maps $\mathbf{x}$ to the same gain
+$\mathbf{k} = \mathbf{P}\mathbf{x} / (\lambda + s)$, so the weights move by the same
+formula. A few cases follow:
+
+- at $\lambda = 1$ nothing is forgotten, and both methods are ordinary RLS;
+- with a single feature, forgetting along the input is forgetting everywhere, and
+  both methods agree;
+- a zero input ($s = 0$) carries no information, and changes nothing.
+
+Directional forgetting does not discount information about directions the inputs
+no longer excite. If the target changes along such a direction, the readout
+follows only once the inputs excite it again.
+
 ## Least Mean Squares (LMS) (Online)
 
 LMS is a stochastic gradient descent method.
@@ -84,3 +135,11 @@ batch-gradient LMS update:
 $$ \mathbf{W} \leftarrow \mathbf{W} + \frac{\eta}{B}\mathbf{X}^T(\mathbf{Y} - \mathbf{X}\mathbf{W}) $$
 
 where $B$ is the mini-batch size.
+
+## References
+
+- R. Kulhavý. Restricted exponential forgetting in real-time identification.
+  *Automatica*, 23(5):589–600, 1987.
+- S. Bittanti, P. Bolzern and M. Campi. Convergence and exponential convergence of
+  identification algorithms with directional forgetting factor. *Automatica*,
+  26(5):929–932, 1990.

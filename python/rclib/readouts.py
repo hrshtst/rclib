@@ -53,6 +53,7 @@ class Rls:
         *,
         include_bias: bool,
         solver: str = "rank1_update",
+        forgetting_method: str = "exponential",
     ) -> None:
         """Initialize the RLS Readout.
 
@@ -63,6 +64,13 @@ class Rls:
             solver: Solver type ("rank1_update" or "rank_k_update").
                 "rank1_update" is traditional sequential RLS.
                 "rank_k_update" is optimized for mini-batches using Woodbury identity.
+            forgetting_method: How each sample forgets the old information when
+                ``lambda_ < 1`` ("exponential" or "directional"). "exponential"
+                discounts it in every direction, so directions that the inputs do
+                not excite wind up: the covariance grows there as ``lambda_**-n``
+                until the weights are lost. "directional" discounts it only along
+                each sample's input, so those directions keep it. At ``lambda_ = 1``
+                the two are the same.
         """
         if not 0 < lambda_ <= 1:
             msg = "lambda_ must be in (0, 1]."
@@ -70,11 +78,15 @@ class Rls:
         if not math.isfinite(delta) or delta <= 0:
             msg = "delta must be finite and positive."
             raise ValueError(msg)
+        if forgetting_method not in {"exponential", "directional"}:
+            msg = "forgetting_method must be 'exponential' or 'directional'."
+            raise ValueError(msg)
 
         self.lambda_ = lambda_
         self.delta = delta
         self.include_bias = include_bias
         self.solver = solver
+        self.forgetting_method = forgetting_method
 
 
 class Lms:

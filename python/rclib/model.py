@@ -34,6 +34,10 @@ _RLS_SOLVERS = {
     "rank1_update": _rclib.RlsReadout.Solver.RANK1_UPDATE,
     "rank_k_update": _rclib.RlsReadout.Solver.RANK_K_UPDATE,
 }
+_RLS_FORGETTING_METHODS = {
+    "exponential": _rclib.RlsReadout.ForgettingMethod.EXPONENTIAL,
+    "directional": _rclib.RlsReadout.ForgettingMethod.DIRECTIONAL,
+}
 _SPECTRAL_RADIUS_METHODS = {
     "power_iteration": _rclib.RandomSparseReservoir.SpectralRadiusMethod.POWER_ITERATION,
     "dense": _rclib.RandomSparseReservoir.SpectralRadiusMethod.DENSE,
@@ -50,6 +54,7 @@ _MODULATORS = {"difference": _RULE.Modulator.DIFFERENCE, "heaviside": _RULE.Modu
 _BASELINES = {"ema": _RULE.Baseline.EMA, "window": _RULE.Baseline.WINDOW, "none": _RULE.Baseline.NONE}
 _RIDGE_SOLVER_NAMES = {solver: name for name, solver in _RIDGE_SOLVERS.items()}
 _RLS_SOLVER_NAMES = {solver: name for name, solver in _RLS_SOLVERS.items()}
+_RLS_FORGETTING_METHOD_NAMES = {method: name for name, method in _RLS_FORGETTING_METHODS.items()}
 _SPECTRAL_RADIUS_METHOD_NAMES = {method: name for name, method in _SPECTRAL_RADIUS_METHODS.items()}
 _DISTRIBUTION_NAMES = {value: name for name, value in _DISTRIBUTIONS.items()}
 _POST_SIGNAL_NAMES = {value: name for name, value in _POST_SIGNALS.items()}
@@ -162,6 +167,7 @@ def _readout_config_from_cpp(
             delta=cpp_readout.getDelta(),
             include_bias=cpp_readout.getIncludeBias(),
             solver=_RLS_SOLVER_NAMES[cpp_readout.getSolver()],
+            forgetting_method=_RLS_FORGETTING_METHOD_NAMES[cpp_readout.getForgettingMethod()],
         )
     if isinstance(cpp_readout, _rclib.LmsReadout):
         return readouts.Lms(learning_rate=cpp_readout.getLearningRate(), include_bias=cpp_readout.getIncludeBias())
@@ -188,7 +194,16 @@ def _cpp_readout_from_config(readout: Any) -> Any:  # noqa: ANN401
         if readout.solver not in _RLS_SOLVERS:
             msg = f"Unsupported RLS solver: {readout.solver}"
             raise ValueError(msg)
-        return _rclib.RlsReadout(readout.lambda_, readout.delta, readout.include_bias, _RLS_SOLVERS[readout.solver])
+        if readout.forgetting_method not in _RLS_FORGETTING_METHODS:
+            msg = f"Unsupported RLS forgetting_method: {readout.forgetting_method}"
+            raise ValueError(msg)
+        return _rclib.RlsReadout(
+            readout.lambda_,
+            readout.delta,
+            readout.include_bias,
+            _RLS_SOLVERS[readout.solver],
+            _RLS_FORGETTING_METHODS[readout.forgetting_method],
+        )
     if isinstance(readout, readouts.Lms):
         return _rclib.LmsReadout(readout.learning_rate, readout.include_bias)
     if isinstance(readout, readouts.RewardModulated):

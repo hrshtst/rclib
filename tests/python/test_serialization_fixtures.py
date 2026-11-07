@@ -1,7 +1,7 @@
 # Copyright (c) 2025-2026 Hiroshi Atsuta
 # SPDX-License-Identifier: Apache-2.0
 
-"""Load the frozen fixtures of model format versions 1 to 4.
+"""Load the frozen fixtures of model format versions 1 to 5.
 
 The fixtures in tests/data/serialization/v<N> (see generate.py there) check that
 files written by earlier builds keep loading with the same configuration and
@@ -136,6 +136,16 @@ V3_FIXTURE_CONFIGS = {
         ),
     ),
 }
+# Fixtures that exist from format version 5 on.
+V5_FIXTURE_CONFIGS = {
+    "serial_nvar_rls_directional": (
+        "serial",
+        _expected_configs(
+            reservoirs.Nvar(num_lags=2, polynomial_order=1),
+            readouts.Rls(lambda_=0.95, delta=0.5, include_bias=True, forgetting_method="directional"),
+        ),
+    ),
+}
 # Fixtures that exist from format version 4 on: reward-modulated components saved mid-learning,
 # with the input width of their expected results.
 V4_REWARD_FIXTURES = {
@@ -218,7 +228,12 @@ V4_REWARD_FIXTURES = {
 FIXTURES_BY_VERSION = (
     [(1, name) for name in FIXTURE_CONFIGS]
     + [(2, name) for name in [*FIXTURE_CONFIGS, *V2_FIXTURE_CONFIGS]]
-    + [(version, name) for version in (3, 4) for name in [*FIXTURE_CONFIGS, *V2_FIXTURE_CONFIGS, *V3_FIXTURE_CONFIGS]]
+    + [
+        (version, name)
+        for version in (3, 4, 5)
+        for name in [*FIXTURE_CONFIGS, *V2_FIXTURE_CONFIGS, *V3_FIXTURE_CONFIGS]
+    ]
+    + [(5, name) for name in V5_FIXTURE_CONFIGS]
 )
 # Fixtures with expected results, and whether their readout learns online.
 RESULTS = {
@@ -227,6 +242,7 @@ RESULTS = {
     "serial_rs_lms": True,
     "serial_rs_dense_ridge": False,
     "serial_rs_bias_ridge": False,
+    "serial_nvar_rls_directional": True,
 }
 
 
@@ -234,9 +250,10 @@ RESULTS = {
 def test_fixture_configuration(version: int, name: str) -> None:
     """The configuration is restored exactly.
 
-    Version 1 files load as power iteration, and version 1 and 2 files with a bias_scaling of 1.
+    Version 1 files load as power iteration, version 1 and 2 files with a bias_scaling of 1, and
+    files before version 5 with exponential forgetting.
     """
-    connection_type, configs = (FIXTURE_CONFIGS | V2_FIXTURE_CONFIGS | V3_FIXTURE_CONFIGS)[name]
+    connection_type, configs = (FIXTURE_CONFIGS | V2_FIXTURE_CONFIGS | V3_FIXTURE_CONFIGS | V5_FIXTURE_CONFIGS)[name]
     esn = ESN.load(_fixture(version, name))
     assert esn.connection_type == connection_type
     assert _configs(esn) == configs
@@ -262,7 +279,7 @@ def test_fixture_results(version: int, name: str) -> None:
         check(esn.predict(expected["input_predict"]), "after_partial_fit")
 
 
-@pytest.mark.parametrize("version", [1, 2, 3, 4])
+@pytest.mark.parametrize("version", [1, 2, 3, 4, 5])
 def test_unfitted_fixture_cannot_predict(version: int) -> None:
     """The unfitted fixture loads with an unfitted readout."""
     esn = ESN.load(_fixture(version, "unfitted_ridge"))
@@ -270,21 +287,23 @@ def test_unfitted_fixture_cannot_predict(version: int) -> None:
         esn.predict(np.ones((3, 1)))
 
 
+@pytest.mark.parametrize("version", [4, 5])
 @pytest.mark.parametrize("name", V4_REWARD_FIXTURES)
-def test_reward_fixture_configuration(name: str) -> None:
+def test_reward_fixture_configuration(name: str, version: int) -> None:
     """A reward-modulated model saved mid-learning restores its configuration exactly."""
     connection_type, _, configs = V4_REWARD_FIXTURES[name]
-    esn = ESN.load(_fixture(4, name))
+    esn = ESN.load(_fixture(version, name))
     assert esn.connection_type == connection_type
     assert _configs(esn) == configs
 
 
+@pytest.mark.parametrize("version", [4, 5])
 @pytest.mark.parametrize("name", V4_REWARD_FIXTURES)
-def test_reward_fixture_results(name: str) -> None:
+def test_reward_fixture_results(name: str, version: int) -> None:
     """Exploring, reinforcing and noise-free steps follow the sequence documented in v4/generate.py."""
     _, input_width, _ = V4_REWARD_FIXTURES[name]
-    esn = ESN.load(_fixture(4, name))
-    expected = _read_expected(4, name)
+    esn = ESN.load(_fixture(version, name))
+    expected = _read_expected(version, name)
 
     def check(actual: np.ndarray, key: str) -> None:
         np.testing.assert_allclose(actual.reshape(-1, 1), expected[key], rtol=1e-10, atol=1e-12)

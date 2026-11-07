@@ -135,12 +135,18 @@ PYBIND11_MODULE(_rclib, m) {
       .value("RANK_K_UPDATE", RlsReadout::Solver::RANK_K_UPDATE)
       .export_values();
 
-  rls.def(py::init<double, double, bool, RlsReadout::Solver>(), py::arg("lambda_"), py::arg("delta"),
-          py::arg("include_bias"), py::arg("solver") = RlsReadout::Solver::RANK1_UPDATE)
+  py::enum_<RlsReadout::ForgettingMethod>(rls, "ForgettingMethod")
+      .value("EXPONENTIAL", RlsReadout::ForgettingMethod::EXPONENTIAL)
+      .value("DIRECTIONAL", RlsReadout::ForgettingMethod::DIRECTIONAL);
+
+  rls.def(py::init<double, double, bool, RlsReadout::Solver, RlsReadout::ForgettingMethod>(), py::arg("lambda_"),
+          py::arg("delta"), py::arg("include_bias"), py::arg("solver") = RlsReadout::Solver::RANK1_UPDATE,
+          py::arg("forgetting_method") = RlsReadout::ForgettingMethod::EXPONENTIAL)
       .def("getLambda", &RlsReadout::getLambda)
       .def("getDelta", &RlsReadout::getDelta)
       .def("getIncludeBias", &RlsReadout::getIncludeBias)
       .def("getSolver", &RlsReadout::getSolver)
+      .def("getForgettingMethod", &RlsReadout::getForgettingMethod)
       .def("getWeights", &RlsReadout::getWeights, py::return_value_policy::copy,
            "The current weights as a copy: shape (n_features + include_bias, n_outputs), bias row last; every fit "
            "or partialFit changes them.");

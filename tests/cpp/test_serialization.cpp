@@ -21,6 +21,7 @@
 #include <stdexcept>
 #include <streambuf>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -211,10 +212,13 @@ struct RlsPayload {
   double lambda = 0.99;
   double delta = 1.0;
   std::uint8_t include_bias = 1;
-  std::uint8_t solver = 0; // RANK1_UPDATE
+  std::uint8_t solver = 0;            // RANK1_UPDATE
+  std::uint8_t forgetting_method = 0; // EXPONENTIAL
   std::uint8_t initialized = 1;
   Eigen::MatrixXd W_out = Eigen::MatrixXd::Ones(3, 2);
   Eigen::MatrixXd P = Eigen::MatrixXd::Identity(3, 3);
+  // Versions before 5 have no forgetting_method.
+  std::uint32_t format_version = serialization_format_version;
 
   std::string bytes() const {
     std::stringstream buffer;
@@ -223,6 +227,9 @@ struct RlsPayload {
     writer.writeDouble(delta);
     writer.writeU8(include_bias);
     writer.writeU8(solver);
+    if (format_version >= 5) {
+      writer.writeU8(forgetting_method);
+    }
     writer.writeU8(initialized);
     if (initialized != 0) {
       writer.writeMatrix(W_out);
@@ -729,9 +736,10 @@ TEST_CASE("RidgeReadout - serialization round-trips", "[serialization][RidgeRead
 
 TEST_CASE("RlsReadout - serialization round-trips and continues identically", "[serialization][RlsReadout]") {
   // The rank-k (Woodbury) update only runs for lambda == 1 and batches of more than one row.
-  const auto config =
-      GENERATE(std::make_pair(0.99, RlsReadout::RANK1_UPDATE), std::make_pair(1.0, RlsReadout::RANK_K_UPDATE));
-  RlsReadout original(config.first, 0.5, true, config.second);
+  const auto config = GENERATE(std::make_tuple(0.99, RlsReadout::RANK1_UPDATE, RlsReadout::EXPONENTIAL),
+                               std::make_tuple(0.99, RlsReadout::RANK1_UPDATE, RlsReadout::DIRECTIONAL),
+                               std::make_tuple(1.0, RlsReadout::RANK_K_UPDATE, RlsReadout::EXPONENTIAL));
+  RlsReadout original(std::get<0>(config), 0.5, true, std::get<1>(config), std::get<2>(config));
   const Eigen::MatrixXd states = Eigen::MatrixXd::Random(12, 4);
   const Eigen::MatrixXd targets = Eigen::MatrixXd::Random(12, 2);
 
@@ -749,6 +757,7 @@ TEST_CASE("RlsReadout - serialization round-trips and continues identically", "[
   REQUIRE(restored->getDelta() == original.getDelta());
   REQUIRE(restored->getIncludeBias() == original.getIncludeBias());
   REQUIRE(restored->getSolver() == original.getSolver());
+  REQUIRE(restored->getForgettingMethod() == original.getForgettingMethod());
   REQUIRE(restored->getInputDim() == original.getInputDim());
 
   // The same later updates, in two-row batches, keep both readouts bit-identical.
@@ -804,12 +813,36 @@ TEST_CASE("RlsReadout - invalid payloads are rejected", "[serialization][RlsRead
   SECTION("NaN lambda") { payload.lambda = nan_value; }
   SECTION("Non-positive delta") { payload.delta = 0.0; }
   SECTION("Unknown solver code") { payload.solver = 2; }
+  SECTION("Unknown forgetting_method code") { payload.forgetting_method = 2; }
   SECTION("initialized byte other than 0 or 1") { payload.initialized = 2; }
   SECTION("Weights without output columns") { payload.W_out = Eigen::MatrixXd(3, 0); }
   SECTION("Non-square P") { payload.P = Eigen::MatrixXd::Identity(3, 2); }
   SECTION("P of the wrong size") { payload.P = Eigen::MatrixXd::Identity(2, 2); }
 
   REQUIRE_THROWS_AS(loadFromBytes<RlsReadout>(payload.bytes()), SerializationError);
+}
+
+TEST_CASE("RlsReadout - forgetting_method is read from version 5 on", "[serialization][RlsReadout]") {
+  RlsPayload payload;
+  RlsReadout::ForgettingMethod expected = RlsReadout::EXPONENTIAL;
+  SECTION("Version 4 has no code and loads as EXPONENTIAL") { payload.format_version = 4; }
+  SECTION("Version 5 with EXPONENTIAL") { payload.format_version = 5; }
+  SECTION("Version 5 with DIRECTIONAL") {
+    payload.format_version = 5;
+    payload.forgetting_method = 1;
+    expected = RlsReadout::DIRECTIONAL;
+  }
+
+  std::string bytes = "RCLIBMDL";
+  appendRaw(bytes, payload.format_version);
+  bytes += payload.bytes();
+  std::istringstream input(bytes);
+  BinaryReader reader(input);
+  reader.readHeader();
+  const auto restored = RlsReadout::load(reader);
+  REQUIRE(reader.remainingBytes() == 0);
+  REQUIRE(restored->getForgettingMethod() == expected);
+  REQUIRE(sameBits(restored->getWeights(), payload.W_out));
 }
 
 TEST_CASE("LmsReadout - invalid payloads are rejected", "[serialization][LmsReadout]") {

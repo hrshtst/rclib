@@ -504,11 +504,19 @@ def test_set_readout_replaces_the_readout_set_before() -> None:
     assert model._readout_params is lms  # noqa: SLF001
 
 
+def _rls_with_forgetting_method(method: str) -> readouts.Rls:
+    """An RLS configuration whose forgetting_method was changed after the checks of its constructor."""
+    config = readouts.Rls(lambda_=0.99, delta=1.0, include_bias=True)
+    config.forgetting_method = method
+    return config
+
+
 @pytest.mark.parametrize(
     ("readout", "error"),
     [
         (readouts.Ridge(alpha=1e-6, include_bias=True, solver="unknown"), ValueError),
         (readouts.Rls(lambda_=0.99, delta=1.0, include_bias=True, solver="unknown"), ValueError),
+        (_rls_with_forgetting_method("unknown"), ValueError),
         ("not a readout", TypeError),
     ],
 )

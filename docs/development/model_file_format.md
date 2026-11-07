@@ -1,7 +1,7 @@
 # Model File Format
 
 `Model::save` / `ESN.save` write a binary file in the format described here
-(version 4). Integers and floats are little-endian and fixed-width; only
+(version 5). Integers and floats are little-endian and fixed-width; only
 little-endian hosts are supported.
 
 ## Versions
@@ -11,16 +11,19 @@ little-endian hosts are supported.
 | 1 | rclib 0.2.0 | Initial format. |
 | 2 | rclib after 0.2.0 | `RandomSparseReservoir` stores `spectral_radius_method`. |
 | 3 | later versions | `RandomSparseReservoir` stores `bias_scaling`. |
-| 4 | later versions | Adds `RewardModulatedReservoir` and `RewardModulatedReadout`, and models without a readout (a `has_readout` flag). |
+| 4 | rclib 0.3.0 | Adds `RewardModulatedReservoir` and `RewardModulatedReadout`, and models without a readout (a `has_readout` flag). |
+| 5 | later versions | `RlsReadout` stores `forgetting_method`. |
 
 The writer always writes the current version. The reader accepts every version
 up to the current one and reads a field only in the versions that have it, so
 older files still load. In version 1 files, `RandomSparseReservoir` reservoirs load
 with `spectral_radius_method` POWER_ITERATION, and in version 1 and 2 files with
 `bias_scaling` 1, which is how they were built, and files before version 4 always
-have a readout. rclib 0.2.0 rejects version 2 and later files, builds that write
-version 2 reject version 3 files, and builds that write version 3 reject version 4
-files. The reward-modulated type tags are accepted only in version 4 and later
+have a readout. Files before version 5 load their `RlsReadout` with
+`forgetting_method` EXPONENTIAL, the only method they had. rclib 0.2.0 rejects
+version 2 and later files, builds that write version 2 reject version 3 files,
+builds that write version 3 reject version 4 files, and rclib 0.3.0 and other builds
+that write version 4 reject version 5 files. The reward-modulated type tags are accepted only in version 4 and later
 files.
 
 ## Primitives
@@ -39,7 +42,7 @@ against the bytes remaining in the input before allocating.
 ## Layout
 
 ```
-header      "RCLIBMDL" (8 bytes), u32 format_version = 4
+header      "RCLIBMDL" (8 bytes), u32 format_version = 5
 model       u8 connection (0 = serial, 1 = parallel), u32 n_reservoirs,
             n_reservoirs x (string type_tag, payload),
             bool has_readout (v4+), [string type_tag, payload]   (the readout)
@@ -51,7 +54,8 @@ The model must extend to the end of the input; trailing data is rejected.
 
 A field in brackets is present only when the flag just before it is true, so a
 component that is not initialized carries no leftover matrices. A field marked
-"v2+" is present from version 2 on, and one marked "v3+" from version 3 on. A
+"v2+" is present from version 2 on, one marked "v3+" from version 3 on, and one
+marked "v5+" from version 5 on. A
 version 1 to 3 file has no `has_readout` flag and always a readout.
 
 | Type tag | Payload |
@@ -59,7 +63,7 @@ version 1 to 3 file has no `has_readout` flag and always a readout.
 | `RandomSparseReservoir` | `i32` n_neurons, `f64` spectral_radius, `f64` sparsity, `f64` leak_rate, `f64` input_scaling, `bool` include_bias, `u32` seed, `u8` spectral_radius_method (v2+), `f64` bias_scaling (v3+), sparse W_res, dense bias (1 x n), dense state (1 x n), `bool` w_in_initialized, [dense W_in] |
 | `NvarReservoir` | `i32` num_lags, `i32` polynomial_order, `bool` initialized, [`i32` input_dim, dense state, dense past_inputs] |
 | `RidgeReadout` | `f64` alpha, `bool` include_bias, `u8` solver, `f64` tolerance, `u8` effective_solver, `bool` fitted, [dense W_out] |
-| `RlsReadout` | `f64` lambda, `f64` delta, `bool` include_bias, `u8` solver, `bool` initialized, [dense W_out, dense P] |
+| `RlsReadout` | `f64` lambda, `f64` delta, `bool` include_bias, `u8` solver, `u8` forgetting_method (v5+), `bool` initialized, [dense W_out, dense P] |
 | `LmsReadout` | `f64` learning_rate, `bool` include_bias, `bool` initialized, [dense W_out] |
 | `RewardModulatedReservoir` (v4+) | `i32` n_neurons, `f64` spectral_radius, `f64` sparsity, `f64` leak_rate, `f64` input_scaling, `bool` include_bias, `u32` seed, `u8` spectral_radius_method, `f64` bias_scaling, plastic_presynaptic, plastic_postsynaptic, sparse W_res, dense bias (1 x n), dense state (1 x n), dense potential (1 x n), `bool` w_in_initialized, [dense W_in], learning |
 | `RewardModulatedReadout` (v4+) | `i32` n_outputs, `bool` include_bias, learning, [dense W] when the learning state is initialized |
@@ -84,6 +88,7 @@ Solver and method codes are fixed and independent of the C++ enum order:
 | `RandomSparseReservoir::SpectralRadiusMethod` | POWER_ITERATION = 0, DENSE = 1 |
 | `RidgeReadout::Solver` | AUTO = 0, CHOLESKY = 1, DUAL_CHOLESKY = 2, CONJUGATE_GRADIENT = 3, CONJUGATE_GRADIENT_IMPLICIT = 4 |
 | `RlsReadout::Solver` | RANK1_UPDATE = 0, RANK_K_UPDATE = 1 |
+| `RlsReadout::ForgettingMethod` | EXPONENTIAL = 0, DIRECTIONAL = 1 |
 | `RewardModulatedHebbianRule::Distribution` | UNIFORM = 0, GAUSSIAN = 1 |
 | `RewardModulatedHebbianRule::PostSignal` | NOISE = 0, HIGH_PASS = 1, POTENTIAL = 2 |
 | `RewardModulatedHebbianRule::Update` | ONLINE = 0, TRIAL = 1 |

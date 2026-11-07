@@ -65,6 +65,24 @@ for i in range(0, len(X), 64):
 
 > **Note:** `rank_k_update` is mathematically equivalent to sequential RLS only when the forgetting factor `lambda` is 1.0. For `lambda < 1.0`, `rclib` automatically falls back to sequential `rank1_update` to ensure mathematical correctness.
 
+### Forgetting in RLS
+
+With a forgetting factor `lambda_` below 1, the default `forgetting_method="exponential"`
+forgets in every direction, also in directions that the inputs never excite.
+There the covariance grows as `lambda_**-n` and, within some multiple of
+`1 / (1 - lambda_)` samples, the weights are lost. This is likely whenever the
+inputs span fewer dimensions than the readout has features: samples from one
+repeated trajectory, or features that are linear combinations of others.
+`forgetting_method="directional"` forgets only along each sample's input, so it
+keeps forgetting without winding up:
+
+```python
+readout = readouts.Rls(lambda_=0.999, delta=1.0, include_bias=True, forgetting_method="directional")
+```
+
+At `lambda_=1.0` the two methods are the same. Each costs one rank-1 update per
+sample. See [Forgetting Methods](../theory/readout_algorithms.md#forgetting-methods).
+
 ## Generative Prediction
 
 To generate sequences autonomously (feeding predictions back as inputs):

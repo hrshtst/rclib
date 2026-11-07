@@ -32,16 +32,46 @@ RlsReadout::Solver solverFromWire(std::uint8_t code) {
   }
 }
 
+std::uint8_t forgettingMethodToWire(RlsReadout::ForgettingMethod method) {
+  switch (method) {
+    case RlsReadout::EXPONENTIAL:
+      return 0;
+    case RlsReadout::DIRECTIONAL:
+      return 1;
+  }
+  throw SerializationError("RlsReadout: unknown forgetting method value " + std::to_string(static_cast<int>(method)) +
+                           ".");
+}
+
+RlsReadout::ForgettingMethod forgettingMethodFromWire(std::uint8_t code) {
+  switch (code) {
+    case 0:
+      return RlsReadout::EXPONENTIAL;
+    case 1:
+      return RlsReadout::DIRECTIONAL;
+    default:
+      throw SerializationError("RlsReadout: unknown forgetting method code " + std::to_string(code) + ".");
+  }
+}
+
+// The version that added the forgetting method; earlier files forget exponentially.
+constexpr std::uint32_t forgetting_method_version = 5;
+
 } // namespace
 
-RlsReadout::RlsReadout(double lambda, double delta, bool include_bias, Solver solver)
-    : lambda(lambda), delta(delta), include_bias(include_bias), solver(solver), initialized(false) {
+RlsReadout::RlsReadout(double lambda, double delta, bool include_bias, Solver solver,
+                       ForgettingMethod forgetting_method)
+    : lambda(lambda), delta(delta), include_bias(include_bias), solver(solver), forgetting_method(forgetting_method),
+      initialized(false) {
   // The range check is written so that NaN fails it; the one-sided bound also needs isfinite.
   if (!(lambda > 0.0 && lambda <= 1.0)) {
     throw std::invalid_argument("lambda must be in (0, 1].");
   }
   if (!std::isfinite(delta) || delta <= 0.0) {
     throw std::invalid_argument("delta must be finite and positive.");
+  }
+  if (forgetting_method != EXPONENTIAL && forgetting_method != DIRECTIONAL) {
+    throw std::invalid_argument("forgetting_method must be EXPONENTIAL or DIRECTIONAL.");
   }
 }
 
@@ -132,7 +162,8 @@ void RlsReadout::partialFit(const Eigen::MatrixXd &state, const Eigen::MatrixXd 
       Px.noalias() = P.selfadjointView<Eigen::Upper>() * x_aug;
 
       // 2. Compute denominator = lambda + x^T * Px
-      double denominator = lambda + x_aug.dot(Px);
+      const double xPx = x_aug.dot(Px);
+      const double denominator = lambda + xPx;
 
       // 3. Compute Kalman gain vector k = Px / denominator
       k = Px / denominator;
@@ -143,9 +174,25 @@ void RlsReadout::partialFit(const Eigen::MatrixXd &state, const Eigen::MatrixXd 
       // 5. Update weights: W_out = W_out + k * error
       W_out.noalias() += k * error_vec;
 
-      // 6. Update P: P = (1/lambda) * (P - (Px * Px^T) / denominator)
-      P.triangularView<Eigen::Upper>() *= (1.0 / lambda);
-      P.selfadjointView<Eigen::Upper>().rankUpdate(Px, -1.0 / (lambda * denominator));
+      // 6. Update P. Both methods forget, then add the sample: P^-1 becomes the
+      //    discounted information plus x * x^T, and P follows by Sherman-Morrison.
+      //    At lambda = 1 nothing is forgotten and the methods are the same.
+      if (forgetting_method == DIRECTIONAL && lambda < 1.0) {
+        // Directional: P^-1 loses (1 - lambda) * x * x^T / (x^T * P * x), that share of
+        // its information along x, so the directions x does not excite keep theirs:
+        // P = P + ((1 - lambda) - x^T P x) / denominator * (Px * Px^T) / (x^T P x).
+        // The scaled vector keeps a tiny x^T P x from overflowing the factor. A zero
+        // input carries no information, and nothing is forgotten or added.
+        if (xPx > 0.0) {
+          k = Px / std::sqrt(xPx); // the gain has been applied; reuse its buffer
+          P.selfadjointView<Eigen::Upper>().rankUpdate(k, ((1.0 - lambda) - xPx) / denominator);
+        }
+      } else {
+        // Exponential: P^-1 is discounted by lambda in every direction,
+        // P = (1/lambda) * (P - (Px * Px^T) / denominator).
+        P.triangularView<Eigen::Upper>() *= (1.0 / lambda);
+        P.selfadjointView<Eigen::Upper>().rankUpdate(Px, -1.0 / (lambda * denominator));
+      }
     }
   }
 }
@@ -181,6 +228,7 @@ void RlsReadout::checkConsistency() const {
   translateSerializationErrors("RlsReadout", [&] {
     // The hyperparameters were validated by the constructor; load() constructs through it.
     solverToWire(solver);
+    forgettingMethodToWire(forgetting_method);
     if (!initialized) {
       return; // stale matrices left by a failed fit() are never used or saved
     }
@@ -200,6 +248,7 @@ void RlsReadout::save(BinaryWriter &writer) const {
     writer.writeDouble(delta);
     writer.writeBool(include_bias);
     writer.writeU8(solverToWire(solver));
+    writer.writeU8(forgettingMethodToWire(forgetting_method));
     writer.writeBool(initialized);
     if (initialized) {
       writer.writeMatrix(W_out);
@@ -214,7 +263,10 @@ std::shared_ptr<RlsReadout> RlsReadout::load(BinaryReader &reader) {
     const double delta = reader.readDouble();
     const bool include_bias = reader.readBool();
     const Solver solver = solverFromWire(reader.readU8());
-    auto readout = std::make_shared<RlsReadout>(lambda, delta, include_bias, solver); // validates
+    // Files before version 5 predate the option; they all forgot exponentially.
+    const ForgettingMethod forgetting_method =
+        reader.formatVersion() >= forgetting_method_version ? forgettingMethodFromWire(reader.readU8()) : EXPONENTIAL;
+    auto readout = std::make_shared<RlsReadout>(lambda, delta, include_bias, solver, forgetting_method); // validates
     if (reader.readBool()) {
       readout->W_out = reader.readMatrix();
       readout->P = reader.readMatrix();
