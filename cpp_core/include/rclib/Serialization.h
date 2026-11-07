@@ -18,8 +18,9 @@ public:
 
 /// Version written by BinaryWriter::writeHeader; BinaryReader accepts versions 1..this.
 /// Version 2 added RandomSparseReservoir's spectral_radius_method, version 3 its bias_scaling,
-/// and version 4 the reward-modulated readout and reservoir and models without a readout.
-constexpr std::uint32_t serialization_format_version = 4;
+/// version 4 the reward-modulated readout and reservoir and models without a readout, and
+/// version 5 RlsReadout's forgetting_method.
+constexpr std::uint32_t serialization_format_version = 5;
 
 /// Longest string a model file may contain. Strings only hold component type tags.
 constexpr std::uint32_t serialization_max_string_length = 64;

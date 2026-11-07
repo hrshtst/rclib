@@ -311,6 +311,8 @@ def test_readout_validation() -> None:
         readouts.Rls(lambda_=1.5, delta=1.0, include_bias=True)
     with pytest.raises(ValueError, match="delta"):
         readouts.Rls(lambda_=0.99, delta=0.0, include_bias=True)
+    with pytest.raises(ValueError, match="forgetting_method"):
+        readouts.Rls(lambda_=0.99, delta=1.0, include_bias=True, forgetting_method="unknown")
     with pytest.raises(ValueError, match="learning_rate"):
         readouts.Lms(learning_rate=0.0, include_bias=True)
 
@@ -440,3 +442,50 @@ def test_readout_getters_and_input_dim() -> None:
     assert (lms.getLearningRate(), lms.getIncludeBias(), lms.getInputDim()) == (0.05, True, 0)
     lms.fit(states, targets)
     assert lms.getInputDim() == states.shape[1]
+
+
+def _confined_inputs(n_samples: int) -> np.ndarray:
+    """Inputs that excite two of four directions: the first two features are equal, and so are the last two."""
+    t = np.arange(n_samples)
+    a = np.sin(0.3 * t)
+    b = 0.5 * np.cos(0.7 * t) + 0.2
+    return np.column_stack((a, a, b, b))
+
+
+def test_rls_forgetting_method_defaults_to_exponential() -> None:
+    """The config and the C++ readout both default to exponential forgetting, and report the method."""
+    assert readouts.Rls(lambda_=0.99, delta=1.0, include_bias=True).forgetting_method == "exponential"
+    assert _rclib.RlsReadout(lambda_=0.99, delta=1.0, include_bias=True).getForgettingMethod() == (
+        _rclib.RlsReadout.ForgettingMethod.EXPONENTIAL
+    )
+    directional = _rclib.RlsReadout(
+        lambda_=0.99, delta=1.0, include_bias=True, forgetting_method=_rclib.RlsReadout.ForgettingMethod.DIRECTIONAL
+    )
+    assert directional.getForgettingMethod() == _rclib.RlsReadout.ForgettingMethod.DIRECTIONAL
+
+
+def test_rls_directional_forgetting_does_not_wind_up() -> None:
+    """With inputs that excite only some directions, directional forgetting keeps tracking where exponential is lost.
+
+    Exponential forgetting at 0.8 lets the covariance of the unexcited directions grow as
+    0.8**-n, which overflows within about 3,200 samples. Directional forgetting still
+    forgets, and follows the target when it changes halfway.
+    """
+    states = _confined_inputs(4000)
+    a, b = states[:, 0], states[:, 2]
+    half = len(states) // 2
+    targets = np.where(np.arange(len(states)) < half, 2.0 * a - b, -a + 3.0 * b).reshape(-1, 1)
+
+    predictions = {}
+    for method in ("exponential", "directional"):
+        model = ESN()
+        model.add_reservoir(reservoirs.Nvar(num_lags=1, polynomial_order=1))
+        model.set_readout(readouts.Rls(lambda_=0.8, delta=1.0, include_bias=False, forgetting_method=method))
+        with np.errstate(over="ignore", invalid="ignore"):
+            for state, target in zip(states, targets, strict=True):
+                model.partial_fit(state.reshape(1, -1), target.reshape(1, -1))
+            predictions[method] = model.get_readout().predict(states[-100:])
+
+    lost = predictions["exponential"]
+    assert not (np.all(np.isfinite(lost)) and np.linalg.norm(lost - targets[-100:]) < 1.0)
+    np.testing.assert_allclose(predictions["directional"], targets[-100:], atol=1e-8)

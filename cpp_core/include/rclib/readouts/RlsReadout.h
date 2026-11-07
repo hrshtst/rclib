@@ -11,8 +11,14 @@ class BinaryWriter;
 class RlsReadout : public Readout {
 public:
   enum Solver { RANK1_UPDATE, RANK_K_UPDATE };
+  /// How a sample forgets the old information when lambda < 1. EXPONENTIAL
+  /// discounts it in every direction, so the directions that the inputs do not
+  /// excite wind up: P grows there as lambda^-n. DIRECTIONAL discounts it only
+  /// along the sample's input, so they keep it. At lambda = 1 the two are the same.
+  enum ForgettingMethod { EXPONENTIAL, DIRECTIONAL };
 
-  RlsReadout(double lambda = 0.99, double delta = 1.0, bool include_bias = true, Solver solver = RANK1_UPDATE);
+  RlsReadout(double lambda = 0.99, double delta = 1.0, bool include_bias = true, Solver solver = RANK1_UPDATE,
+             ForgettingMethod forgetting_method = EXPONENTIAL);
 
   void fit(const Eigen::MatrixXd &states, const Eigen::MatrixXd &targets) override;
   void partialFit(const Eigen::MatrixXd &state, const Eigen::MatrixXd &target) override;
@@ -26,6 +32,7 @@ public:
   double getDelta() const { return delta; }
   bool getIncludeBias() const { return include_bias; }
   Solver getSolver() const { return solver; }
+  ForgettingMethod getForgettingMethod() const { return forgetting_method; }
 
   /// The current readout weights: a (n_features [+ 1], n_outputs) matrix whose
   /// last row is the bias term when include_bias is true. Every fit or
@@ -47,6 +54,7 @@ private:
   double delta;
   bool include_bias;
   Solver solver;
+  ForgettingMethod forgetting_method;
 
   Eigen::MatrixXd W_out; // Weight matrix
   Eigen::MatrixXd P;     // Inverse covariance matrix

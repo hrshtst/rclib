@@ -48,9 +48,10 @@ READOUTS: dict[str, readouts.Ridge | readouts.Rls | readouts.Lms] = {
     "rls_rank1": readouts.Rls(lambda_=0.99, delta=1.0, include_bias=True),
     # The rank-k (Woodbury) update only runs for lambda == 1 and batches of more than one row.
     "rls_rank_k": readouts.Rls(lambda_=1.0, delta=1.0, include_bias=True, solver="rank_k_update"),
+    "rls_directional": readouts.Rls(lambda_=0.99, delta=1.0, include_bias=True, forgetting_method="directional"),
     "lms": readouts.Lms(learning_rate=0.01, include_bias=True),
 }
-ONLINE_READOUTS = ["rls_rank1", "rls_rank_k", "lms"]
+ONLINE_READOUTS = ["rls_rank1", "rls_rank_k", "rls_directional", "lms"]
 
 
 def _signal(n_samples: int, phase: float = 0.0) -> np.ndarray:
@@ -115,6 +116,18 @@ def test_ridge_solver_names_round_trip(tmp_path: Path, solver: str) -> None:
     esn.set_readout(readouts.Ridge(alpha=0.5, include_bias=True, solver=solver, tolerance=1e-7))
     esn.save(tmp_path / "model.rclib")
     assert _configs(ESN.load(tmp_path / "model.rclib")) == _configs(esn)
+
+
+@pytest.mark.parametrize("method", ["exponential", "directional"])
+def test_rls_forgetting_method_round_trips(tmp_path: Path, method: str) -> None:
+    """The RLS forgetting_method survives saving and loading, also before fitting."""
+    esn = ESN()
+    esn.add_reservoir(reservoirs.Nvar(num_lags=2))
+    esn.set_readout(readouts.Rls(lambda_=0.9, delta=1.0, include_bias=True, forgetting_method=method))
+    esn.save(tmp_path / "model.rclib")
+    restored = ESN.load(tmp_path / "model.rclib")
+    assert _configs(restored) == _configs(esn)
+    assert restored._readout_params.forgetting_method == method  # noqa: SLF001
 
 
 @pytest.mark.parametrize("method", ["power_iteration", "dense"])

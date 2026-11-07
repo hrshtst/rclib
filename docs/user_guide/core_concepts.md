@@ -38,7 +38,9 @@ must be exact. See
 The readout maps the high-dimensional reservoir state to the target output.
 
 *   **Ridge Regression (`readouts.Ridge`)**: The standard offline training method. Fast and stable.
-*   **Recursive Least Squares (`readouts.Rls`)**: For online, adaptive learning.
+*   **Recursive Least Squares (`readouts.Rls`)**: For online, adaptive learning. With a forgetting factor below 1,
+    `forgetting_method="directional"` keeps it from winding up when the inputs excite only some directions (see
+    [Forgetting in RLS](advanced_usage.md#forgetting-in-rls)).
 *   **Least Mean Squares (`readouts.Lms`)**: A simpler gradient-based online method.
 
 Ridge readouts regularize all fitted weights, including the appended constant
