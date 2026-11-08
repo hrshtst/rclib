@@ -83,7 +83,7 @@ int main() {
   // Initialize W_out and predict first step
   esn_lms.getReservoir(0)->advance(test_input.row(0));
   esn_lms.getReadout()->partialFit(esn_lms.getReservoir(0)->getState(), test_target.row(0));
-  preds_lms.row(0) = esn_lms.predict(esn_lms.getReservoir(0)->getState());
+  preds_lms.row(0) = esn_lms.getReadout()->predict(esn_lms.getReservoir(0)->getState());
 
   for (int i = 1; i < test_input.rows(); ++i) {
     Eigen::MatrixXd current_input = test_input.row(i);
@@ -108,7 +108,7 @@ int main() {
   // Initialize W_out and P and predict first step
   esn_rls.getReservoir(0)->advance(test_input.row(0));
   esn_rls.getReadout()->partialFit(esn_rls.getReservoir(0)->getState(), test_target.row(0));
-  preds_rls.row(0) = esn_rls.predict(esn_rls.getReservoir(0)->getState());
+  preds_rls.row(0) = esn_rls.getReadout()->predict(esn_rls.getReservoir(0)->getState());
 
   for (int i = 1; i < test_input.rows(); ++i) {
     Eigen::MatrixXd current_input = test_input.row(i);

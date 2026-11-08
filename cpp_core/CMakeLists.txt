@@ -27,6 +27,8 @@ add_library(
 
 set_target_properties(rclib_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
+target_compile_features(rclib_core PUBLIC cxx_std_17)
+
 target_include_directories(rclib_core PUBLIC include ${EIGEN_INCLUDE_DIRS})
 
 target_link_libraries(rclib_core PUBLIC Eigen3::Eigen)

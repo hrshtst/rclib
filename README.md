@@ -21,6 +21,11 @@
 *   **Build Tool:** `uv` is recommended for managing the Python environment, but standard `pip` works too.
 *   **OpenMP:** Required for parallelization.
     *   Ubuntu/Debian: `sudo apt install libomp-dev`
+    *   macOS: `brew install libomp`, then point CMake at it (otherwise the build silently falls back to single-threaded):
+        ```bash
+        cmake -S . -B build -DOpenMP_ROOT="$(brew --prefix libomp)"                # C++
+        CMAKE_ARGS="-DOpenMP_ROOT=$(brew --prefix libomp)" ./scripts/setup-dev.sh  # Python
+        ```
 
 ### Building from Source
 
