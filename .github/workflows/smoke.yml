@@ -47,8 +47,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # RCLIB_WERROR fails on warnings in our own sources, as in the CI C++ job, so
+          # AppleClang-only warnings are caught here too.
           # shellcheck disable=SC2086 # CMAKE_ARGS is intentionally word-split.
-          cmake -S . -B build -DBUILD_EXAMPLES=ON -DBUILD_TESTING=OFF ${CMAKE_ARGS:-}
+          cmake -S . -B build -DBUILD_EXAMPLES=ON -DBUILD_TESTING=OFF -DRCLIB_WERROR=ON ${CMAKE_ARGS:-}
           # Fail instead of silently falling back to a single-threaded build.
           if ! grep -q '^OpenMP_CXX_FLAGS:STRING=-' build/CMakeCache.txt; then
             echo "::error::OpenMP was not found"

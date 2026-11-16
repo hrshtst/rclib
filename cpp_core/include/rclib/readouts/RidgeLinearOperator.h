@@ -74,7 +74,8 @@ struct evaluator<RidgeLinearOperator<MatrixType>> : evaluator_base<RidgeLinearOp
 
   evaluator(const XprType &xpr) : m_d(xpr) {}
 
-  CoeffReturnType coeff(Index row, Index col) const { return 0; }
+  // Required by Eigen but never called: products go through generic_product_impl below.
+  CoeffReturnType coeff(Index /*row*/, Index /*col*/) const { return 0; }
 
   const XprType &m_d;
 };
