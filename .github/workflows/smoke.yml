@@ -1,0 +1,106 @@
+name: Smoke Test
+
+on:
+  push:
+    branches: ["main", "develop"]
+  pull_request:
+    branches: ["main", "develop"]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install system dependencies (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          # python3-dev lets pybind11 configure/build the _rclib extension.
+          sudo apt-get install -y libomp-dev python3-dev
+
+      # Apple clang has no OpenMP runtime and Homebrew's libomp is keg-only, so
+      # CMake needs OpenMP_ROOT to find it (see README "Prerequisites").
+      # CMAKE_ARGS is used by the C++ build below and read by scikit-build-core
+      # for the Python build.
+      - name: Install system dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install libomp
+          echo "CMAKE_ARGS=-DOpenMP_ROOT=$(brew --prefix libomp)" >> "$GITHUB_ENV"
+
+      - name: Build C++ core and examples
+        shell: bash
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC2086 # CMAKE_ARGS is intentionally word-split.
+          cmake -S . -B build -DBUILD_EXAMPLES=ON -DBUILD_TESTING=OFF ${CMAKE_ARGS:-}
+          # Fail instead of silently falling back to a single-threaded build.
+          if ! grep -q '^OpenMP_CXX_FLAGS:STRING=-' build/CMakeCache.txt; then
+            echo "::error::OpenMP was not found"
+            exit 1
+          fi
+          cmake --build build --config Release -j 4
+
+      - name: Run C++ examples
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Examples write CSV output; keep it out of the checkout.
+          cd "$RUNNER_TEMP"
+          # performance_benchmark is skipped: it is a timing run, not a correctness check.
+          for example in quick_start quick_online mackey_glass sine_wave_prediction online_learning \
+                         compare_online_learning generative_prediction multi_dimensional_prediction \
+                         reward_modulated_pattern_generation; do
+            echo "::group::${example}"
+            "$GITHUB_WORKSPACE/build/examples/cpp/${example}"
+            echo "::endgroup::"
+          done
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Build Python package
+        run: |
+          uv sync --no-install-project --only-group build
+          uv sync
+
+      - name: Python smoke test
+        shell: bash
+        run: |
+          uv run python - <<'EOF'
+          import numpy as np
+          from rclib import ESN, readouts, reservoirs
+
+          t = np.linspace(0, 20, 600).reshape(-1, 1)
+          y = np.sin(t)
+          model = ESN()
+          model.add_reservoir(
+              reservoirs.RandomSparse(n_neurons=200, spectral_radius=0.9, sparsity=0.1, leak_rate=0.3, include_bias=True)
+          )
+          model.set_readout(readouts.Ridge(alpha=1e-6, include_bias=True))
+          model.fit(y[:-1], y[1:])
+          mse = float(np.mean((model.predict(y[:-1]) - y[1:]) ** 2))
+          print(f"one-step MSE: {mse:.3e}")
+          assert np.isfinite(mse) and mse < 1e-2, mse
+          EOF
