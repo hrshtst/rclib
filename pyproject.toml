@@ -10,7 +10,7 @@ readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICEN[CS]E*"]
 authors = [{ name = "Hiroshi Atsuta" }]
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 # The core library depends on numpy alone. Plotting/data deps used only by the
 # examples and benchmarks live in the optional `examples` extra (see below).
 dependencies = [
@@ -24,7 +24,6 @@ classifiers = [
   # from source. Keep this in sync with [tool.cibuildwheel] and CI.
   "Operating System :: POSIX :: Linux",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
   "Topic :: Scientific/Engineering :: Physics",
@@ -134,7 +133,7 @@ build.tool-args = ["-j8"]
 [tool.cibuildwheel]
 build-verbosity = 1
 # Build for specific Python versions and skip 32-bit/musl for now
-build = "cp311-* cp312-* cp313-*"
+build = "cp312-* cp313-*"
 build-frontend = "build[uv]"
 skip = "*-musllinux_* *-manylinux_i686"
 test-command = "pytest {project}/tests/python"
@@ -147,8 +146,8 @@ before-all = "yum install -y libomp-devel"
 [tool.ruff]
 line-length = 120
 indent-width = 4
-# Matches requires-python floor (>=3.11) so 3.11-incompatible syntax is caught.
-target-version = "py311"
+# Matches requires-python floor (>=3.12) so 3.12-incompatible syntax is caught.
+target-version = "py312"
 
 # Exclude a variety of commonly ignored directories.
 exclude = [
@@ -254,7 +253,7 @@ exclude = [
 ]
 venvPath = "."
 venv = ".venv"
-pythonVersion = "3.11"
+pythonVersion = "3.12"
 pythonPlatform = "Linux"
 typeCheckingMode = "basic"
 
