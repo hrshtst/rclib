@@ -42,7 +42,7 @@ Once the release is published on GitHub, the **Publish to PyPI** workflow trigge
 
 *   It checks out the code (including submodules).
 *   It builds the source distribution (`.tar.gz`).
-*   It builds **manylinux-compliant binary wheels** for multiple Python versions (3.11, 3.12, 3.13) using `cibuildwheel`.
+*   It builds **manylinux-compliant binary wheels** for multiple Python versions (3.12–3.15) using `cibuildwheel`.
 *   It securely uploads all artifacts to PyPI using OpenID Connect (OIDC).
 
 ### 5. Documentation Deployment

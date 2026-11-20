@@ -10,7 +10,7 @@ import os
 import nox
 
 # Define the supported Python versions
-PYTHON_VERSIONS = ["3.11", "3.12", "3.13"]
+PYTHON_VERSIONS = ["3.12", "3.13", "3.14", "3.15"]
 
 nox.options.sessions = ["lint", "type_check", "tests"]
 nox.options.default_venv_backend = "uv|virtualenv"

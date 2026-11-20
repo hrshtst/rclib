@@ -17,7 +17,7 @@
 
 *   **C++ Compiler:** GCC or Clang supporting C++17.
 *   **CMake:** Version 3.15 or higher.
-*   **Python:** Version 3.11 or higher (for Python bindings).
+*   **Python:** Version 3.12 or higher (for Python bindings).
 *   **Build Tool:** `uv` is recommended for managing the Python environment, but standard `pip` works too.
 *   **OpenMP:** Required for parallelization.
     *   Ubuntu/Debian: `sudo apt install libomp-dev`
