@@ -48,5 +48,5 @@ cmake --build build --config Release -j $(nproc)
 ## Conventions
 
 - **Commits:** Conventional Commits — `feat:`, `fix:`, `docs:`, `test:`, `perf:`, `chore:`, `style:`, `benchmark:`.
-- **CI** runs on `main` and `develop` (Python tests across 3.12–3.13, C++ tests, lint + type-check). Keep these green.
+- **CI** runs on `main` and `develop` (Python tests across 3.12–3.15, C++ tests, lint + type-check). Keep these green.
 - Build flags (`RCLIB_USE_OPENMP`, `RCLIB_ENABLE_EIGEN_PARALLELIZATION`, `RCLIB_ADAPTIVE_PARALLELIZATION`) default to `ON`; see `README.md` for tuning.

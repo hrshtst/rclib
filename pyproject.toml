@@ -26,6 +26,8 @@ classifiers = [
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: 3.15",
   "Topic :: Scientific/Engineering :: Physics",
   "Typing :: Typed",
 ]
@@ -133,7 +135,7 @@ build.tool-args = ["-j8"]
 [tool.cibuildwheel]
 build-verbosity = 1
 # Build for specific Python versions and skip 32-bit/musl for now
-build = "cp312-* cp313-*"
+build = "cp312-* cp313-* cp314-* cp315-*"
 build-frontend = "build[uv]"
 skip = "*-musllinux_* *-manylinux_i686"
 test-command = "pytest {project}/tests/python"
